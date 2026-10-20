@@ -1,0 +1,42 @@
+// An app's Chat (src/sdk/chat.tsx): Better Messages' conversation column, the
+// message list over the composer, filling whatever holds it. Its own, not
+// Better Messages': the messenger lays its column out itself (.bm-thread-col).
+
+.realtime-chat {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    min-height: 0;
+    overflow: hidden;
+    background: rgba(var(--bm-color-chat-bg), 1);
+    color: rgba(var(--bm-color-text-primary), 1);
+    font-family: var(--bm-messenger-font, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif);
+    font-size: var(--bm-font-size-base, 15px);
+    line-height: var(--bm-line-height-normal, 1.45);
+    -webkit-font-smoothing: antialiased;
+
+    *, *::before, *::after { box-sizing: border-box; }
+
+    // A message as it was typed: its line breaks kept, a long word broken
+    // rather than widening the bubble.
+    .bm-chat-text {
+        white-space: pre-wrap;
+        overflow-wrap: anywhere;
+    }
+
+    // The sender's name above their stack.
+    .bm-msg-stack__info .bm-name {
+        font-weight: 600;
+    }
+}
+
+// The user was taken out of the room by the app server: a quiet line where the composer was.
+.realtime-chat .bm-chat-removed {
+    flex: 0 0 auto;
+    background: rgba(var(--bm-color-composer-bg), 1);
+    border-top: 1px solid rgba(var(--bm-color-border), 1);
+    padding: 16px 12px;
+    text-align: center;
+    font-size: var(--bm-font-size-sm);
+    color: rgba(var(--bm-color-text-primary), 0.7);
+}

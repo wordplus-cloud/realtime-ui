@@ -1,0 +1,279 @@
+import React, { createRef } from 'react';
+import { act, cleanup, fireEvent, render } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { configureUi, setUiUsers } from '../src/index.ts';
+import { CallScreen, type CallParticipant } from '../src/calls.ts';
+import { CallContext } from '../src/components/calls/context.ts';
+import GroupVideoGridItem from '../src/components/calls/group-video-grid-item.tsx';
+import { PAUSED_NOTICE_MS } from '../src/inc/hooks/held.ts';
+import { fakeCall, fakeTrack, participant } from './fake-call.ts';
+
+beforeEach( () => {
+    configureUi( { translate: ( text ) => text, currentUserId: () => 42, accentColor: () => '#21759b' } );
+    setUiUsers( [ [ 34, { name: 'Ann', avatar: 'https://example.com/ann.png' } ], [ 42, { name: 'Ben' } ], [ 43, { name: 'Cara' } ] ] );
+} );
+
+afterEach( cleanup );
+
+const wrapped = ( call: ReturnType<typeof fakeCall>, layout: 'private' | 'group-video' | 'group-audio' ) =>
+    render( <CallScreen call={ { ...call, wrapper: createRef<HTMLDivElement>() as never } } layout={ layout } /> );
+
+describe( 'the private call', () => {
+    it( 'rings out with the other side\'s face, says so, and cancels', () => {
+        const call = fakeCall( { action: 'outgoing_call' } );
+        const { container } = wrapped( call, 'private' );
+
+        expect( container.querySelector( '.bm-call-wrap .bm-private-call' ) ).not.toBeNull();
+        expect( container.querySelector( '.bm-placeholder-outgoing-text' )?.textContent ).toBe( 'Calling...' );
+        expect( container.querySelector<HTMLImageElement>( '.bm-call-animation img.avatar-100' )?.src ).toBe( 'https://example.com/ann.png' );
+
+        fireEvent.click( container.querySelector( '.bm-cancel' )! );
+        expect( call.calls ).toEqual( [ 'endCall "abort"' ] );
+    } );
+
+    it( 'rings in with Answer and Reject', () => {
+        const call = fakeCall( { action: 'incoming_call' } );
+        const { container } = wrapped( call, 'private' );
+
+        expect( container.querySelector( '.bm-placeholder-incoming-text' )?.textContent ).toBe( 'Incoming Call' );
+        fireEvent.click( container.querySelector( '.bm-answer' )! );
+        fireEvent.click( container.querySelector( '.bm-cancel' )! );
+        expect( call.calls ).toEqual( [ 'answerCall', 'endCall "reject"' ] );
+    } );
+
+    it( 'shows the call\'s time, the other side\'s picture attached, and its controls', () => {
+        const video = fakeTrack();
+        const peer = participant( 'user_34', { video, audio: fakeTrack() } );
+        const call = fakeCall( {
+            participants: new Map<string, CallParticipant>( [ [ 'me', participant( 'me' ) ], [ 'user_34', peer ] ] ),
+            myMicrophoneTrack: fakeTrack(),
+        } );
+        const { container } = wrapped( call, 'private' );
+
+        expect( container.querySelector( 'video.video1' ) ).not.toBeNull();
+        expect( video.attached ).toContain( container.querySelector( 'video.video1' ) );
+        expect( container.querySelector( '.bm-disable-mic' ) ).not.toBeNull();
+        expect( container.querySelector( '.bm-enable-video' ) ).not.toBeNull();
+
+        fireEvent.click( container.querySelector( '.bm-disable-mic' )! );
+        fireEvent.click( container.querySelector( '.bm-cancel' )! );
+        expect( call.calls ).toEqual( [ 'disableMic', 'endCall' ] );
+    } );
+
+    it( 'says when the other side\'s microphone is off, and the time while there is no picture', () => {
+        const call = fakeCall( {
+            participants: new Map<string, CallParticipant>( [ [ 'me', participant( 'me' ) ], [ 'user_34', participant( 'user_34', { micMuted: true } ) ] ] ),
+        } );
+        const { container } = wrapped( call, 'private' );
+
+        expect( container.querySelector( '.bm-timer' )?.textContent ).toBe( '01:05' );
+        expect( container.querySelector( '.bm-placeholder-no-source-message' )?.textContent ).toContain( 'The microphone and camera not enabled at the other side' );
+    } );
+
+    it( 'swaps the icons where the host asks it to', () => {
+        const { container } = wrapped( fakeCall( { iconsReverted: true, myMicrophoneTrack: fakeTrack() } ), 'private' );
+        expect( container.querySelector( '.bm-disable-mic svg' ) ).not.toBeNull();
+    } );
+} );
+
+describe( 'the group calls', () => {
+    const three = () => new Map<string, CallParticipant>( [
+        [ 'me', participant( 'me', { audio: fakeTrack() } ) ],
+        [ 'user_34', participant( 'user_34', { video: fakeTrack(), audio: fakeTrack(), isSpeaking: true, audioLevel: 0.4 } ) ],
+        [ 'user_43', participant( 'user_43' ) ],
+    ] );
+
+    it( 'draw a video tile each, a speaker ringed in the accent colour, and the dock', () => {
+        const { container } = wrapped( fakeCall( { participants: three() } ), 'group-video' );
+
+        expect( container.querySelector( '.bm-call-wrap.bm-call-wrap-group .bm-group-call-container' ) ).not.toBeNull();
+        expect( container.querySelector( '.bm-group-call-controls-buttons .bm-exit-room' ) ).not.toBeNull();
+        expect( container.querySelector( '.bm-connection-status, .bm-group-call-controls-v2' ) ).not.toBeNull();
+    } );
+
+    it( 'draw an audio row each, with names from the host', async () => {
+        const { container } = wrapped( fakeCall( { participants: three() } ), 'group-audio' );
+        await act( async () => {} );
+
+        const rows = [ ...container.querySelectorAll( '.bm-group-call-input-audio' ) ];
+        expect( rows.map( ( row ) => row.getAttribute( 'data-key' ) ).sort() ).toEqual( [ 'me', 'user_34', 'user_43' ] );
+        expect( container.querySelector( '[data-key="user_34"] .bm-uname' )?.textContent ).toBe( 'Ann' );
+        expect( container.querySelector( '[data-key="me"] .bm-uname' )?.textContent ).toBe( 'Ben' );
+        expect( ( container.querySelector( '[data-key="user_34"] .bm-group-call-input-audio-inner' ) as HTMLElement ).style.boxShadow ).toContain( 'rgba(33,117,155' );
+    } );
+
+    it( 'let a moderator mute everyone, lock the room and kick, through the call\'s moderate()', async () => {
+        const call = fakeCall( { participants: three(), adminMode: true } );
+        const { container } = wrapped( call, 'group-audio' );
+        await act( async () => {} );
+
+        await act( async () => { fireEvent.click( container.querySelector( '.bm-mute-all' )! ); } );
+        await act( async () => { fireEvent.click( container.querySelector( '.bm-lock-room' )! ); } );
+        await act( async () => { fireEvent.click( container.querySelector( '[data-key="user_43"] .bm-admin-controls span' )! ); } );
+
+        expect( call.calls ).toEqual( [
+            'moderate {"act":"mute_all","type":"video"}',
+            'moderate {"act":"lock_room","type":"video"}',
+            'moderate {"act":"remove_participant","identity":"user_43","type":"audio"}',
+        ] );
+    } );
+
+    it( 'spin a moderator\'s control while its request is out, and turn a second click away', async () => {
+        let answer: ( value: unknown ) => void = () => {};
+        const asked: unknown[] = [];
+        const call = fakeCall( { participants: three(), adminMode: true, moderate: ( request ) => ( asked.push( request ), new Promise( ( resolve ) => { answer = resolve; } ) ) } );
+        const { container } = wrapped( call, 'group-video' );
+        await act( async () => {} );
+
+        await act( async () => { fireEvent.click( container.querySelector( '.bm-mute-all' )! ); } );
+        await act( async () => { fireEvent.click( container.querySelector( '.bm-mute-all' )! ); } );
+        expect( asked ).toHaveLength( 1 );
+        expect( container.querySelector( '.bm-mute-all' )?.getAttribute( 'data-busy' ) ).toBe( '1' );
+        expect( container.querySelector( '.bm-mute-all .bm-svg-animate' ) ).not.toBeNull();
+
+        await act( async () => { answer( true ); } );
+        expect( container.querySelector( '.bm-mute-all, .bm-unmute-all' )?.getAttribute( 'data-busy' ) ).toBeNull();
+    } );
+
+    it( 'offer Show Chat and Hide Chat in the dock only where the call has a chat beside it', async () => {
+        const { container, unmount } = wrapped( fakeCall( { participants: three() } ), 'group-video' );
+        expect( container.querySelector( '.bm-toggle-chat' ) ).toBeNull();
+        unmount();
+
+        const toggled: unknown[] = [];
+        const call = fakeCall( { participants: three(), chatShown: true, chatToggle: ( next ) => void toggled.push( typeof next === 'function' ? next( true ) : next ) } );
+        const shown = wrapped( call, 'group-video' ).container;
+        expect( shown.querySelector( '.bm-toggle-chat' )?.getAttribute( 'data-active' ) ).toBe( '1' );
+        fireEvent.click( shown.querySelector( '.bm-toggle-chat' )! );
+        expect( toggled ).toEqual( [ false ] );
+    } );
+
+    it( 'keep a tile through its reconnect, marked Reconnecting...', async () => {
+        // The audio grid: the video grid lays its tiles out by its measured size, which the test's page hasn't.
+        const participants = three();
+        participants.set( 'user_43', participant( 'user_43', { reconnecting: true } ) );
+        const { container } = wrapped( fakeCall( { participants } ), 'group-audio' );
+        await act( async () => {} );
+
+        expect( container.querySelector( '[data-key="user_43"] .bm-call-reconnecting' )?.textContent ).toBe( 'Reconnecting...' );
+        expect( container.querySelector( '[data-key="user_34"] .bm-call-reconnecting' ) ).toBeNull();
+    } );
+
+    it( 'show a moderation error as the host shows errors', async () => {
+        const shown: unknown[] = [];
+        configureUi( { showError: ( e ) => shown.push( e ) } );
+        const call = fakeCall( { participants: three(), adminMode: true, moderate: async () => { throw new Error( 'refused' ); } } );
+        const { container } = wrapped( call, 'group-video' );
+
+        await act( async () => { fireEvent.click( container.querySelector( '.bm-mute-all' )! ); } );
+        expect( ( shown[ 0 ] as Error ).message ).toBe( 'refused' );
+    } );
+
+    it( 'pass the tiles through the host\'s filter', async () => {
+        // A filter answers the same map for the same participants: the grid lays itself out again whenever they change.
+        const filtered = new WeakMap<object, Map<string, CallParticipant>>();
+        const without43 = ( all: Map<string, CallParticipant> ) => {
+            if ( ! filtered.has( all ) ) filtered.set( all, new Map( [ ...all ].filter( ( [ key ] ) => key !== 'user_43' ) ) );
+            return filtered.get( all )!;
+        };
+        configureUi( { applyFilters: ( name, value ) => name === 'group_video_call_items' ? without43( value as Map<string, CallParticipant> ) as never : value } );
+        const { container } = wrapped( fakeCall( { participants: three() } ), 'group-video' );
+        await act( async () => {} );
+
+        expect( container.querySelector( '[data-key="user_43"]' ) ).toBeNull();
+        configureUi( { applyFilters: ( _name, value ) => value } );
+    } );
+} );
+
+describe( 'a picture the media server paused for this page\'s download', () => {
+    beforeEach( () => { vi.useFakeTimers(); } );
+    afterEach( () => { vi.useRealTimers(); } );
+
+    const screen = ( call: ReturnType<typeof fakeCall>, layout: 'private' | 'group-video' ) =>
+        <CallScreen call={ { ...call, wrapper: createRef<HTMLDivElement>() as never } } layout={ layout } />;
+    const two = ( paused: boolean ) => new Map<string, CallParticipant>( [
+        [ 'me', participant( 'me', { audio: fakeTrack() } ) ],
+        [ 'user_34', participant( 'user_34', { video: fakeTrack(), audio: fakeTrack(), videoPaused: paused } ) ],
+    ] );
+
+    it( 'is said over the other side\'s picture in a call between two once it has held for 2 s, and no longer once it resumes', () => {
+        const { container, rerender } = render( screen( fakeCall( { participants: two( true ) } ), 'private' ) );
+
+        act( () => { vi.advanceTimersByTime( PAUSED_NOTICE_MS - 100 ); } );
+        expect( container.querySelector( '.bm-call-paused' ) ).toBeNull();
+        act( () => { vi.advanceTimersByTime( 200 ); } );
+        expect( container.querySelector( '.bm-main-video .bm-call-paused-main' )?.textContent )
+            .toBe( 'Paused: weak connectionYour connection cannot carry this video right now. The sound goes on and the video comes back by itself.' );
+
+        rerender( screen( fakeCall( { participants: two( false ) } ), 'private' ) );
+        expect( container.querySelector( '.bm-call-paused' ) ).toBeNull();
+    } );
+
+    it( 'is said on the tile, over its last frame, never on the user\'s own', () => {
+        const tile = ( key: string, extra: Partial<CallParticipant> ) => render(
+            <CallContext.Provider value={ fakeCall() }>
+                <GroupVideoGridItem unique_key={ key } participant={ participant( key, { video: fakeTrack(), ...extra } ) } width={ 50 } height={ 50 } x={ 0 } y={ 0 } />
+            </CallContext.Provider> ).container;
+
+        const paused = tile( 'user_34', { videoPaused: true } );
+        const sharing = tile( 'user_43', { screen: fakeTrack(), screenPaused: true } );
+        const own = tile( 'me', { videoPaused: true } );
+        const away = tile( 'user_44', { videoPaused: true, reconnecting: true } );
+        act( () => { vi.advanceTimersByTime( PAUSED_NOTICE_MS ); } );
+
+        expect( paused.querySelector( '.bm-call-paused .bm-call-paused-notice' )?.textContent ).toBe( 'Paused: weak connection' );
+        expect( sharing.querySelector( '.bm-call-paused' ) ).not.toBeNull();
+        expect( own.querySelector( '.bm-call-paused' ) ).toBeNull();
+        expect( away.querySelector( '.bm-call-paused' ) ).toBeNull();
+    } );
+
+    it( 'is said for the whole group call when every picture it gets is paused, and not while one still comes', () => {
+        const three = ( second: boolean ) => {
+            const people = two( true );
+            people.set( 'user_43', participant( 'user_43', { video: fakeTrack(), videoPaused: second } ) );
+            return people;
+        };
+        const { container, rerender } = render( screen( fakeCall( { participants: three( false ) } ), 'group-video' ) );
+        act( () => { vi.advanceTimersByTime( PAUSED_NOTICE_MS ); } );
+        expect( container.querySelector( '.bm-group-call-status' ) ).toBeNull();
+
+        rerender( screen( fakeCall( { participants: three( true ) } ), 'group-video' ) );
+        act( () => { vi.advanceTimersByTime( PAUSED_NOTICE_MS ); } );
+        expect( container.querySelector( '.bm-group-call-status' )?.textContent ).toBe( 'Your connection is weak: videos are paused, sound continues.' );
+
+        // What the call has to say itself comes first.
+        rerender( screen( fakeCall( { participants: three( true ), statusMessage: 'Connecting...' } ), 'group-video' ) );
+        expect( container.querySelector( '.bm-group-call-status' )?.textContent ).toBe( 'Connecting...' );
+    } );
+} );
+
+describe( 'the private call\'s controls on a touch', () => {
+    it( 'take no press from the tap that brings them back, and their own taps as before (Better Messages ticket 10500 sweep)', () => {
+        const call = fakeCall();
+        const { container } = wrapped( call, 'private' );
+        const end = container.querySelector( '.bm-cancel' )!;
+        const mic = container.querySelector( '.bm-enable-mic' )!;
+
+        // Hidden, the controls take no touch: it lands on the picture, and the click on the button shown at once.
+        fireEvent.touchStart( container.querySelector( '.bm-private-call' )! );
+        fireEvent.click( end );
+        expect( call.calls, 'a tap meant to show the controls ended the call' ).toEqual( [] );
+
+        fireEvent.touchStart( mic );
+        fireEvent.click( mic );
+        expect( call.calls ).toEqual( [ 'enableMic' ] );
+
+        // A click with no touch before it, as from a mouse or a key, is pressed as ever.
+        fireEvent.click( end );
+        expect( call.calls ).toEqual( [ 'enableMic', 'endCall' ] );
+    } );
+} );
+
+describe( 'the host', () => {
+    it( 'translates every string the screens show', () => {
+        configureUi( { translate: ( text, context ) => context === 'Private Call Screen' ? '[' + text + ']' : text } );
+        const { container } = wrapped( fakeCall( { action: 'outgoing_call' } ), 'private' );
+
+        expect( container.querySelector( '.bm-placeholder-outgoing-text' )?.textContent ).toBe( '[Calling...]' );
+    } );
+} );

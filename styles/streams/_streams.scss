@@ -1,0 +1,3893 @@
+// Easy Stream's look: the player dark, the rest light, dark, or as the visitor's system is set. Every
+// colour is a custom property on the theme root (.estream-theme, which EasyStreamApp renders), so a site
+// can restyle it without overriding rules; the accent and the corners also come from its appearance
+// settings (appearance.ts) as inline properties.
+
+// Dark paints a card of its own, so its light text never lands on a light page.
+@mixin dark {
+    --estream-text: #eceef1;
+    --estream-muted: #9aa0aa;
+    --estream-surface: #17191d;
+    --estream-surface-2: #21242a;
+    --estream-border: #30343c;
+    --estream-background: #0e1013;
+    --estream-padding: 14px;
+    color-scheme: dark;
+}
+
+// A button's text and background, kept on hover, focus and press. Themes colour every button there (`button:hover {
+// background-color: #1175e9; color: #fff }`), which outranks a rule of one class, so a button coloured by its own
+// class alone took the theme's: white text on its own light hover, or on the theme's blue. Its colours are said
+// again for those states by `html body button.<class>`, which outranks the theme's and is still outranked by any
+// rule of two classes: the player's own hover and focus, and a button's colours where it is (over the stage, in a bar).
+@mixin button-colours( $color: null, $background: null ){
+    color: $color;
+    background: $background;
+
+    @at-root html body button#{ & }:where(:hover, :focus, :active) {
+        color: $color;
+        background: $background;
+    }
+}
+
+.estream-theme {
+    --estream-accent: #2f6fde;
+    --estream-accent-text: #fff;
+    --estream-live: #e0322b;
+    --estream-danger: #c62828;
+    --estream-text: #1d1f23;
+    --estream-muted: #6b7079;
+    --estream-surface: #fff;
+    --estream-surface-2: #f4f5f7;
+    --estream-border: #e3e5e9;
+    --estream-stage: #0c0d0f;
+    --estream-radius: 8px;
+    --estream-font: inherit;
+    // Behind the whole player: the page's own, unless the theme paints a card.
+    --estream-background: transparent;
+    --estream-padding: 0px;
+    // What sits over the picture: always light on dark, whatever the theme.
+    --estream-over: rgba(18, 20, 24, 0.88);
+    --estream-over-text: #f4f5f7;
+}
+
+.estream-theme--dark {
+    @include dark;
+}
+
+@media (prefers-color-scheme: dark) {
+    .estream-theme--auto {
+        @include dark;
+    }
+}
+
+// The shell is what the layout measures: a sidebar's width of chat beside the player when there is
+// room, below it when there isn't, whatever the page's own width.
+.estream-shell {
+    container-type: inline-size;
+    width: 100%;
+}
+
+.estream-app {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 340px;
+    gap: 16px;
+    position: relative;
+    padding: var(--estream-padding);
+    border-radius: calc(var(--estream-radius) + var(--estream-padding) / 2);
+    background: var(--estream-background);
+    color: var(--estream-text);
+    font-family: var(--estream-font);
+    font-size: 15px;
+    line-height: 1.45;
+    text-align: left;
+
+    *, *::before, *::after {
+        box-sizing: border-box;
+    }
+
+    &__main {
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+    }
+
+    &__side {
+        min-width: 0;
+        display: flex;
+    }
+}
+
+// No chat, or chat always below the stream.
+.estream-app--no-chat,
+.estream-theme--chat-below .estream-app {
+    grid-template-columns: minmax(0, 1fr);
+}
+
+@container (max-width: 760px) {
+    .estream-app {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}
+
+// Browsers without container queries go by the window instead.
+@supports not (container-type: inline-size) {
+    @media (max-width: 760px) {
+        .estream-app { grid-template-columns: minmax(0, 1fr); }
+    }
+}
+
+.estream-icon {
+    width: 1.25em;
+    height: 1.25em;
+    flex: none;
+    display: block;
+}
+
+// No outline from a click, only from the keyboard: WordPress's global styles put one on everything focused on a page
+// (`.wp-site-blocks *:focus`), so the item a menu gives focus to as it opens showed a ring after a mouse click.
+.estream-theme :focus:not(:focus-visible) {
+    outline: none;
+}
+
+// The player's headings set their own type and colour: themes and the WordPress admin style h2 and h3
+// for themselves (`.entry-content h2` and the like), which would leave a dark card's title dark.
+.estream-theme {
+    .estream-info__title,
+    .estream-studio__title,
+    .estream-chat__title,
+    .estream-summary__title,
+    .estream-queue__title,
+    .estream-dialog__box h2 {
+        margin-top: 0;
+        padding: 0;
+        border: 0;
+        color: var(--estream-text);
+        font-family: var(--estream-font);
+        letter-spacing: normal;
+        text-transform: none;
+        text-align: left;
+    }
+
+    .estream-queue__title {
+        color: var(--estream-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+    }
+}
+
+.estream-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 3px 8px;
+    border-radius: 4px;
+    font-size: 0.75em;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    line-height: 1.3;
+    text-transform: uppercase;
+    background: rgba(0, 0, 0, 0.6);
+    color: #fff;
+    white-space: nowrap;
+
+    .estream-icon {
+        width: 1.2em;
+        height: 1.2em;
+    }
+
+    &--live {
+        background: var(--estream-live);
+
+        &::before {
+            content: "";
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: currentColor;
+            animation: estream-pulse 2s ease-in-out infinite;
+        }
+    }
+}
+
+@keyframes estream-pulse {
+    50% { opacity: 0.35; }
+}
+
+// The picture
+
+.estream-stage {
+    position: relative;
+    aspect-ratio: 16 / 9;
+    background: var(--estream-stage);
+    border-radius: var(--estream-radius);
+    overflow: hidden;
+    color: var(--estream-over-text);
+    isolation: isolate;
+
+    &:focus-visible {
+        outline: 2px solid var(--estream-accent);
+        outline-offset: 2px;
+    }
+
+    // At rest over the picture, the pointer goes too.
+    &--picture.estream-stage--idle {
+        cursor: none;
+    }
+}
+
+// What the stage shows without a picture: a moment of the stream, centred.
+.estream-screen {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    padding: 24px;
+    text-align: center;
+
+    &__icon {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 52px;
+        height: 52px;
+        border-radius: 50%;
+        background: rgba(255, 255, 255, 0.08);
+        color: #d6d9de;
+
+        .estream-icon {
+            width: 26px;
+            height: 26px;
+        }
+    }
+
+    &--error &__icon {
+        color: #ffb4ab;
+        background: rgba(255, 90, 80, 0.14);
+    }
+
+    &__title {
+        margin: 0;
+        max-width: 32em;
+        font-size: 1.05em;
+        font-weight: 600;
+    }
+
+    &__sub {
+        max-width: 36em;
+        color: #a4a8b0;
+        font-size: 0.9em;
+    }
+
+    &__actions {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 8px;
+        margin-top: 4px;
+    }
+
+    // Buttons over the dark stage, whatever the theme.
+    .estream-button,
+    .estream-menu__button:not(.estream-icon-button) {
+        background: rgba(255, 255, 255, 0.1);
+        border-color: rgba(255, 255, 255, 0.16);
+        color: #fff;
+
+        &:hover:not(:disabled) {
+            background: rgba(255, 255, 255, 0.18);
+        }
+    }
+}
+
+@container (max-width: 420px) {
+    .estream-screen {
+        gap: 6px;
+        padding: 12px;
+
+        &__icon {
+            width: 40px;
+            height: 40px;
+        }
+    }
+}
+
+.estream-countdown {
+    display: flex;
+    gap: 8px;
+    margin: 4px 0;
+
+    &__unit {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        min-width: 58px;
+        padding: 8px 6px 6px;
+        border-radius: calc(var(--estream-radius) * 0.75);
+        background: rgba(255, 255, 255, 0.08);
+    }
+
+    &__number {
+        font-size: 1.6em;
+        font-weight: 700;
+        line-height: 1.1;
+        font-variant-numeric: tabular-nums;
+    }
+
+    &__label {
+        color: #a4a8b0;
+        font-size: 0.72em;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+    }
+}
+
+@container (max-width: 420px) {
+    .estream-countdown__unit {
+        min-width: 46px;
+        padding: 6px 4px 4px;
+    }
+
+    .estream-countdown__number {
+        font-size: 1.25em;
+    }
+}
+
+.estream-spinner {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    border: 3px solid rgba(255, 255, 255, 0.2);
+    border-top-color: #fff;
+    animation: estream-spin 0.9s linear infinite;
+
+    &--small {
+        width: 14px;
+        height: 14px;
+        border-width: 2px;
+    }
+}
+
+@keyframes estream-spin {
+    to { transform: rotate(360deg); }
+}
+
+.estream-tiles {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    gap: 4px;
+
+    &--n1 { grid-template-columns: 1fr; }
+    &--n2 { grid-template-columns: 1fr 1fr; }
+    &--n3, &--n4 { grid-template-columns: 1fr 1fr; grid-auto-rows: 1fr; }
+
+    &--share {
+        grid-template-columns: minmax(0, 1fr) 22%;
+    }
+
+    &__main {
+        min-width: 0;
+        min-height: 0;
+        position: relative;
+    }
+
+    // The cameras beside a screen or the one speaking, each in its own shape and not the strip's height, in the middle
+    // of it.
+    &__strip {
+        display: flex;
+        flex-direction: column;
+        justify-content: safe center;
+        gap: 4px;
+        min-height: 0;
+
+        .estream-tile {
+            flex: 0 0 auto;
+            height: auto;
+            aspect-ratio: 16 / 9;
+        }
+    }
+
+    // The sharer's camera over their screen, in a corner as the logo is.
+    &__corner {
+        position: absolute;
+        z-index: 1;
+        bottom: 14px;
+        width: clamp(96px, 22%, 360px);
+        aspect-ratio: 16 / 9;
+        border-radius: calc(var(--estream-radius) * 0.75);
+        overflow: hidden;
+        box-shadow: 0 2px 12px rgba(0, 0, 0, 0.45);
+        transition: bottom 0.25s;
+
+        &--right { right: 14px; }
+        &--left { left: 14px; }
+
+        // The host's, which they drag or move with the arrow keys.
+        &--movable {
+            cursor: grab;
+            touch-action: none;
+
+            &:focus-visible {
+                outline: 2px solid var(--estream-accent);
+                outline-offset: 2px;
+            }
+        }
+
+        &--moving {
+            cursor: grabbing;
+            transition: none;
+        }
+    }
+}
+
+// Out of the bar's way while it shows.
+.estream-stage:has(> .estream-bar:not(.estream-bar--hidden)) .estream-tiles__corner {
+    bottom: 58px;
+}
+
+.estream-tile {
+    position: relative;
+    min-width: 0;
+    min-height: 0;
+    background: #1b1d21;
+    overflow: hidden;
+    height: 100%;
+
+    // The speaker's ring, over the picture.
+    &::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        border: 3px solid transparent;
+        pointer-events: none;
+        transition: border-color 0.2s;
+    }
+
+    &--speaking::after {
+        border-color: var(--estream-accent);
+    }
+
+    &__name {
+        position: absolute;
+        left: 8px;
+        bottom: 8px;
+        z-index: 1;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        max-width: calc(100% - 16px);
+        padding: 3px 8px;
+        border-radius: 4px;
+        background: rgba(0, 0, 0, 0.55);
+        font-size: 0.8em;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        transition: transform 0.2s;
+
+        span {
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+    }
+
+    &__muted {
+        display: flex;
+        color: #ff8a80;
+
+        .estream-icon {
+            width: 14px;
+            height: 14px;
+        }
+    }
+}
+
+// Names step up out of the controls' way while they show, but in the corner, which steps up whole.
+.estream-stage:not(.estream-stage--idle) .estream-tiles--n1 > .estream-tile .estream-tile__name,
+.estream-stage:not(.estream-stage--idle) .estream-tiles--n2 .estream-tile__name,
+.estream-stage:not(.estream-stage--idle) .estream-tiles__main .estream-tile__name {
+    transform: translateY(-44px);
+}
+
+.estream-video {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    background: #000;
+
+    &--contain {
+        object-fit: contain;
+    }
+
+    &--mirrored {
+        transform: scaleX(-1);
+    }
+}
+
+// Someone without a picture: their avatar (or initials) in a circle as large as the tile allows, their name under it.
+// Sized to the tile (a container), so a small tile beside a shared screen keeps them small.
+.estream-tile {
+    container-type: size;
+}
+
+.estream-theme .estream-person {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: clamp(6px, 4cqmin, 14px);
+    padding: 8px;
+    color: var(--estream-over-text);
+
+    .estream-person__avatar,
+    .estream-initials {
+        flex: none;
+        width: clamp(36px, 34cqmin, 120px);
+        height: clamp(36px, 34cqmin, 120px);
+        margin: 0;
+        padding: 0;
+        border: 0;
+        border-radius: 50%;
+        box-shadow: none;
+    }
+
+    .estream-person__avatar {
+        object-fit: cover;
+        background: #33363c;
+    }
+
+    .estream-initials {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: #33363c;
+        font-size: clamp(14px, 12cqmin, 40px);
+        font-weight: 600;
+        line-height: 1;
+    }
+
+    .estream-person__name {
+        max-width: 100%;
+        overflow: hidden;
+        font-size: clamp(12px, 5cqmin, 16px);
+        font-weight: 600;
+        line-height: 1.3;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+}
+
+// A small tile: the circle alone.
+@container (max-height: 90px) {
+    .estream-theme .estream-person__name {
+        display: none;
+    }
+}
+
+.estream-audio {
+    display: none;
+}
+
+// Over the picture: the Live badge and what the viewer needs to know, along the top.
+.estream-top {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 4;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 12px;
+    pointer-events: none;
+
+    > * {
+        pointer-events: auto;
+    }
+
+    &__count {
+        text-transform: none;
+        letter-spacing: 0;
+        font-weight: 600;
+    }
+
+    &__title {
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        font-weight: 600;
+        text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
+        transition: opacity 0.25s;
+
+        &--hidden {
+            opacity: 0;
+        }
+    }
+
+    &__weak {
+        text-transform: none;
+        letter-spacing: 0;
+        font-weight: 600;
+        background: rgba(120, 72, 0, 0.85);
+    }
+}
+
+// The controls along the bottom, on a flat band that keeps them readable over any picture (no gradients).
+.estream-bar {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 4;
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    padding: 6px 8px;
+    background: rgba(0, 0, 0, 0.55);
+    transition: opacity 0.25s, transform 0.25s;
+
+    &--hidden {
+        opacity: 0;
+        transform: translateY(6px);
+        pointer-events: none;
+    }
+
+    &__spacer {
+        flex: 1;
+    }
+
+    &__time {
+        padding: 0 8px;
+        font-size: 0.85em;
+        font-weight: 600;
+        font-variant-numeric: tabular-nums;
+        white-space: nowrap;
+    }
+}
+
+.estream-icon-button {
+    appearance: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 38px;
+    height: 38px;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    cursor: pointer;
+    transition: background-color 0.15s;
+    @include button-colours( inherit, transparent );
+
+    &:hover {
+        background: rgba(255, 255, 255, 0.14);
+    }
+
+    &:focus-visible {
+        outline: 2px solid #fff;
+        outline-offset: -2px;
+    }
+
+    .estream-icon {
+        width: 22px;
+        height: 22px;
+    }
+}
+
+// Sound: the button, and the slider opening beside it on hover or focus.
+.estream-volume {
+    display: flex;
+    align-items: center;
+
+    &__slider {
+        width: 0;
+        opacity: 0;
+        margin: 0;
+        transition: width 0.2s, opacity 0.2s, margin 0.2s;
+    }
+
+    &:hover &__slider,
+    &:focus-within &__slider {
+        width: 76px;
+        opacity: 1;
+        margin: 0 8px 0 2px;
+    }
+}
+
+@media (pointer: coarse) {
+    .estream-volume__slider {
+        display: none;
+    }
+}
+
+// A volume slider, white over the picture: the bar's, and in a Better Messages conversation, its sheet's.
+@mixin estream-slider {
+    appearance: none;
+    box-sizing: border-box;
+    height: 18px;
+    margin: 0;
+    // A theme styles a range among its form fields (a border, padding, a radius): none here.
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+    cursor: pointer;
+
+    &::-webkit-slider-runnable-track {
+        height: 4px;
+        border-radius: 2px;
+        background: linear-gradient(to right, #fff var(--estream-level, 100%), rgba(255, 255, 255, 0.3) var(--estream-level, 100%));
+    }
+
+    &::-webkit-slider-thumb {
+        appearance: none;
+        width: 12px;
+        height: 12px;
+        margin-top: -4px;
+        border-radius: 50%;
+        background: #fff;
+    }
+
+    &::-moz-range-track {
+        height: 4px;
+        border-radius: 2px;
+        background: rgba(255, 255, 255, 0.3);
+    }
+
+    &::-moz-range-progress {
+        height: 4px;
+        border-radius: 2px;
+        background: #fff;
+    }
+
+    &::-moz-range-thumb {
+        width: 12px;
+        height: 12px;
+        border: 0;
+        border-radius: 50%;
+        background: #fff;
+    }
+
+    // No box around it, which browsers also draw for a click (a slider takes the keyboard): a halo round its thumb
+    // from the keyboard, as its own focus. Over a site's own outline for whatever has focus, which some set with
+    // !important, and a theme's shadow for fields.
+    &:focus,
+    &:focus-visible {
+        outline: none !important;
+        box-shadow: none;
+    }
+
+    &:focus-visible::-webkit-slider-thumb {
+        box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.35);
+    }
+
+    &:focus-visible::-moz-range-thumb {
+        box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.35);
+    }
+}
+
+// Inside the player's theme, over a theme's `input[type="range"]`.
+.estream-theme .estream-volume__slider {
+    @include estream-slider;
+}
+
+// A menu opening from its button: the player's settings, "Add to calendar", later the studio's devices.
+.estream-menu {
+    position: relative;
+
+    &__button:not(.estream-icon-button) {
+        appearance: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 7px 14px;
+        border: 1px solid var(--estream-border);
+        border-radius: 6px;
+        background: var(--estream-surface);
+        color: var(--estream-text);
+        font: inherit;
+        font-size: 0.92em;
+        font-weight: 500;
+        cursor: pointer;
+
+        .estream-icon {
+            width: 1.15em;
+            height: 1.15em;
+        }
+    }
+
+    &__list {
+        position: absolute;
+        z-index: 10;
+        min-width: 200px;
+        max-width: min(280px, 80vw);
+        padding: 6px;
+        border-radius: calc(var(--estream-radius) * 0.75 + 2px);
+        background: var(--estream-surface);
+        color: var(--estream-text);
+        border: 1px solid var(--estream-border);
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.22);
+        text-align: left;
+        // No taller than the room beside its button (menu.tsx, the SDK's menus): the rest scrolls.
+        overflow-y: auto;
+        overscroll-behavior: contain;
+
+        &--up { bottom: calc(100% + 8px); }
+        &--down { top: calc(100% + 6px); }
+        &--end { right: 0; }
+        &--start { left: 0; }
+    }
+
+    &__heading {
+        padding: 6px 10px 4px;
+        color: var(--estream-muted);
+        font-size: 0.75em;
+        font-weight: 700;
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
+    }
+
+    &__item {
+        appearance: none;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        width: 100%;
+        padding: 8px 10px;
+        border: 0;
+        border-radius: 6px;
+        font: inherit;
+        font-size: 0.92em;
+        text-align: left;
+        cursor: pointer;
+        @include button-colours( inherit, transparent );
+
+        &:hover,
+        &:focus-visible {
+            background: var(--estream-surface-2);
+            outline: none;
+        }
+
+        &--danger {
+            @include button-colours( var(--estream-danger) );
+        }
+    }
+
+    &__tick {
+        display: flex;
+        width: 18px;
+        flex: none;
+
+        .estream-icon {
+            width: 18px;
+            height: 18px;
+        }
+    }
+
+    &__label {
+        flex: 1;
+    }
+
+    &__hint {
+        color: var(--estream-muted);
+        font-size: 0.85em;
+    }
+
+    // A line under a choice's name saying what it does.
+    &__note {
+        display: block;
+        margin-top: 2px;
+        color: var(--estream-muted);
+        font-size: 0.8em;
+        font-weight: 400;
+        line-height: 1.35;
+    }
+}
+
+// Our own tooltip (tooltip.ts), where the page has no WordPlus SDK or the browser no popovers: one for the page, in
+// its body or the element shown full screen, outside any stream's theme, so it brings its own type. Dark on any
+// theme, as over the picture.
+.estream-tooltip {
+    position: fixed;
+    top: 0;
+    left: 0;
+    z-index: 2147483600;
+    box-sizing: border-box;
+    max-width: min(260px, calc(100vw - 16px));
+    padding: 5px 9px;
+    border-radius: 6px;
+    background: rgba(18, 20, 24, 0.94);
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.22);
+    color: #f4f5f7;
+    font: 500 12px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    letter-spacing: normal;
+    text-align: center;
+    text-transform: none;
+    white-space: normal;
+    overflow-wrap: break-word;
+    pointer-events: none;
+    visibility: hidden;
+
+    // At once, as the SDK's: a tooltip that fades in reads as lag on a control the pointer is already over.
+    &--on {
+        visibility: visible;
+    }
+}
+
+// The same look on the WordPlus SDK's floater, where the page has it (tooltip.ts): it reads these on our class.
+.wplus-tooltip.estream-tip {
+    --wplus-tooltip-bg: 18, 20, 24;
+    --wplus-tooltip-ink: 244, 245, 247;
+    --wplus-tooltip-radius: 6px;
+    --wplus-tooltip-padding: 5px 9px;
+    --wplus-tooltip-font: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    --wplus-tooltip-font-size: 12px;
+    --wplus-tooltip-align: center;
+    --wplus-tooltip-shadow: 0 4px 14px rgba(0, 0, 0, 0.22);
+    // No wider than ours: a longer label wraps there.
+    --wplus-tooltip-max-width: 260px;
+}
+
+// Over the picture a menu is always dark.
+.estream-stage .estream-menu__list {
+    background: var(--estream-over);
+    color: var(--estream-over-text);
+    border-color: rgba(255, 255, 255, 0.08);
+    backdrop-filter: blur(8px);
+
+    .estream-menu__heading,
+    .estream-menu__hint {
+        color: #a4a8b0;
+    }
+
+    .estream-menu__item:hover,
+    .estream-menu__item:focus-visible {
+        background: rgba(255, 255, 255, 0.1);
+    }
+}
+
+.estream-reconnecting {
+    position: absolute;
+    top: 12px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 5;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 5px 12px;
+    border-radius: 999px;
+    background: var(--estream-over);
+    font-size: 0.85em;
+    font-weight: 600;
+}
+
+// A stalled picture: a spinner in its middle until frames come again, said to screen readers.
+.estream-buffering {
+    position: absolute;
+    inset: 0;
+    z-index: 4;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+
+    &__text {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+        clip-path: inset(50%);
+        white-space: nowrap;
+    }
+}
+
+// The statistics over the picture (stats.tsx), read while the stream plays behind them, scrolling within the picture:
+// under the badges along the top, the Live badge among them, and over the controls along the bottom. Headings are the
+// panel's own: a theme's h2 and h3 never reach them.
+.estream-stats {
+    position: absolute;
+    top: 44px;
+    inset-inline-start: 12px;
+    z-index: 6;
+    display: flex;
+    flex-direction: column;
+    width: min(340px, calc(100% - 24px));
+    max-height: calc(100% - 44px - 56px);
+    border-radius: 8px;
+    background: rgba(0, 0, 0, 0.8);
+    color: #fff;
+    font-size: 12px;
+    line-height: 1.45;
+    font-variant-numeric: tabular-nums;
+
+    &:focus-visible {
+        outline: 2px solid var(--estream-accent);
+        outline-offset: 2px;
+    }
+
+    &__head {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        padding: 8px 8px 8px 12px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+    }
+
+    &__title,
+    &__heading {
+        margin: 0;
+        padding: 0;
+        border: 0;
+        color: inherit;
+        font-family: inherit;
+        line-height: inherit;
+        letter-spacing: normal;
+        text-transform: none;
+    }
+
+    &__title {
+        margin-inline-end: auto;
+        font-size: 13px;
+        font-weight: 600;
+    }
+
+    &__heading {
+        margin-top: 10px;
+        font-size: 11px;
+        font-weight: 600;
+        color: rgba(255, 255, 255, 0.6);
+    }
+
+    &__button {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        min-height: 26px;
+        padding: 3px 8px;
+        border: 0;
+        border-radius: 6px;
+        font: inherit;
+        cursor: pointer;
+        @include button-colours( inherit, rgba(255, 255, 255, 0.12) );
+
+        .estream-icon {
+            width: 14px;
+            height: 14px;
+        }
+
+        &:hover {
+            background: rgba(255, 255, 255, 0.22);
+        }
+
+        &:focus-visible {
+            outline: 2px solid var(--estream-accent);
+            outline-offset: 1px;
+        }
+    }
+
+    &__close {
+        padding: 3px 5px;
+    }
+
+    &__body {
+        overflow-y: auto;
+        padding: 0 12px 10px;
+    }
+
+    &__rows {
+        margin: 2px 0 0;
+    }
+
+    &__row {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+
+        dt {
+            color: rgba(255, 255, 255, 0.7);
+        }
+
+        dd {
+            margin: 0;
+            text-align: end;
+            overflow-wrap: anywhere;
+        }
+    }
+
+    &__events {
+        margin: 2px 0 0;
+        padding: 0;
+        list-style: none;
+
+        time {
+            color: rgba(255, 255, 255, 0.6);
+        }
+    }
+
+    &__empty {
+        margin: 10px 0 0;
+        color: rgba(255, 255, 255, 0.7);
+    }
+}
+
+@media (forced-colors: active) {
+    .estream-stats {
+        border: 1px solid CanvasText;
+        background: Canvas;
+        color: CanvasText;
+    }
+}
+
+.estream-unmute {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 5;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 18px;
+    border: 0;
+    border-radius: 999px;
+    font: inherit;
+    font-weight: 600;
+    box-shadow: 0 6px 24px rgba(0, 0, 0, 0.35);
+    cursor: pointer;
+    @include button-colours( #111, #fff );
+
+    &:focus-visible {
+        outline: 3px solid var(--estream-accent);
+        outline-offset: 2px;
+    }
+}
+
+.estream-floating {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    overflow: hidden;
+    z-index: 3;
+
+    &__item {
+        position: absolute;
+        bottom: 40px;
+        font-size: 28px;
+        animation: estream-float 3.2s cubic-bezier(0.2, 0.6, 0.35, 1) forwards;
+        opacity: 0;
+        will-change: transform, opacity;
+    }
+}
+
+@keyframes estream-float {
+    0% { transform: translate(0, 0) scale(0.6); opacity: 0; }
+    12% { transform: translate(0, -20px) scale(1.15); opacity: 1; }
+    100% { transform: translate(var(--estream-drift, 0), -240px) scale(1); opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .estream-floating__item {
+        animation: estream-fade 1.6s ease-out forwards;
+    }
+
+    .estream-spinner { animation-duration: 2s; }
+    .estream-badge--live::before { animation: none; }
+    .estream-bar { transition: none; }
+}
+
+@keyframes estream-fade {
+    0% { opacity: 0; }
+    20% { opacity: 1; }
+    100% { opacity: 0; }
+}
+
+// Full screen: the theme root fills the screen, the picture takes all the height there is, and the chat
+// stays beside it where there is room.
+.estream-theme--full {
+    width: 100%;
+    height: 100%;
+    background: #000;
+    overflow: hidden;
+
+    .estream-shell {
+        height: 100%;
+    }
+
+    .estream-app {
+        height: 100%;
+        gap: 0;
+        padding: 0;
+        border-radius: 0;
+        background: var(--estream-surface);
+    }
+
+    .estream-app__main {
+        min-height: 0;
+        height: 100%;
+    }
+
+    .estream-stage {
+        flex: 1;
+        min-height: 0;
+        aspect-ratio: auto;
+        border-radius: 0;
+    }
+
+    .estream-info,
+    .estream-studio,
+    .estream-controls--studio {
+        display: none;
+    }
+
+    .estream-app__side {
+        min-height: 0;
+        height: 100%;
+        border-left: 1px solid var(--estream-border);
+    }
+
+    .estream-chat {
+        max-height: none;
+        min-height: 0;
+        border: 0;
+        border-radius: 0;
+    }
+}
+
+// A phone in full screen has room for the picture alone.
+@container (max-width: 760px) {
+    .estream-theme--full .estream-app__side {
+        display: none;
+    }
+}
+
+// The Appearance tab's choices.
+
+.estream-theme--system-font {
+    --estream-font: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+.estream-theme--standard .estream-stage {
+    aspect-ratio: 4 / 3;
+}
+
+// Upright, as from a phone: no taller than most of the window, centred in its column.
+.estream-theme--upright .estream-stage {
+    aspect-ratio: 9 / 16;
+    width: min(100%, calc(min(80vh, 780px) * 9 / 16));
+    align-self: center;
+}
+
+.estream-theme--full .estream-stage {
+    width: auto;
+    align-self: stretch;
+}
+
+// Beside the stream, the chat is as tall as the column beside it: it adds no height of its own to the row.
+.estream-app__side {
+    position: relative;
+    min-height: 360px;
+
+    > .estream-chat {
+        position: absolute;
+        inset: 0;
+        height: auto;
+        min-height: 0;
+    }
+}
+
+// Below it, the chat is the height the site chose.
+.estream-theme--chat-below .estream-app__side {
+    position: static;
+    min-height: 0;
+
+    > .estream-chat {
+        position: static;
+        height: var(--estream-chat-height, 480px);
+    }
+}
+
+@container (max-width: 760px) {
+    .estream-app__side {
+        position: static;
+        min-height: 0;
+
+        > .estream-chat {
+            position: static;
+            height: var(--estream-chat-height, 480px);
+        }
+    }
+}
+
+@supports not (container-type: inline-size) {
+    @media (max-width: 760px) {
+        .estream-app__side { position: static; min-height: 0; }
+        .estream-app__side > .estream-chat { position: static; height: var(--estream-chat-height, 480px); }
+    }
+}
+
+// Full screen keeps the chat beside the picture, wherever the site puts it on the page.
+.estream-theme.estream-theme--full {
+    .estream-app:not(.estream-app--no-chat) {
+        grid-template-columns: minmax(0, 1fr) 340px;
+    }
+
+    .estream-app__side {
+        position: relative;
+
+        > .estream-chat {
+            position: absolute;
+            inset: 0;
+            height: auto;
+        }
+    }
+}
+
+.estream-theme--no-avatars .estream-message__avatar {
+    display: none;
+}
+
+// The site's logo over the picture, out of the badges' and the controls' way.
+.estream-logo {
+    position: absolute;
+    z-index: 4;
+    max-width: 40%;
+    height: auto;
+    pointer-events: none;
+    user-select: none;
+    transition: bottom 0.25s, top 0.25s;
+
+    &--top-left { top: 46px; left: 14px; }
+    &--top-right { top: 14px; right: 14px; }
+    &--bottom-left { bottom: 14px; left: 14px; }
+    &--bottom-right { bottom: 14px; right: 14px; }
+}
+
+.estream-stage--picture:not(.estream-stage--idle) {
+    .estream-logo--bottom-left,
+    .estream-logo--bottom-right {
+        bottom: 58px;
+    }
+}
+
+// The cover before the start and after the end, darkened for the words over it.
+.estream-cover {
+    position: absolute;
+    inset: 0;
+    background-position: center;
+    background-size: cover;
+    background-repeat: no-repeat;
+
+    &::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.55);
+    }
+
+    + .estream-screen {
+        background: none;
+        text-shadow: 0 1px 8px rgba(0, 0, 0, 0.5);
+    }
+}
+
+// Under the picture: the title, when and how many, and what the viewer can do.
+.estream-info {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px 16px;
+
+    &__text {
+        flex: 1 1 260px;
+        min-width: 0;
+    }
+
+    &__title {
+        margin: 0;
+        font-size: 1.2em;
+        font-weight: 650;
+        line-height: 1.3;
+        overflow-wrap: anywhere;
+    }
+
+    &__meta {
+        display: flex;
+        flex-wrap: wrap;
+        margin: 2px 0 0;
+        color: var(--estream-muted);
+        font-size: 0.88em;
+
+        > span + span::before {
+            content: "·";
+            margin: 0 6px;
+        }
+    }
+
+    &__actions {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 8px;
+    }
+}
+
+// Controls
+
+.estream-controls {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+
+    &__row {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 8px;
+    }
+
+    &__spacer {
+        flex: 1;
+    }
+
+    &__hint {
+        margin: 0;
+        color: var(--estream-muted);
+        font-size: 0.9em;
+    }
+
+    &__error {
+        margin: 0;
+        color: var(--estream-danger);
+        font-size: 0.9em;
+    }
+}
+
+.estream-button {
+    appearance: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 7px 14px;
+    border: 1px solid var(--estream-border);
+    border-radius: 6px;
+    font: inherit;
+    font-size: 0.92em;
+    font-weight: 500;
+    line-height: 1.3;
+    cursor: pointer;
+    white-space: nowrap;
+    @include button-colours( var(--estream-text), var(--estream-surface) );
+
+    .estream-icon {
+        width: 1.15em;
+        height: 1.15em;
+    }
+
+    &:hover:not(:disabled) {
+        background: var(--estream-surface-2);
+    }
+
+    &:disabled {
+        opacity: 0.55;
+        cursor: default;
+    }
+
+    &:focus-visible {
+        outline: 2px solid var(--estream-accent);
+        outline-offset: 2px;
+    }
+
+    &--primary {
+        border-color: var(--estream-accent);
+        @include button-colours( var(--estream-accent-text), var(--estream-accent) );
+
+        &:hover:not(:disabled) {
+            background: var(--estream-accent);
+            filter: brightness(1.08);
+        }
+    }
+
+    &--danger {
+        @include button-colours( var(--estream-danger) );
+    }
+
+    &--danger-solid {
+        border-color: var(--estream-danger);
+        @include button-colours( #fff, var(--estream-danger) );
+
+        &:hover:not(:disabled) {
+            background: var(--estream-danger);
+            filter: brightness(1.08);
+        }
+    }
+
+    &--on {
+        border-color: var(--estream-accent);
+        @include button-colours( var(--estream-accent) );
+    }
+
+    &--off {
+        @include button-colours( var(--estream-muted) );
+    }
+
+    &--quiet {
+        border-color: transparent;
+        @include button-colours( $background: var(--estream-surface-2) );
+    }
+
+    &--small {
+        padding: 3px 10px;
+        font-size: 0.85em;
+    }
+}
+
+// The studio: a card under the picture, its head with what matters while live, its body for the moment,
+// and one bar of controls.
+.estream-studio {
+    // Its bar fits to its own width, whatever is beside it.
+    container: estream-studio / inline-size;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 14px;
+    border: 1px solid var(--estream-border);
+    border-radius: var(--estream-radius);
+    background: var(--estream-surface);
+
+    &__head {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 8px 12px;
+    }
+
+    &__title {
+        margin: 0;
+        font-size: 1em;
+        font-weight: 650;
+    }
+
+    &__status {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 6px;
+    }
+
+    &__numbers {
+        color: var(--estream-muted);
+        font-size: 0.82em;
+        font-variant-numeric: tabular-nums;
+    }
+
+    &__bar {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 8px;
+        padding-top: 12px;
+        border-top: 1px solid var(--estream-border);
+    }
+
+    // Going live, or ending, at the bar's end, on the right even when it wraps.
+    &__go {
+        margin-left: auto;
+    }
+
+    &__tool .estream-icon-button {
+        width: 36px;
+        height: 36px;
+        border: 1px solid var(--estream-border);
+        border-radius: 6px;
+        background: var(--estream-surface);
+        color: var(--estream-text);
+
+        &:hover {
+            background: var(--estream-surface-2);
+        }
+
+        &:focus-visible {
+            outline-color: var(--estream-accent);
+        }
+
+        .estream-icon {
+            width: 18px;
+            height: 18px;
+        }
+    }
+}
+
+// Where the bar is narrow, its buttons show their icons; their names stay for screen readers.
+@container estream-studio (max-width: 640px) {
+    .estream-studio__bar .estream-label {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+        clip-path: inset(50%);
+        white-space: nowrap;
+    }
+}
+
+.estream-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 3px 9px;
+    border-radius: 999px;
+    font-size: 0.82em;
+    font-weight: 600;
+    white-space: nowrap;
+    @include button-colours( var(--estream-text), var(--estream-surface-2) );
+
+    .estream-icon {
+        width: 15px;
+        height: 15px;
+    }
+
+    &__number {
+        font-variant-numeric: tabular-nums;
+    }
+
+    &__sub {
+        color: var(--estream-muted);
+        font-weight: 500;
+
+        &::before {
+            content: "·";
+            margin: 0 4px;
+        }
+    }
+
+    // A way on from what the chip says (Buy credits), in its colour.
+    &__link,
+    &__link:visited {
+        margin-left: 4px;
+        color: inherit;
+        text-decoration: underline;
+        text-underline-offset: 2px;
+    }
+
+    &--live {
+        background: var(--estream-live);
+        color: #fff;
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
+    }
+
+    &--good {
+        color: #1f8a4c;
+    }
+
+    &--warn {
+        background: #fff4dc;
+        color: #8a5a00;
+    }
+
+    // A chip that opens something (the statistics): a button that looks like the figures beside it.
+    &--button {
+        appearance: none;
+        border: 0;
+        font-family: inherit;
+        line-height: inherit;
+        cursor: pointer;
+
+        &:hover,
+        &[aria-pressed="true"] {
+            background: var(--estream-accent);
+            color: var(--estream-accent-text, #fff);
+        }
+
+        &:focus-visible {
+            outline: 2px solid var(--estream-accent);
+            outline-offset: 2px;
+        }
+    }
+}
+
+.estream-theme--dark .estream-chip--good { color: #5fd08f; }
+.estream-theme--dark .estream-chip--warn { background: #3a2c10; color: #f3c46b; }
+
+@media (prefers-color-scheme: dark) {
+    .estream-theme--auto .estream-chip--good { color: #5fd08f; }
+    .estream-theme--auto .estream-chip--warn { background: #3a2c10; color: #f3c46b; }
+}
+
+// Before anything is on: the camera here, or OBS, sharing the width between them, one under the other where it is
+// narrow. (A grid of auto-fit columns kept an empty third column on a wide card: the title spans every column, so
+// none was empty enough to drop.)
+.estream-sources {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+
+    &__title {
+        flex: 1 0 100%;
+        margin: 0;
+        font-size: 1em;
+        font-weight: 650;
+    }
+}
+
+.estream-source {
+    flex: 1 1 220px;
+    appearance: none;
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 14px;
+    border: 1px solid var(--estream-border);
+    border-radius: var(--estream-radius);
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+    transition: border-color 0.15s, box-shadow 0.15s;
+    @include button-colours( var(--estream-text), var(--estream-surface) );
+
+    &:hover:not(:disabled) {
+        border-color: var(--estream-accent);
+        box-shadow: 0 0 0 1px var(--estream-accent);
+    }
+
+    &:focus-visible {
+        outline: 2px solid var(--estream-accent);
+        outline-offset: 2px;
+    }
+
+    &:disabled {
+        opacity: 0.55;
+        cursor: default;
+    }
+
+    &__icon {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex: none;
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        background: color-mix(in srgb, var(--estream-accent) 14%, transparent);
+        color: var(--estream-accent);
+    }
+
+    &__text {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+
+        strong {
+            font-weight: 650;
+        }
+
+        span {
+            color: var(--estream-muted);
+            font-size: 0.88em;
+        }
+    }
+}
+
+// Setting up the devices before going live.
+.estream-setup {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+
+    &__row {
+        display: grid;
+        grid-template-columns: 110px minmax(0, 1fr);
+        align-items: center;
+        gap: 8px 12px;
+
+        > label,
+        > .estream-setup__label {
+            color: var(--estream-muted);
+            font-size: 0.9em;
+        }
+    }
+
+    &__field {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        min-width: 0;
+
+        select {
+            flex: 1;
+            min-width: 0;
+            max-width: 360px;
+        }
+    }
+
+}
+
+// A switch, on or off (the setup's countdown): a checkbox, drawn as a track and a knob whatever the page does to
+// checkboxes (WordPress's admin draws its own).
+.estream-switch {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 0.92em;
+    cursor: pointer;
+
+    // Over the whole switch, unseen: a click anywhere on it is the checkbox's own.
+    input {
+        position: absolute;
+        inset: 0;
+        z-index: 1;
+        width: 100%;
+        height: 100%;
+        margin: 0;
+        opacity: 0;
+        cursor: pointer;
+    }
+
+    &__track {
+        position: relative;
+        flex: none;
+        width: 34px;
+        height: 20px;
+        border-radius: 999px;
+        background: var(--estream-border);
+        transition: background 0.15s ease;
+
+        &::after {
+            content: "";
+            position: absolute;
+            top: 2px;
+            left: 2px;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: #fff;
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+            transition: transform 0.15s ease;
+        }
+    }
+
+    input:checked + &__track {
+        background: var(--estream-accent);
+
+        &::after {
+            transform: translateX(14px);
+        }
+    }
+
+    input:focus-visible + &__track {
+        outline: 2px solid var(--estream-accent);
+        outline-offset: 2px;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        &__track,
+        &__track::after {
+            transition: none;
+        }
+    }
+}
+
+// The quality to send: HD, or Full HD where the plan has it, each with the upload it needs.
+.estream-quality {
+    flex-wrap: wrap;
+    gap: 8px;
+
+    &__option {
+        display: flex;
+        flex: 1 1 170px;
+        align-items: flex-start;
+        gap: 8px;
+        max-width: 260px;
+        padding: 8px 12px;
+        border: 1px solid var(--estream-border);
+        border-radius: var(--estream-radius);
+        cursor: pointer;
+
+        input {
+            flex: none;
+            width: 16px;
+            height: 16px;
+            margin: 2px 0 0;
+            accent-color: var(--estream-accent);
+        }
+
+        strong {
+            display: block;
+            font-weight: 600;
+        }
+
+        small {
+            display: block;
+            color: var(--estream-muted);
+            font-size: 0.85em;
+        }
+
+        &:has(input:checked) {
+            border-color: var(--estream-accent);
+            box-shadow: inset 0 0 0 1px var(--estream-accent);
+        }
+
+        &--off {
+            cursor: default;
+
+            strong {
+                color: var(--estream-muted);
+            }
+        }
+    }
+}
+
+@container (max-width: 480px) {
+    .estream-setup__row {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .estream-quality__option {
+        max-width: none;
+    }
+}
+
+// How loud the microphone is.
+.estream-level {
+    position: relative;
+    flex: 1;
+    max-width: 160px;
+    height: 6px;
+    border-radius: 3px;
+    background: var(--estream-surface-2);
+    box-shadow: inset 0 0 0 1px var(--estream-border);
+    overflow: hidden;
+
+    &__bar {
+        position: absolute;
+        inset: 0 auto 0 0;
+        width: var(--estream-level, 0%);
+        border-radius: 3px;
+        // Green, then amber, then red near the top: flat bands, not a gradient.
+        background: linear-gradient(to right, #2fbf71 0 70%, #f0b429 70% 85%, #e0322b 85%);
+        background-size: 160px 100%;
+        transition: width 0.06s linear;
+    }
+
+    &--compact {
+        flex: none;
+        width: 26px;
+        height: 4px;
+        margin-left: 2px;
+    }
+}
+
+// A device's button in the bar, and its menu of the others.
+.estream-device {
+    display: inline-flex;
+    align-items: stretch;
+    border: 1px solid var(--estream-border);
+    border-radius: 6px;
+    background: var(--estream-surface);
+
+    &__toggle {
+        appearance: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 7px 12px;
+        border: 0;
+        border-radius: 5px;
+        font: inherit;
+        font-size: 0.92em;
+        font-weight: 500;
+        cursor: pointer;
+        @include button-colours( var(--estream-text), transparent );
+
+        .estream-icon {
+            width: 1.15em;
+            height: 1.15em;
+        }
+
+        &:hover {
+            background: var(--estream-surface-2);
+        }
+
+        &:focus-visible {
+            outline: 2px solid var(--estream-accent);
+            outline-offset: 1px;
+        }
+    }
+
+    &__menu {
+        display: flex;
+        border-left: 1px solid var(--estream-border);
+
+        .estream-icon-button {
+            width: 30px;
+            height: auto;
+            border-radius: 0 5px 5px 0;
+            color: var(--estream-muted);
+
+            &:hover {
+                background: var(--estream-surface-2);
+            }
+
+            .estream-icon {
+                width: 16px;
+                height: 16px;
+            }
+        }
+    }
+
+    // Off, as in calls: plain to see.
+    &--off {
+        border-color: color-mix(in srgb, var(--estream-danger) 40%, var(--estream-border));
+        background: color-mix(in srgb, var(--estream-danger) 10%, var(--estream-surface));
+
+        .estream-device__toggle {
+            color: var(--estream-danger);
+        }
+    }
+}
+
+.estream-button--large {
+    padding: 9px 18px;
+    font-weight: 650;
+}
+
+// 3, 2, 1 over the picture.
+.estream-going {
+    position: absolute;
+    inset: 0;
+    z-index: 6;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    background: rgba(0, 0, 0, 0.45);
+    pointer-events: none;
+
+    &__number {
+        font-size: 96px;
+        font-weight: 800;
+        line-height: 1;
+        color: #fff;
+        text-shadow: 0 4px 24px rgba(0, 0, 0, 0.5);
+        animation: estream-tick 1s ease-out;
+    }
+
+    &__label {
+        font-size: 0.95em;
+        font-weight: 600;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+    }
+}
+
+@keyframes estream-tick {
+    0% { transform: scale(1.6); opacity: 0; }
+    20% { transform: scale(1); opacity: 1; }
+    100% { transform: scale(0.9); opacity: 0.85; }
+}
+
+@container (max-width: 480px) {
+    .estream-going__number {
+        font-size: 64px;
+    }
+}
+
+.estream-badge--preview {
+    background: rgba(255, 255, 255, 0.18);
+    backdrop-filter: blur(6px);
+}
+
+// The end, summed up.
+.estream-summary {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+
+    &__title {
+        margin: 0;
+        font-size: 1.05em;
+        font-weight: 650;
+    }
+
+    &__figures {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+        gap: 8px;
+        width: 100%;
+        margin: 0;
+    }
+
+    &__figure {
+        display: flex;
+        flex-direction: column-reverse;
+        gap: 2px;
+        padding: 10px 12px;
+        border-radius: calc(var(--estream-radius) * 0.75);
+        background: var(--estream-surface-2);
+
+        dt {
+            color: var(--estream-muted);
+            font-size: 0.8em;
+        }
+
+        dd {
+            margin: 0;
+            font-size: 1.4em;
+            font-weight: 700;
+            font-variant-numeric: tabular-nums;
+        }
+    }
+}
+
+// Streaming from OBS: the steps, the address and key to paste into it, and whether its picture has come.
+.estream-encoder {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+
+    &__head {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 6px 12px;
+    }
+
+    &__steps {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        margin: 0;
+        padding: 0;
+        list-style: none;
+        counter-reset: estream-step;
+
+        > li {
+            position: relative;
+            padding-left: 32px;
+            counter-increment: estream-step;
+            font-size: 0.92em;
+
+            &::before {
+                content: counter(estream-step);
+                position: absolute;
+                left: 0;
+                top: 0;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                width: 22px;
+                height: 22px;
+                border-radius: 50%;
+                background: var(--estream-surface-2);
+                color: var(--estream-muted);
+                font-size: 0.8em;
+                font-weight: 700;
+            }
+        }
+    }
+
+    &__status {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin: 0;
+        font-weight: 600;
+        color: var(--estream-muted);
+
+        &::before {
+            content: "";
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--estream-border);
+        }
+
+        &--on {
+            color: var(--estream-text);
+
+            &::before {
+                background: var(--estream-accent);
+            }
+        }
+    }
+
+    &__field {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+
+        label {
+            font-size: 0.85em;
+            color: var(--estream-muted);
+        }
+    }
+}
+
+.estream-reactions {
+    display: flex;
+    gap: 2px;
+    padding: 2px;
+    border-radius: 999px;
+    background: var(--estream-surface-2);
+}
+
+.estream-reaction {
+    appearance: none;
+    width: 34px;
+    height: 34px;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    font-size: 18px;
+    line-height: 1;
+    cursor: pointer;
+    transition: transform 0.12s, background-color 0.15s;
+    @include button-colours( inherit, transparent );
+
+    &:hover {
+        background: var(--estream-surface);
+        transform: scale(1.12);
+    }
+
+    &:active {
+        transform: scale(0.9);
+    }
+
+    &:focus-visible {
+        outline: 2px solid var(--estream-accent);
+        outline-offset: 0;
+    }
+}
+
+// The guests: who is on stage, and who asks to come.
+.estream-queue {
+    padding-top: 12px;
+    border-top: 1px solid var(--estream-border);
+
+    &__title {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        margin: 4px 0 6px;
+        font-size: 0.8em;
+        font-weight: 700;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        color: var(--estream-muted);
+    }
+
+    &__count {
+        padding: 0 6px;
+        border-radius: 999px;
+        background: var(--estream-accent);
+        color: var(--estream-accent-text);
+        letter-spacing: 0;
+    }
+
+    ul {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+    }
+
+    li {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 6px 0;
+    }
+
+    &__face {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex: none;
+        width: 30px;
+        height: 30px;
+        border-radius: 50%;
+        background: var(--estream-surface-2);
+        font-size: 0.75em;
+        font-weight: 700;
+    }
+
+    &__name {
+        flex: 1;
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+        font-weight: 600;
+        overflow-wrap: anywhere;
+    }
+
+    &__note {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        color: var(--estream-muted);
+        font-size: 0.82em;
+        font-weight: 400;
+
+        .estream-icon {
+            width: 13px;
+            height: 13px;
+        }
+    }
+}
+
+// Chat
+
+.estream-chat {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 320px;
+    height: var(--estream-chat-height, 480px);
+    border: 1px solid var(--estream-border);
+    border-radius: var(--estream-radius);
+    background: var(--estream-surface);
+    overflow: hidden;
+
+    &__header {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        min-height: 44px;
+        padding: 4px 6px 4px 14px;
+        border-bottom: 1px solid var(--estream-border);
+    }
+
+    &__title {
+        margin: 0;
+        font-size: 0.95em;
+        font-weight: 650;
+    }
+
+    &__slow {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        padding: 1px 8px;
+        border-radius: 999px;
+        background: var(--estream-surface-2);
+        color: var(--estream-muted);
+        font-size: 0.8em;
+        font-weight: 600;
+
+        .estream-icon {
+            width: 14px;
+            height: 14px;
+        }
+    }
+
+    &__spacer {
+        flex: 1;
+    }
+
+    &__body {
+        position: relative;
+        flex: 1;
+        min-height: 0;
+        display: flex;
+        flex-direction: column;
+    }
+
+    &__list {
+        flex: 1;
+        min-height: 0;
+        list-style: none;
+        margin: 0;
+        padding: 8px 0;
+        overflow-y: auto;
+        overscroll-behavior: contain;
+    }
+
+    &__empty {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 4px;
+        padding: 40px 16px;
+        color: var(--estream-muted);
+        text-align: center;
+
+        .estream-icon {
+            width: 28px;
+            height: 28px;
+            margin-bottom: 4px;
+            opacity: 0.6;
+        }
+    }
+
+    &__empty-sub {
+        font-size: 0.88em;
+    }
+
+    &__unseen {
+        position: absolute;
+        left: 50%;
+        bottom: 10px;
+        transform: translateX(-50%);
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 6px 12px;
+        border: 0;
+        border-radius: 999px;
+        font: inherit;
+        font-size: 0.85em;
+        font-weight: 600;
+        white-space: nowrap;
+        box-shadow: 0 4px 14px rgba(0, 0, 0, 0.2);
+        cursor: pointer;
+        @include button-colours( var(--estream-accent-text), var(--estream-accent) );
+
+        .estream-icon {
+            width: 16px;
+            height: 16px;
+        }
+    }
+
+    &__note {
+        margin: 0;
+        padding: 8px 12px;
+        color: var(--estream-muted);
+        font-size: 0.85em;
+        border-top: 1px solid var(--estream-border);
+
+        &--error {
+            color: var(--estream-danger);
+        }
+
+        &--action {
+            display: flex;
+            justify-content: center;
+            padding: 10px 12px;
+
+            .estream-button {
+                text-decoration: none;
+            }
+        }
+    }
+
+    &__form {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        padding: 8px;
+        border-top: 1px solid var(--estream-border);
+    }
+
+    &__field {
+        position: relative;
+        flex: 1;
+        min-width: 0;
+        display: flex;
+
+        .estream-input {
+            padding-right: 40px;
+        }
+
+        .estream-emoji {
+            position: absolute;
+            right: 2px;
+            top: 50%;
+            transform: translateY(-50%);
+        }
+    }
+
+    &__left {
+        min-width: 2ch;
+        color: var(--estream-muted);
+        font-size: 0.8em;
+        font-variant-numeric: tabular-nums;
+        text-align: right;
+
+        &--low {
+            color: var(--estream-danger);
+            font-weight: 600;
+        }
+    }
+
+    &__send {
+        justify-content: center;
+        width: 40px;
+        height: 36px;
+        padding: 0;
+    }
+
+    &__wait {
+        font-weight: 700;
+        font-variant-numeric: tabular-nums;
+    }
+
+    // On the chat's surface, icon buttons take the theme's colours.
+    .estream-icon-button {
+        width: 34px;
+        height: 34px;
+        color: var(--estream-muted);
+
+        &:hover {
+            background: var(--estream-surface-2);
+            color: var(--estream-text);
+        }
+
+        &:focus-visible {
+            outline-color: var(--estream-accent);
+        }
+
+        .estream-icon {
+            width: 20px;
+            height: 20px;
+        }
+    }
+}
+
+// The message a moderator pinned over the chat.
+.estream-chat__pinned {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 8px 6px 8px 12px;
+    border-bottom: 1px solid var(--estream-border);
+    background: color-mix(in srgb, var(--estream-accent) 8%, var(--estream-surface));
+    font-size: 0.9em;
+
+    > .estream-icon {
+        width: 16px;
+        height: 16px;
+        margin-top: 2px;
+        color: var(--estream-accent);
+    }
+
+    &-body {
+        flex: 1;
+        min-width: 0;
+        overflow-wrap: anywhere;
+
+        a {
+            color: var(--estream-accent);
+            text-decoration: underline;
+        }
+    }
+
+    .estream-icon-button {
+        width: 26px;
+        height: 26px;
+        flex: none;
+    }
+}
+
+.estream-reconnecting .estream-icon {
+    width: 16px;
+    height: 16px;
+}
+
+.estream-emoji {
+    .estream-menu__list {
+        min-width: 0;
+        width: 292px;
+        padding: 8px;
+    }
+
+    &__grid {
+        display: grid;
+        grid-template-columns: repeat(8, 1fr);
+        gap: 2px;
+    }
+
+    &__item {
+        appearance: none;
+        width: 32px;
+        height: 32px;
+        padding: 0;
+        border: 0;
+        border-radius: 6px;
+        font-size: 20px;
+        line-height: 1;
+        cursor: pointer;
+        @include button-colours( inherit, transparent );
+
+        &:hover,
+        &:focus-visible {
+            background: var(--estream-surface-2);
+            outline: none;
+        }
+    }
+}
+
+.estream-input {
+    flex: 1;
+    min-width: 0;
+    padding: 7px 10px;
+    border: 1px solid var(--estream-border);
+    border-radius: 6px;
+    background: var(--estream-surface);
+    color: var(--estream-text);
+    font: inherit;
+    font-size: 0.95em;
+
+    &:focus {
+        outline: 2px solid var(--estream-accent);
+        outline-offset: -1px;
+    }
+}
+
+select.estream-input {
+    flex: none;
+}
+
+// The chat's field where the site draws emoji in a set (emoji-field.tsx): one line like the input it stands for,
+// scrolling sideways when long, its placeholder shown while empty.
+.estream-chat__editable {
+    // The input's height: its line, and the emoji drawn a little larger than the text.
+    min-height: calc(1.45em + 16px);
+    line-height: 1.45;
+    white-space: pre;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: none;
+    cursor: text;
+
+    &::-webkit-scrollbar {
+        display: none;
+    }
+
+    &:empty::before {
+        content: attr(data-placeholder);
+        color: var(--estream-muted);
+        pointer-events: none;
+    }
+
+    .estream-emoji-image {
+        vertical-align: -0.25em;
+    }
+}
+
+// An emoji in the site's set, a little larger than the text around it, as Better Messages draws them.
+.estream-emoji-image {
+    display: inline-block;
+    width: 1.3em;
+    height: 1.3em;
+    margin: 0 0.05em;
+    vertical-align: -0.3em;
+    border: 0;
+}
+
+.estream-message {
+    position: relative;
+    display: flex;
+    gap: 8px;
+    padding: 5px 12px;
+    font-size: 0.94em;
+
+    &:hover,
+    &:focus-within {
+        background: var(--estream-surface-2);
+    }
+
+    // A message naming you, marked as YouTube and Twitch do.
+    &--mention {
+        background: color-mix(in srgb, var(--estream-accent) 12%, transparent);
+        box-shadow: inset 3px 0 0 var(--estream-accent);
+
+        &:hover {
+            background: color-mix(in srgb, var(--estream-accent) 18%, transparent);
+        }
+    }
+
+    &__avatar {
+        flex: none;
+        width: 26px;
+        height: 26px;
+        margin-top: 1px;
+        border-radius: 50%;
+        object-fit: cover;
+
+        &--initials {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #fff;
+            font-size: 11px;
+            font-weight: 700;
+        }
+    }
+
+    &__body {
+        min-width: 0;
+        overflow-wrap: anywhere;
+
+        a {
+            color: var(--estream-accent);
+            text-decoration: underline;
+            text-underline-offset: 2px;
+        }
+    }
+
+    &__name {
+        font-weight: 650;
+        margin-right: 6px;
+        color: var(--estream-muted);
+    }
+
+    &--host &__name {
+        color: var(--estream-accent);
+    }
+
+    // Its time is in its tooltip, and beside the name where the site shows times.
+    &__time {
+        display: none;
+        margin-right: 6px;
+        color: var(--estream-muted);
+        font-size: 0.8em;
+        font-variant-numeric: tabular-nums;
+    }
+
+    .estream-theme--times &__time {
+        display: inline;
+    }
+
+    &__actions {
+        position: absolute;
+        right: 6px;
+        top: 2px;
+        opacity: 0;
+
+        .estream-icon-button {
+            width: 28px;
+            height: 28px;
+            background: var(--estream-surface);
+            box-shadow: 0 0 0 1px var(--estream-border);
+        }
+    }
+
+    &:hover &__actions,
+    &:focus-within &__actions {
+        opacity: 1;
+    }
+}
+
+// The chat's "Who's here" button, lit while the list shows.
+.estream-chat__people[aria-pressed="true"] {
+    color: var(--estream-accent);
+    background: color-mix(in srgb, var(--estream-accent) 12%, transparent);
+}
+
+// Who is here, in place of the messages: the signed-in, then how many visitors, and for moderators the banned.
+.estream-people {
+    height: 100%;
+    overflow-y: auto;
+    padding: 6px 0 10px;
+
+    &__list {
+        margin: 0;
+        padding: 0;
+        list-style: none;
+    }
+
+    &__more {
+        margin: 6px 12px 0;
+        color: var(--estream-muted);
+        font-size: 0.86em;
+    }
+
+    &__heading {
+        margin: 14px 12px 4px;
+        color: var(--estream-muted);
+        font-size: 0.75em;
+        font-weight: 650;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+
+        &:first-child {
+            margin-top: 6px;
+        }
+    }
+}
+
+.estream-person {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 36px;
+    padding: 3px 12px;
+    font-size: 0.94em;
+
+    &:hover,
+    &:focus-within {
+        background: var(--estream-surface-2);
+    }
+
+    .estream-message__avatar {
+        margin-top: 0;
+    }
+
+    &__name {
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        font-weight: 600;
+    }
+
+    .estream-role {
+        margin-right: 0;
+    }
+
+    &__muted {
+        display: inline-flex;
+        color: var(--estream-muted);
+
+        .estream-icon {
+            width: 14px;
+            height: 14px;
+        }
+    }
+
+    &__actions,
+    .estream-button {
+        margin-left: auto;
+    }
+
+    &--banned &__name {
+        color: var(--estream-muted);
+        font-weight: 500;
+    }
+}
+
+// Who wrote it, beside the name.
+.estream-role {
+    display: inline-block;
+    margin-right: 6px;
+    padding: 0 5px;
+    border-radius: 4px;
+    font-size: 0.7em;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    line-height: 1.6;
+    text-transform: uppercase;
+    vertical-align: 1px;
+
+    &--host {
+        background: var(--estream-accent);
+        color: var(--estream-accent-text);
+    }
+
+    &--guest {
+        background: var(--estream-surface-2);
+        color: var(--estream-text);
+        box-shadow: inset 0 0 0 1px var(--estream-border);
+    }
+}
+
+// The invitation
+
+.estream-dialog {
+    position: fixed;
+    inset: 0;
+    z-index: 100000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    background: rgba(0, 0, 0, 0.45);
+    // Outside the app, so its type is set again here, not taken from the page.
+    font-family: var(--estream-font);
+    font-size: 15px;
+    line-height: 1.45;
+    text-align: left;
+
+    *, *::before, *::after {
+        box-sizing: border-box;
+    }
+
+    &__box {
+        max-width: 400px;
+        width: 100%;
+        padding: 20px;
+        border-radius: var(--estream-radius);
+        background: var(--estream-surface);
+        color: var(--estream-text);
+        box-shadow: 0 12px 40px rgba(0, 0, 0, 0.25);
+
+        h2 {
+            margin: 0 0 8px;
+            color: inherit;
+            font-family: inherit;
+            font-size: 1.15em;
+            font-weight: 650;
+            line-height: 1.3;
+            letter-spacing: normal;
+        }
+
+        p {
+            margin: 0 0 18px;
+            color: var(--estream-muted);
+            font-size: 0.95em;
+        }
+    }
+
+    &__actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: 8px;
+    }
+}
+
+// The player's keys (shortcuts.tsx), in its dialog: each key beside what it does.
+.estream-keys {
+    margin: 4px 0 18px;
+
+    &__row {
+        display: flex;
+        align-items: baseline;
+        gap: 12px;
+        padding: 5px 0;
+        border-bottom: 1px solid var(--estream-border);
+
+        dt {
+            flex: 0 0 56px;
+        }
+
+        dd {
+            margin: 0;
+            color: var(--estream-muted);
+        }
+    }
+
+    kbd {
+        display: inline-block;
+        min-width: 24px;
+        padding: 1px 6px;
+        border: 1px solid var(--estream-border);
+        border-bottom-width: 2px;
+        border-radius: 5px;
+        background: var(--estream-surface);
+        color: var(--estream-text);
+        font-family: inherit;
+        font-size: 0.85em;
+        font-weight: 600;
+        text-align: center;
+    }
+}
+
+// Parts placed apart on a page (parts.tsx): each is a theme root of its own, with the type the app sets.
+
+.estream-part {
+    color: var(--estream-text);
+    font-family: var(--estream-font);
+    font-size: 15px;
+    line-height: 1.45;
+    text-align: left;
+
+    *, *::before, *::after {
+        box-sizing: border-box;
+    }
+}
+
+// The layer for dialogs that belong to no part adds nothing to the page.
+.estream-part--dialogs {
+    display: contents;
+}
+
+.estream-theme .estream-studio-page__title,
+.estream-theme .estream-studio-page__heading {
+    padding: 0;
+    border: 0;
+    color: var(--estream-text);
+    font-family: var(--estream-font);
+    letter-spacing: normal;
+    text-transform: none;
+    text-align: left;
+}
+
+// A host on a page without the studio: where they go live.
+.estream-hostnote {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 12px;
+    margin-bottom: 10px;
+    padding: 8px 10px 8px 12px;
+    border: 1px solid var(--estream-border);
+    border-radius: var(--estream-radius);
+    background: var(--estream-surface);
+    color: var(--estream-text);
+    font-size: 0.92em;
+
+    > .estream-icon {
+        color: var(--estream-live);
+    }
+
+    &__text {
+        flex: 1;
+        min-width: 0;
+    }
+
+    a.estream-button {
+        text-decoration: none;
+    }
+}
+
+.estream-theme--full .estream-hostnote,
+.estream-part--floating .estream-hostnote {
+    display: none;
+}
+
+// A phone that scrolled past the player while live keeps the picture at the top of the screen (`sticky`), its
+// place on the page kept meanwhile.
+.estream-part--floating {
+    position: fixed;
+    top: var(--wp-admin--admin-bar--height, 0px);
+    left: 0;
+    right: 0;
+    z-index: 99990;
+    background: var(--estream-stage);
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.3);
+
+    .estream-app {
+        padding: 0;
+        gap: 0;
+        border-radius: 0;
+    }
+
+    .estream-stage {
+        width: min(100%, calc(40vh * 16 / 9));
+        margin: 0 auto;
+        border-radius: 0;
+    }
+
+    &.estream-theme--standard .estream-stage {
+        width: min(100%, calc(40vh * 4 / 3));
+    }
+
+    &.estream-theme--upright .estream-stage {
+        width: min(100%, calc(40vh * 9 / 16));
+    }
+}
+
+// The chat as a part: the site's chat height, or the height it was given (as tall as the player beside it, or
+// the block's own).
+.estream-part--chat {
+    display: flex;
+    flex-direction: column;
+
+    > .estream-chat {
+        flex: 1;
+    }
+}
+
+.estream-part--sized > .estream-chat {
+    height: 100%;
+    min-height: 0;
+}
+
+// The stream in a Better Messages conversation (better-messages.tsx): Better Messages' own markup in the places it keeps
+// for another plugin, which its stylesheet dresses (the header's button, the group call's banner and the call's dock);
+// here only what is the stream's.
+
+// The header's button, a live dot on it while the stream is on air.
+.estream-bm-button--live {
+    position: relative;
+
+    &::after {
+        content: "";
+        position: absolute;
+        top: 5px;
+        inset-inline-end: 5px;
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        background: #e0322b;
+        box-shadow: 0 0 0 2px rgba(var(--bm-color-chat-bg, 255, 255, 255), 1);
+    }
+}
+
+// The banner over the messages: Live, the stream's title, how many watch.
+.estream-bm-banner {
+    .bm-group-call-in-progress-info {
+        flex-wrap: wrap;
+        justify-content: center;
+    }
+
+    &__badge {
+        padding: 1px 7px;
+        border-radius: 4px;
+        background: #e0322b;
+        color: #fff;
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+    }
+
+    &__title {
+        min-width: 0;
+        overflow: hidden;
+        font-weight: 600;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    &__count {
+        opacity: 0.8;
+        font-variant-numeric: tabular-nums;
+    }
+}
+
+// The stream in the call area: its picture over the call's canvas, above the dock, as a call's grid is.
+.estream-theme.estream-bm-stage {
+    --estream-stage: transparent;
+    --estream-background: transparent;
+    position: absolute;
+    inset: 0;
+    background: transparent;
+
+    > .bm-group-call-container {
+        position: absolute;
+        inset: 0;
+    }
+
+    .estream-bm-stage__picture {
+        position: absolute;
+        inset: 0 0 64px;
+    }
+
+    // The call's bar under the picture, flat: Better Messages fades it in with a gradient (none here).
+    .bm-group-call-controls-v2 {
+        background: none;
+    }
+
+    .estream-stage {
+        position: absolute;
+        inset: 0;
+        aspect-ratio: auto;
+        max-height: none;
+        border-radius: 0;
+    }
+
+    // Light on the dark stage: over a theme's colour for links in a post (`.entry-content a:not(…)`), which outranks
+    // a class or two, as Better Messages outranks it.
+    a.estream-bm-stage__studio:not(#\9) {
+        color: var(--estream-over-text);
+        text-decoration: underline;
+        text-decoration-color: rgba(255, 255, 255, 0.5);
+        text-underline-offset: 3px;
+
+        &:hover,
+        &:focus-visible {
+            color: #fff;
+            text-decoration-color: #fff;
+        }
+    }
+
+    // Turning the sound on where the browser kept it off: one of Better Messages' own buttons, in its accent, over the
+    // picture. Better Messages strips every button in its wraps with !important (no background, no padding, square
+    // corners, no shadow, the text's colour), so this takes an id's weight and !important back.
+    button.estream-unmute:not(#\9) {
+        padding: 10px 18px !important;
+        border-radius: var(--bm-radius-button, 8px) !important;
+        background: rgba(var(--bm-color-accent, 37, 99, 235), 1) !important;
+        color: #fff !important;
+        font-size: 14px !important;
+        line-height: 20px;
+        white-space: nowrap;
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3) !important;
+
+        &:hover {
+            background: rgba(var(--bm-color-accent, 37, 99, 235), 0.9) !important;
+        }
+    }
+
+    // The time on air, beside the Live badge.
+    .estream-top__time .estream-bar__time {
+        opacity: 1;
+    }
+
+    // Over each tile, as over a call's tile: the name in a pill at the bottom start, the microphone off in a red disc
+    // at the bottom end (Better Messages' _call-stage.scss).
+    .bm-group-call-input-video-inner-info {
+        position: absolute;
+        inset-inline: 0;
+        bottom: 0;
+        z-index: 2;
+        display: flex;
+        padding: 8px;
+        padding-inline-end: 40px;
+        pointer-events: none;
+    }
+
+    .bm-info-name {
+        display: inline-flex;
+        align-items: center;
+        min-width: 0;
+        max-width: 100%;
+        padding: 3px 9px;
+        border-radius: 999px;
+        background: rgba(0, 0, 0, 0.55);
+        color: #fff;
+        font-size: 12px;
+        font-weight: 600;
+        line-height: 1.3;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .bm-caller-status {
+        position: absolute;
+        z-index: 2;
+        bottom: 8px;
+        inset-inline-end: 8px;
+        display: flex;
+    }
+
+    .bm-mic-disabled {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 24px;
+        height: 24px;
+        border-radius: 50%;
+        background: rgba(var(--bm-color-recording, 239, 68, 68), 0.92);
+        color: #fff;
+        line-height: 0;
+
+        > svg {
+            width: 13px;
+            height: 13px;
+        }
+    }
+
+    // A sheet's button while its sheet is open, as a latched extra of the call's.
+    .bm-group-call-controls-buttons > .bm-configure-call[data-active],
+    .bm-group-call-controls-buttons > .estream-bm-react[data-active] {
+        background: rgba(var(--bm-color-accent), 1);
+        color: rgba(var(--bm-color-text-on-accent), 1);
+    }
+
+    // The viewer's sheet: the volume over the quality, one column as wide as a device's picker.
+    .bm-call-settings.estream-bm-watch {
+        flex-direction: column;
+        flex-wrap: nowrap;
+        align-items: stretch;
+        width: min(240px, calc(100% - 28px));
+
+        > .bm-call-setting {
+            flex: none;
+            max-width: none;
+        }
+    }
+
+    .estream-bm-volume input[type="range"] {
+        @include estream-slider;
+        display: block;
+        width: 100%;
+        margin: 7px 0;
+    }
+
+    // The reactions, a row of emoji over the dock.
+    .bm-call-settings.estream-bm-reactions {
+        gap: 2px;
+        padding: 6px;
+    }
+
+    .estream-bm-reaction {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        font-size: 22px;
+        line-height: 1;
+        cursor: pointer;
+        user-select: none;
+        transition: background 0.12s ease, transform 0.12s ease;
+
+        &:hover,
+        &:focus-visible {
+            background: rgba(255, 255, 255, 0.14);
+            outline: none;
+        }
+
+        &:active {
+            transform: scale(0.9);
+        }
+    }
+
+    // Where a call shows its connection: the host's, and how many watch.
+    .estream-bm-status {
+        gap: 6px;
+    }
+
+    .estream-bm-watching {
+        flex: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 6px 10px;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 999px;
+        background: rgba(0, 0, 0, 0.5);
+        color: #fff;
+        font-size: 13px;
+        font-variant-numeric: tabular-nums;
+        line-height: 1;
+    }
+
+    // A host's peak beside the count, set apart by a hairline and a shade softer.
+    .estream-bm-watching__peak {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        padding-left: 7px;
+        margin-left: 1px;
+        border-left: 1px solid rgba(255, 255, 255, 0.2);
+        color: rgba(255, 255, 255, 0.78);
+
+        .estream-icon {
+            width: 14px;
+            height: 14px;
+        }
+    }
+
+    // The settings sheet's rows from the left, so a field alone on its row (the speakers) sits under the first.
+    .bm-group-call-controls-v2 .bm-call-settings {
+        justify-content: flex-start;
+    }
+
+    // The host's statistics across the settings sheet, over the devices: each figure's name, then the figure.
+    .bm-call-settings > .estream-bm-statistics {
+        flex: 1 1 100%;
+        max-width: none;
+    }
+
+    .estream-bm-figures {
+        display: grid;
+        grid-template-columns: max-content 1fr;
+        gap: 5px 16px;
+        margin: 0;
+        font-size: 13px;
+        line-height: 1.35;
+
+        > div {
+            display: contents;
+        }
+
+        dt {
+            color: rgba(255, 255, 255, 0.62);
+        }
+
+        dd {
+            margin: 0;
+            color: #fff;
+            font-weight: 600;
+            font-variant-numeric: tabular-nums;
+        }
+    }
+
+    // The host's last stream, under "Your stream has ended", which says what its own title would.
+    .estream-screen .estream-summary {
+        align-items: stretch;
+        width: min(100%, 440px);
+        margin-top: 4px;
+        text-align: left;
+    }
+
+    .estream-screen .estream-summary__title {
+        display: none;
+    }
+
+    .estream-summary__figure {
+        background: rgba(255, 255, 255, 0.07);
+    }
+
+    // A control that can't act yet (Go live before a preview).
+    .bm-group-call-controls-buttons > [aria-disabled="true"] {
+        opacity: 0.45;
+        cursor: default;
+    }
+}
+
+// In full screen, the frame is the screen's.
+.estream-theme.estream-bm-stage.estream-theme--full {
+    background: #111318;
+}
+
+.estream-theme.estream-theme--full .estream-stage {
+    max-height: none;
+}
+
+// A Better Messages chat room in the chat's place: it takes the space the light chat would,
+// beside the stream, below it, as a part and in the studio, and Better Messages' room fills it, whatever height its
+// placeholder came with.
+.estream-bm-room {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 320px;
+    height: var(--estream-chat-height, 480px);
+
+    > .bm-chat-wrap {
+        flex: 1;
+        height: auto !important;
+        min-height: 0;
+    }
+}
+
+.estream-app__side > .estream-bm-room {
+    position: absolute;
+    inset: 0;
+    height: auto;
+    min-height: 0;
+}
+
+.estream-theme--chat-below .estream-app__side > .estream-bm-room {
+    position: static;
+    height: var(--estream-chat-height, 480px);
+}
+
+@container (max-width: 760px) {
+    .estream-theme:not(.estream-theme--full) .estream-app__side > .estream-bm-room {
+        position: static;
+        height: var(--estream-chat-height, 480px);
+    }
+}
+
+.estream-part--sized > .estream-bm-room {
+    height: 100%;
+    min-height: 0;
+}
+
+.estream-studio-page__panel--chat > .estream-bm-room {
+    height: auto;
+    min-height: 0;
+
+    // In the studio's Chat tab the room fills the panel edge to edge, as the light chat does: none of Better Messages'
+    // card frame, which it raises with an id's weight (`:not(#\9)`).
+    .bm-card--thread-embed:not(#\9) {
+        border: 0;
+        border-radius: 0;
+        box-shadow: none;
+    }
+}
+
+// The studio card: the way to the studio with more room, and a host live from another window.
+.estream-studio__open {
+    margin-left: auto;
+    color: var(--estream-accent);
+    font-size: 0.88em;
+    font-weight: 600;
+    text-decoration: none;
+
+    &:hover {
+        text-decoration: underline;
+    }
+}
+
+.estream-studio__elsewhere {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    margin: 0;
+    padding: 12px 14px;
+    border-radius: var(--estream-radius);
+    background: var(--estream-surface-2);
+    color: var(--estream-text);
+
+    .estream-icon {
+        margin-top: 2px;
+        color: var(--estream-live);
+    }
+}
+
+// The admin's studio page (studio-page.tsx), in the height its place gives it (the admin's content area): the
+// picture as large as fits with the controls under it, and the chat, the guests and the stream's details beside it.
+
+.estream-part--studio-page {
+    container: estream-studio-page / inline-size;
+    height: 100%;
+}
+
+// What the controls of a live stream take under the picture: the statistics and the bar, in their card.
+$studio-controls: 150px;
+
+.estream-studio-page {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    background: var(--estream-surface-2);
+    color: var(--estream-text);
+
+    &__head {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 8px 14px;
+        min-height: 60px;
+        padding: 10px 16px;
+        border-bottom: 1px solid var(--estream-border);
+        background: var(--estream-surface);
+    }
+
+    &__back {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 36px;
+        height: 36px;
+        border-radius: 8px;
+        color: var(--estream-text);
+        text-decoration: none;
+
+        &:hover {
+            background: var(--estream-surface-2);
+        }
+
+        &:focus-visible {
+            outline: 2px solid var(--estream-accent);
+        }
+    }
+
+    &__name {
+        min-width: 0;
+    }
+
+    &__title {
+        margin: 0;
+        font-size: 1.15em;
+        font-weight: 650;
+        line-height: 1.25;
+        overflow-wrap: anywhere;
+    }
+
+    &__when {
+        margin: 0;
+        color: var(--estream-muted);
+        font-size: 0.85em;
+    }
+
+    &__spacer {
+        flex: 1;
+    }
+
+    &__head a.estream-button {
+        text-decoration: none;
+    }
+
+    &__body {
+        flex: 1;
+        min-height: 0;
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) clamp(300px, 34%, 380px);
+    }
+
+    &__main {
+        container: estream-studio-main / size;
+        min-width: 0;
+        min-height: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        padding: 16px;
+        overflow: auto;
+    }
+
+    // The picture at the top, at a size of its own: as wide as the column at its shape, no taller than leaves the
+    // controls of a live stream room under it. What happens under it never moves or resizes it, so it never
+    // jumps when the tools below change size. Controls that need more room, as setting up does on a wide screen,
+    // scroll the column with it, pinned nowhere.
+    &__picture {
+        flex: none;
+        height: min(calc(100cqw * 9 / 16), calc(100cqh - #{$studio-controls}));
+        min-height: 240px;
+        container-type: size;
+        display: flex;
+        align-items: flex-start;
+        justify-content: center;
+
+        .estream-stage {
+            width: min(100cqw, calc(100cqh * 16 / 9));
+        }
+
+        &--full {
+            align-items: center;
+            background: #000;
+
+            .estream-stage {
+                border-radius: 0;
+            }
+        }
+    }
+
+    &__controls {
+        flex: none;
+        container: estream-studio / inline-size;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        padding: 14px;
+        border: 1px solid var(--estream-border);
+        border-radius: var(--estream-radius);
+        background: var(--estream-surface);
+
+        // The bar first, under the statistics while live, and what the moment needs under it, set apart.
+        > .estream-studio__bar:first-child {
+            padding-top: 0;
+            border-top: 0;
+        }
+
+        > .estream-studio__bar ~ :not(.estream-controls__error) {
+            padding-top: 12px;
+            border-top: 1px solid var(--estream-border);
+        }
+    }
+
+    // While live: time on air, viewers and their peak, messages, reactions, the connection, the picture's numbers.
+    &__stats .estream-studio__status {
+        gap: 8px;
+    }
+
+    &__side {
+        min-width: 0;
+        min-height: 0;
+        display: flex;
+        flex-direction: column;
+        border-left: 1px solid var(--estream-border);
+        background: var(--estream-surface);
+    }
+
+    &__tabs {
+        display: flex;
+        gap: 4px;
+        padding: 6px 10px 0;
+        border-bottom: 1px solid var(--estream-border);
+    }
+
+    &__tab {
+        appearance: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        margin-bottom: -1px;
+        padding: 10px 12px;
+        border: 0;
+        border-bottom: 2px solid transparent;
+        font: inherit;
+        font-weight: 600;
+        cursor: pointer;
+        @include button-colours( var(--estream-muted), none );
+
+        &:hover {
+            color: var(--estream-text);
+        }
+
+        &:focus-visible {
+            outline: 2px solid var(--estream-accent);
+            outline-offset: -2px;
+        }
+
+        &--on {
+            border-bottom-color: var(--estream-accent);
+            @include button-colours( var(--estream-text) );
+        }
+    }
+
+    &__badge {
+        min-width: 20px;
+        padding: 0 6px;
+        border-radius: 999px;
+        background: var(--estream-accent);
+        color: var(--estream-accent-text);
+        font-size: 0.78em;
+        line-height: 20px;
+        text-align: center;
+    }
+
+    &__panel {
+        flex: 1;
+        min-height: 0;
+        display: flex;
+        flex-direction: column;
+        padding: 14px;
+        overflow: auto;
+
+        &--chat {
+            padding: 0;
+            overflow: hidden;
+
+            > .estream-chat {
+                flex: 1;
+                height: auto;
+                min-height: 0;
+                border: 0;
+                border-radius: 0;
+            }
+
+            // The tab names it already; its header keeps slow mode and the moderators' settings.
+            .estream-chat__title {
+                position: absolute;
+                width: 1px;
+                height: 1px;
+                overflow: hidden;
+                clip-path: inset(50%);
+                white-space: nowrap;
+            }
+        }
+
+        .estream-queue {
+            padding: 0;
+            border: 0;
+        }
+    }
+
+    &__details {
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+
+        section {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 8px;
+            width: 100%;
+        }
+
+        .estream-encoder__field {
+            width: 100%;
+        }
+
+        a.estream-button {
+            text-decoration: none;
+        }
+    }
+
+    &__heading {
+        margin: 0;
+        color: var(--estream-muted);
+        font-size: 0.78em;
+        font-weight: 650;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+    }
+
+    &__note {
+        margin: 0;
+        color: var(--estream-muted);
+        font-size: 0.92em;
+    }
+
+    &__refused {
+        margin: 0;
+        padding: 32px 24px;
+    }
+}
+
+.estream-theme--standard .estream-studio-page__picture {
+    height: min(calc(100cqw * 3 / 4), calc(100cqh - #{$studio-controls}));
+
+    .estream-stage {
+        width: min(100cqw, calc(100cqh * 4 / 3));
+    }
+}
+
+.estream-theme--upright .estream-studio-page__picture {
+    height: min(calc(100cqw * 16 / 9), calc(100cqh - #{$studio-controls}));
+
+    .estream-stage {
+        width: min(100cqw, calc(100cqh * 9 / 16));
+    }
+}
+
+// Narrow, by the room it is given (the admin's content area, beside WordPress's menu and the plugin's tabs, or a
+// phone): everything in one column that scrolls under the head, the picture as wide as it is, the tabs under it.
+@container estream-studio-page (max-width: 820px) {
+    .estream-studio-page {
+        &__body {
+            display: flex;
+            flex-direction: column;
+            overflow-y: auto;
+        }
+
+        &__main {
+            flex: none;
+            overflow: visible;
+            container-type: normal;
+        }
+
+        // As wide as the column, and at the top of it.
+        &__picture,
+        .estream-theme--standard &__picture,
+        .estream-theme--upright &__picture {
+            height: auto;
+            min-height: 0;
+            container-type: inline-size;
+
+            .estream-stage {
+                width: 100%;
+            }
+        }
+
+        &__side {
+            flex: none;
+            height: max(420px, 70%);
+            border-left: 0;
+            border-top: 1px solid var(--estream-border);
+        }
+    }
+
+    .estream-theme--upright .estream-studio-page__picture .estream-stage {
+        width: min(100%, calc(70vh * 9 / 16));
+    }
+}
+
+// The Live stream block's ready layouts (the WordPress plugin's Easy_Stream_Render::LAYOUTS): the stream's parts
+// in a column or two, the chat beside the player down to a phone's width, under it below that.
+
+.estream-layout {
+    container-type: inline-size;
+    width: 100%;
+
+    &__grid {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr);
+        gap: 16px;
+        align-items: start;
+    }
+
+    &__main,
+    &__side {
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+    }
+}
+
+@container (min-width: 600px) {
+    .estream-layout--side .estream-layout__grid {
+        grid-template-columns: minmax(0, 1fr) clamp(260px, 32%, 360px);
+    }
+
+    // Upright: the player as wide as its shape at the window's height, the chat beside it.
+    .estream-layout--vertical .estream-layout__grid {
+        grid-template-columns: minmax(0, calc(min(80vh, 780px) * 9 / 16)) minmax(260px, 360px);
+        justify-content: center;
+    }
+}
+
+// The WordPress plugin's blocks in a row (the Row block, or any flex box a theme or page builder lays them out in),
+// which sizes each to what it holds: a player has no width of its own (its height follows its width), so it would
+// shrink away. The player, the details and the studio take the room there is, from a size each reads at; the chat
+// keeps a sidebar's width beside them, and every one wraps under the others where the row is too narrow. A width
+// chosen for one in the editor (Row's Fit, Fill or Fixed) is the block's own class, which outweighs these.
+:where(.wp-block-wordplus-stream-player) {
+    flex: 1 1 480px;
+    min-width: min(100%, 280px);
+}
+
+:where(.wp-block-wordplus-stream-chat) {
+    flex: 0 1 340px;
+    min-width: min(100%, 260px);
+}
+
+:where(.wp-block-wordplus-stream-details, .wp-block-wordplus-stream-studio, .wp-block-wordplus-stream-live-stream) {
+    flex: 1 1 100%;
+    min-width: 0;
+}

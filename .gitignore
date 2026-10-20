@@ -1,0 +1,9 @@
+node_modules/
+# npm run build and npm run pack: the build and the tarball Better Messages copies
+dist/
+*.tgz
+
+# The gallery page as built for the picture checks, and their results
+gallery/build/
+test-results/
+playwright-report/

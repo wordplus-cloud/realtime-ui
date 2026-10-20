@@ -1,0 +1,768 @@
+// Better Messages — Design Token Source of Truth
+// Spec: docs/design/tokens-spec.md
+//
+// All values authoring follows the rules in the spec:
+//   - Colors are RGB triples ("r, g, b") so consumers can compose alpha
+//   - Sizes carry units
+//   - Numbers (z-index, weights, density) are unitless
+//   - Semantic tokens reference scale tokens via var(), never bake values
+//
+// Consumption pattern:
+//   color: rgba(var(--bm-color-text-primary), 1);
+//   background: rgba(var(--bm-color-bg-secondary), 0.6);
+//
+// Or via the SCSS helper in _helpers.scss:
+//   color: bm-color(text-primary);
+//   background: bm-color(bg-secondary, 0.6);
+
+// ============================================================================
+// LIGHT MODE (default :root)
+// ============================================================================
+
+// The cells of the colour matrix beyond the two lists: each part's stock
+// literal, light and dark, emitted as --bm-color-<cell>-<part>. PHP prints
+// the same values from the registry; these keep the sheet coherent alone.
+$bm-cell-stock: (
+  bg: (255, 255, 255), text: (17, 24, 39), preview: (107, 114, 128), muted: (107, 114, 128), icon: (107, 114, 128),
+  border: (229, 231, 235), field: (249, 250, 251), accent: (37, 99, 235), accent-text: (255, 255, 255),
+  self-bg: (37, 99, 235), self-text: (255, 255, 255), self-name: (55, 65, 81),
+  other-bg: (243, 244, 246), other-text: (17, 24, 39), other-name: (55, 65, 81)
+);
+$bm-cell-stock-dark: (
+  bg: (15, 23, 42), text: (241, 245, 249), preview: (148, 163, 184), muted: (148, 163, 184), icon: (148, 163, 184),
+  border: (51, 65, 95), field: (17, 25, 47), accent: (96, 165, 250), accent-text: (255, 255, 255),
+  self-bg: (37, 99, 235), self-text: (255, 255, 255), self-name: (203, 213, 225),
+  other-bg: (38, 50, 82), other-text: (241, 245, 249), other-name: (203, 213, 225)
+);
+$bm-cell-head: (bg, text, muted, border);
+$bm-cell-reply: (bg, text, muted, border, accent, accent-text);
+$bm-cell-list: (bg, text, preview, muted, icon, border, field, accent, accent-text);
+$bm-cell-area: (bg, text, muted, border, self-bg, self-text, self-name, other-bg, other-text, other-name);
+$bm-cells: (
+  header: $bm-cell-head, reply: $bm-cell-reply,
+  mc-head: $bm-cell-head, mc: $bm-cell-area, mc-reply: $bm-cell-reply,
+  dock: $bm-cell-reply, wlist: $bm-cell-list,
+  mob-head: $bm-cell-head, mob: $bm-cell-area, mob-reply: $bm-cell-reply, mob-list: $bm-cell-list,
+  mob-tabs: (bg, icon, border, accent, accent-text)
+);
+$bm-cells-list: (wlist, mob-list, mob-tabs);
+
+@mixin bm-cell-stock($stock, $list-field) {
+  @each $cell, $parts in $bm-cells {
+    @each $part in $parts {
+      $value: map-get($stock, $part);
+      @if $part == field and index($bm-cells-list, $cell) {
+        $value: $list-field;
+      }
+      --bm-color-#{$cell}-#{$part}: #{$value};
+      @if $part == accent-text {
+        --bm-color-#{$cell}-accent-text-auto: #{$value};
+      }
+    }
+  }
+}
+
+:root {
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // §3.1 — Surfaces
+  // ──────────────────────────────────────────────────────────────────────────
+
+  --bm-color-bg: 255, 255, 255;
+  --bm-color-bg-secondary: 249, 250, 251;
+  --bm-color-bg-elevated: 255, 255, 255;
+  --bm-color-bg-hover: 243, 244, 246;
+  --bm-color-bg-active: 235, 240, 246;
+  --bm-color-scrim: 0, 0, 0;
+
+  // The notification card, settable at Appearance → Colors → Notifications.
+  // These are the Inverted values — the text colour as the card, the elevated
+  // surface as its ink — and they stay the Inverted ones whatever the admin
+  // chooses, because this file IS the baseline design.php measures a resolved
+  // colour against before deciding to print it. Match the messenger and any
+  // hand-set colour both differ from what is here, so both reach the site.
+  --bm-color-toast-bg: 17, 24, 39;
+  --bm-color-toast-text: 255, 255, 255;
+  --bm-color-toast-border: 50, 56, 69;
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // §3.1b — Surface paint slots
+  // Per-zone retint targets so presets can hit "look like X" without touching
+  // the neutral surface scale. Default each slot to a sensible neutral; presets
+  // override only the slots they care about.
+  // ──────────────────────────────────────────────────────────────────────────
+
+  --bm-color-card-bg: 255, 255, 255;
+  --bm-color-card-border: 229, 231, 235;
+  --bm-color-inbox-bg: 249, 250, 251;
+  // The side conversations list is a surface of its own: background, text,
+  // border and field fill. Text, border and fields follow the conversation
+  // until the admin sets them; the registry blends the side list's muted
+  // text, hover rows and fields from this pair rather than the base one.
+  --bm-color-inbox-text: 17, 24, 39;
+  --bm-color-inbox-border: 229, 231, 235;
+  --bm-color-inbox-field: 255, 255, 255;
+  --bm-color-inbox-accent: 37, 99, 235;
+  --bm-color-inbox-accent-text: 255, 255, 255;
+  --bm-color-inbox-accent-text-auto: 255, 255, 255;
+  --bm-color-inbox-muted: 107, 114, 128;
+  --bm-color-inbox-preview: 107, 114, 128;
+  --bm-color-inbox-icon: 107, 114, 128;
+  // The conversations list on its own — mobile, a single-column messenger,
+  // the mini widgets — is a second surface that follows the conversation
+  // colours until set, so it stays white while the side list carries a tint.
+  --bm-color-list-bg: 255, 255, 255;
+  --bm-color-list-text: 17, 24, 39;
+  --bm-color-list-border: 229, 231, 235;
+  --bm-color-list-field: 255, 255, 255;
+  --bm-color-list-accent: 37, 99, 235;
+  --bm-color-list-accent-text: 255, 255, 255;
+  --bm-color-list-accent-text-auto: 255, 255, 255;
+  --bm-color-list-muted: 107, 114, 128;
+  --bm-color-list-preview: 107, 114, 128;
+  --bm-color-list-icon: 107, 114, 128;
+  // Small glyphs (tab icons, status ticks, flags) and the preview line under
+  // a conversation name, each a colour of its own per surface; the muted
+  // text is what they follow until set.
+  --bm-color-icon: 107, 114, 128;
+  --bm-color-preview: 107, 114, 128;
+  --bm-color-preview-unread: 55, 65, 81;
+  // Text inside a field, picked to read on the field fill: the surface text
+  // when it does, else whichever stock text does. Placeholders and field
+  // icons are a blend of it toward the fill.
+  --bm-color-field-text-fallback: 17, 24, 39;
+  --bm-color-field-text: 17, 24, 39;
+  --bm-color-field-placeholder: 107, 114, 128;
+  @include bm-cell-stock($bm-cell-stock, (255, 255, 255));
+  // The background of whatever surface an element sits on: the conversation
+  // here, re-pointed to the zone's background inside each zone. For rings
+  // and cut-outs that must match their surface exactly.
+  --bm-color-surface: 255, 255, 255;
+  --bm-color-chat-bg: 255, 255, 255;
+  --bm-color-composer-bg: 255, 255, 255;
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // §3.2 — Text
+  // ──────────────────────────────────────────────────────────────────────────
+
+  --bm-color-text-primary: 17, 24, 39;
+  --bm-color-text-secondary: 55, 65, 81;
+  --bm-color-text-tertiary: 107, 114, 128;
+  --bm-color-text-disabled: 165, 171, 182;
+  // Links in messages under Outlined and Classic. Like the two bubble ones
+  // below, it is the text around the link until an admin sets it.
+  --bm-color-text-link: 17, 24, 39;
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // §3.3 — Borders
+  // ──────────────────────────────────────────────────────────────────────────
+
+  --bm-color-border: 229, 231, 235;
+  --bm-color-border-strong: 156, 163, 175;
+  --bm-color-border-subtle: 243, 244, 246;
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // §3.4 — Brand / accent
+  // ──────────────────────────────────────────────────────────────────────────
+
+  // Default is neutral slate (slate-500). Presets override with their own
+  // accent. Override at :root via the admin Design tab.
+  --bm-color-accent: 37, 99, 235;
+  --bm-color-accent-hover: 29, 78, 216;
+  --bm-color-accent-pressed: 30, 64, 175;
+  --bm-color-accent-subtle: 241, 245, 249;
+  --bm-color-text-on-accent: 255, 255, 255;
+  // The tint laid over a control while it is hovered or pressed.
+  --bm-button-hover: rgba(0, 0, 0, 0.09);
+  --bm-button-active: rgba(0, 0, 0, 0.15);
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // §3.5 — Semantic state
+  // ──────────────────────────────────────────────────────────────────────────
+
+  --bm-color-success: 34, 197, 94;
+  --bm-color-success-bg: 220, 252, 231;
+  --bm-color-warning: 245, 158, 11;
+  --bm-color-warning-bg: 254, 243, 199;
+  --bm-color-danger: 220, 53, 69;
+  --bm-color-danger-bg: 248, 215, 218;
+  --bm-color-info: 13, 110, 253;
+  --bm-color-info-bg: 207, 244, 252;
+  // Toast fills. A toast is a solid card floating over the page and its
+  // text is white, so these are picked for that contrast and stay the
+  // same in both themes: the status tokens above are tuned for icons and
+  // tints on the messenger's own surfaces, not for carrying text. Amber
+  // keeps dark ink instead (see _toasts.scss).
+  --bm-toast-fill-success: 21, 128, 61;
+  --bm-toast-fill-error: var(--bm-color-danger);
+  --bm-toast-fill-warning: var(--bm-color-warning);
+  --bm-toast-fill-info: 37, 99, 235;
+  // 2.0's favorite star (#fdae00): the one control colour that never follows
+  // the accent, so a favorited message reads the same on every site.
+  --bm-color-favorite: 253, 174, 0;
+  // Inline alerts: an ink that reads on the status tint.
+  --bm-alert-error-color: #842029;
+  --bm-alert-error-bg: rgba(var(--bm-color-danger-bg), 1);
+  --bm-alert-error-border-color: rgba(var(--bm-color-danger), 1);
+  --bm-alert-info-color: #055160;
+  --bm-alert-info-bg: rgba(var(--bm-color-info-bg), 1);
+  --bm-alert-info-border-color: rgba(var(--bm-color-info), 1);
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // §3.6 — Presence
+  // ──────────────────────────────────────────────────────────────────────────
+
+  --bm-color-online: 61, 165, 18;
+  // Two weights of one hue, split by what each has to survive. A dot is read
+  // as a shape and gets away with 3.19:1 on a white row; as *text* that is
+  // not enough, so a presence LABEL takes the darker cast — 5.09:1 on white,
+  // and it still clears AA on a hovered or active row.
+  --bm-color-online-text: 18, 128, 18;
+  // And the ink for anything drawn ON the green — the online count in the
+  // side panel, the mobile tab bar, the mini widget panel, the live dot in
+  // the rail. Those are four surfaces rendering the same badge, and four
+  // copies of a literal white is how they drift apart. Named like
+  // --bm-color-text-on-accent, which means exactly this for the accent.
+  //
+  // Not an admin control, because --bm-color-online is not one either: the
+  // ground never moves, so the ink on it should not be something the palette
+  // can reach. One value, no dark variant — the badge is its own ground.
+  --bm-color-text-on-online: 255, 255, 255;
+  --bm-color-away: 245, 158, 11;
+  --bm-color-busy: 220, 53, 69;
+  --bm-color-offline: 156, 163, 175;
+  --bm-color-typing: var(--bm-color-text-tertiary);
+  --bm-color-recording: 232, 65, 65;
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // §3.7 — Message bubbles (semantic, RTL-safe)
+  // ──────────────────────────────────────────────────────────────────────────
+
+  --bm-color-bubble-self-bg: 37, 99, 235;
+  --bm-color-bubble-self-text: 255, 255, 255;
+  --bm-color-bubble-self-nickname: 55, 65, 81;
+  --bm-color-bubble-self-link: 255, 255, 255;
+  // The outline each side is drawn with under Outlined: your own background
+  // and the conversation border until an admin sets them.
+  --bm-color-bubble-self-outline: 37, 99, 235;
+  --bm-color-bubble-other-bg: 243, 244, 246;
+  --bm-color-bubble-other-text: 17, 24, 39;
+  --bm-color-bubble-other-nickname: 55, 65, 81;
+  --bm-color-bubble-other-link: 17, 24, 39;
+  --bm-color-bubble-other-outline: 229, 231, 235;
+  // The seen tick on a filled own bubble: the accent where it reads 3:1 on
+  // that bubble, the bubble's own text where it does not. Stock paints the
+  // own bubble the accent itself, so the stock value is the text. Derived in
+  // PHP (inc/design-schema.php) and printed only when a palette moves it.
+  --bm-color-bubble-self-seen: 255, 255, 255;
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // §3.8 — Mentions / sticky-date / tooltip
+  // ──────────────────────────────────────────────────────────────────────────
+
+  --bm-color-mention-bg: 219, 234, 254;
+  --bm-color-mention-text: 30, 64, 175;
+  --bm-color-sticky-date-bg: 17, 24, 39;
+  --bm-color-sticky-date-text: 255, 255, 255;
+  --bm-color-tooltip-bg: 17, 24, 39;
+  --bm-color-tooltip-text: 255, 255, 255;
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // §3.9 — Scrollbar (full rgba strings — alpha is fixed)
+  // ──────────────────────────────────────────────────────────────────────────
+
+  --bm-color-scrollbar: rgba(0, 0, 0, 0.1);
+  --bm-color-scrollbar-hover: rgba(0, 0, 0, 0.55);
+  --bm-color-scrollbar-active: rgba(0, 0, 0, 0.7);
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // §4 — Density modifier (precedes spacing scale)
+  // ──────────────────────────────────────────────────────────────────────────
+
+  --bm-density: 1;
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // §4 — Spacing scale
+  // ──────────────────────────────────────────────────────────────────────────
+
+  --bm-space-2xs: calc(2px * var(--bm-density));
+  --bm-space-xs: calc(4px * var(--bm-density));
+  --bm-space-sm: calc(8px * var(--bm-density));
+  --bm-space-md: calc(12px * var(--bm-density));
+  --bm-space-lg: calc(16px * var(--bm-density));
+  --bm-space-xl: calc(24px * var(--bm-density));
+  --bm-space-2xl: calc(32px * var(--bm-density));
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // §5 — Typography
+  // ──────────────────────────────────────────────────────────────────────────
+
+  // The messenger brings its own type rather than inheriting the theme's:
+  // themes set body text for articles, not for a chat column, and it looked
+  // wrong out of the box on plenty of them. This is the stack 2.0 shipped for
+  // its whole life, so an upgraded site reads as it did on Apple platforms —
+  // with Segoe UI and Roboto inserted, which 2.0 lacked, so Windows and
+  // Android reach their own UI face instead of falling through to Arial.
+  // Appearance → Typography → Font family sets this token; its "Inherit from
+  // the theme" choice stores the literal `inherit`, which is what the old
+  // empty default meant through the var() fallback below.
+  --bm-messenger-font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+
+  --bm-font-family-mono: "SF Mono", Menlo, Consolas, monospace;
+
+  // One-knob font scaling. Admin ships this as a slider; presets bump it for
+  // larger / smaller-feeling messengers. Default 1 = no scaling.
+  --bm-font-size-x: 1;
+
+  --bm-font-size-xs: calc(11px * var(--bm-font-size-x));
+  --bm-font-size-sm: calc(13px * var(--bm-font-size-x));
+  --bm-font-size-base: 15px;
+  --bm-font-size-md: calc(15px * var(--bm-font-size-x));
+  --bm-font-size-lg: calc(16px * var(--bm-font-size-x));
+  --bm-font-size-xl: calc(18px * var(--bm-font-size-x));
+  --bm-font-size-2xl: calc(22px * var(--bm-font-size-x));
+  --bm-font-size-name: 12px;
+
+  --bm-line-height-tight: 1.15;
+  --bm-line-height-normal: 1.45;
+  --bm-line-height-relaxed: 1.6;
+
+  --bm-font-weight-regular: 400;
+  --bm-font-weight-medium: 500;
+  --bm-font-weight-semibold: 600;
+  --bm-font-weight-bold: 700;
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // §6 — Radius (scale + semantic)
+  // ──────────────────────────────────────────────────────────────────────────
+
+  // Master radius knob. Drives the whole scale so admin/preset can re-shape
+  // the messenger by changing one value. Defaults preserve the previous
+  // hard-coded scale (master 8 → xs 2 / sm 4 / md 8 / lg 12 / xl 16).
+  --bm-radius: 8px;
+
+  --bm-radius-xs: calc(var(--bm-radius) * 0.25);
+  --bm-radius-sm: calc(var(--bm-radius) * 0.5);
+  --bm-radius-md: var(--bm-radius);
+  --bm-radius-lg: calc(var(--bm-radius) * 1.5);
+  --bm-radius-pill: 999px;
+  --bm-radius-circle: 50%;
+
+  --bm-radius-bubble: 14px;
+  --bm-radius-bubble-head: 50%;
+  --bm-radius-avatar: var(--bm-radius-circle);
+  --bm-radius-button: var(--bm-radius-sm);
+  // sm, not md: every real input in the messenger (composer, subject,
+  // selects, the tag field) shipped at the sm step, and the Inputs design
+  // option has to describe what they actually render.
+  --bm-radius-input: var(--bm-radius-sm);
+  --bm-radius-card: var(--bm-radius-lg);
+  --bm-radius-panel: var(--bm-radius-lg);
+  --bm-radius-popover: var(--bm-radius-md);
+  --bm-radius-tooltip: var(--bm-radius-sm);
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // §7 — Shadow (scale + semantic compound)
+  // ──────────────────────────────────────────────────────────────────────────
+
+  // Shadows are disabled across the messenger per the design's flat-chrome direction.
+  // Every semantic + scale token resolves to `none` so any rule that uses
+  // them inherits the flat look. Individual partials should NOT hard-code
+  // drop-shadows — use these tokens. Functional rings (avatar presence
+  // halo, focus halo) still use raw `box-shadow: 0 0 0 Npx ...` inline
+  // because they're strokes, not depth shadows.
+  --bm-shadow-xs: none;
+  --bm-shadow-sm: none;
+  --bm-shadow-md: none;
+
+  --bm-shadow-input: none;
+  --bm-shadow-input-focus: 0 0 0 3px rgba(var(--bm-color-accent), 0.15);
+  --bm-shadow-card: none;
+  --bm-shadow-popover: none;
+  --bm-shadow-modal: none;
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // §8 — Motion
+  // ──────────────────────────────────────────────────────────────────────────
+
+  --bm-duration-instant: 75ms;
+  --bm-duration-fast: 150ms;
+  --bm-duration-base: 200ms;
+  --bm-duration-slow: 300ms;
+  --bm-duration-slower: 500ms;
+
+  --bm-ease-out: cubic-bezier(0.0, 0.0, 0.2, 1);
+  --bm-ease-in-out: cubic-bezier(0.4, 0.0, 0.2, 1);
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // §9 — Z-index scale
+  // ──────────────────────────────────────────────────────────────────────────
+
+  // Tooltips must sit above everything they can be hovered over — modals
+  // (100001), the call surface, and the fullscreen lightbox / image-editor
+  // (2147483600) — so they are never clipped behind their host. Pin to the max.
+  --bm-z-tooltip: 2147483647;
+  --bm-z-overlay: 800;
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // §10 — Layout / sizing
+  // ──────────────────────────────────────────────────────────────────────────
+
+  --bm-sidebar-width: 320px;
+
+  // The messenger's height on the messages page (Appearance → Layout →
+  // Messenger size): the space reserved for a sticky header and the two
+  // limits it fills the window between.
+  --bm-viewport-offset: 0px;
+  --bm-min-height: 450px;
+  --bm-max-height: 650px;
+
+  // Room kept beside every bubble for the hover actions, which sit outside it
+  // (left/right: 100%). Without a reserve, a 100% bubble pushes them past the
+  // edge of the list and they are clipped out of reach.
+  --bm-msg-actions-space: 96px;
+  --bm-bubble-max-width: 70%;
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // §12 — Bubble shape variants (theme-overridable)
+  // ──────────────────────────────────────────────────────────────────────────
+
+  --bm-bubble-tail: 0;
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // §13 — Focus ring (accessibility)
+  // ──────────────────────────────────────────────────────────────────────────
+
+  --bm-focus-ring-width: 3px;
+  --bm-focus-ring-offset: 1px;
+  --bm-focus-ring-color: rgba(var(--bm-color-accent), 0.4);
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // Mini widgets and mini chats — sizing the admin Design tab owns
+  // ──────────────────────────────────────────────────────────────────────────
+
+  --bm-radius-date-pill: 16px;
+  --bm-mini-widget-offset-x: 20px;
+  --bm-mini-widget-offset-y: 0px;
+  --bm-mobile-button-bottom: 20px;
+  --bm-mini-widget-width: 320px;
+  --bm-mini-widget-height: 450px;
+  --bm-radius-mini-widget: 12px;
+  --bm-mini-chat-width: 300px;
+  --bm-mini-chat-height: 450px;
+  --bm-radius-mini-chat-button: var(--bm-radius-md);
+  --bm-radius-bubble-button: 50%;
+  --bm-bubble-size: 56px;
+  --bm-bubble-head-size: 50px;
+  --bm-mini-chats-offset: calc(var(--bm-mini-widget-width) + var(--bm-mini-widget-offset-x) + 10px);
+
+  // The floating launcher's own colours. It used to borrow the widget bar's
+  // accent and the ink on it, which meant a site could only recolour the
+  // button by recolouring the bar with it — so these are its own registry
+  // rows now (Colors › Mini widgets › Bubble launcher) and the values below
+  // are what it used to borrow. Not zone names, deliberately: the button
+  // renders inside the dock zone and a name in $bm-zone-colors would be
+  // re-pointed at the bar's value again.
+  //
+  // Must stay in step with the same tokens' stocks in inc/design-schema.php,
+  // because render_css() only prints a token that DIFFERS from stock.
+  --bm-color-bubble-button-bg: 37, 99, 235;
+  --bm-color-bubble-button-icon: 255, 255, 255;
+  --bm-color-bubble-button-border: 37, 99, 235;
+  --bm-color-bubble-button-badge-bg: 220, 53, 69;
+  --bm-color-bubble-button-badge-text: 255, 255, 255;
+
+}
+
+
+// ============================================================================
+// DARK MODE
+// Applied via OS preference OR explicit body class.
+// .bm-messages-light always wins (explicit opt-out of dark).
+// ============================================================================
+
+// ============================================================================
+// Secondary surface palette
+//
+// The conversations list and the side panels paint --bm-color-inbox-bg, and
+// when the admin makes that dark in the light scheme (or light in the dark
+// one) everything drawn on it has to come from the other scheme, or names
+// and rows vanish into it. PHP decides that per scheme when it prints the
+// tokens and publishes the answer as --bm-zone-secondary-<name> — equal to
+// the base value normally, the other scheme's value when the surface flips.
+// Every root that paints the secondary surface re-points the shared colour
+// tokens at those variants, so nothing inside has to know.
+//
+// Stylesheet defaults mirror the base tokens so the sheet is coherent on its
+// own; the inline block PHP prints on every page overrides them.
+// ============================================================================
+
+$bm-zone-names: (header, reply, secondary, list, mc-head, mc, mc-reply, dock, wlist, mob-head, mob, mob-reply, mob-list, mob-tabs);
+
+
+$bm-zone-colors: (
+  bg, bg-secondary, bg-elevated, bg-hover, bg-active, surface,
+  card-bg, card-border, inbox-bg, inbox-text, inbox-border, inbox-field, inbox-accent, inbox-accent-text, inbox-accent-text-auto, inbox-muted, inbox-preview, inbox-icon,
+  list-bg, list-text, list-border, list-field, list-accent, list-accent-text, list-accent-text-auto, list-muted, list-preview, list-icon,
+  icon, preview, preview-unread,
+  field-text-fallback, field-text, field-placeholder, chat-bg, composer-bg,
+  text-primary, text-secondary, text-tertiary, text-disabled, text-link,
+  border, border-subtle, border-strong,
+  accent, accent-hover, accent-pressed, accent-subtle, text-on-accent,
+  bubble-self-bg, bubble-self-text, bubble-self-nickname, bubble-self-seen, bubble-self-link, bubble-self-outline,
+  bubble-other-bg, bubble-other-text, bubble-other-nickname, bubble-other-link, bubble-other-outline,
+  sticky-date-bg, sticky-date-text, mention-bg, mention-text,
+  tooltip-bg, tooltip-text,
+  // online-text is deliberately NOT here. A zone re-points every name in this
+  // list at --bm-zone-<zone>-<name>, and those are declared on :root while the
+  // dark tokens land on body — so a name PHP does not also print per zone gets
+  // frozen at its light value inside every zone. PHP knows nothing about the
+  // presence colours; left out, the label simply inherits and flips.
+  online, away, busy, offline, recording
+);
+
+// Where a zone's surface is not the shared one.
+//
+// Most of a zone's names simply follow the base above. A handful do not: the
+// conversation lists paint the plain background rather than the secondary one,
+// the secondary surface takes the secondary colour as its raised tone, and the
+// panels raise off the plain background rather than the elevated colour. That
+// is the design's own default, not a per-site setting, so it belongs here —
+// and written as var() it follows whatever the admin does to those colours.
+//
+// PHP prints these only when a site genuinely departs from them. Said here,
+// a site on the stock scheme has nothing left for it to say at all. If this
+// ever falls out of step with color_sets() the result is a few bytes back in
+// the page, not a wrong colour: PHP emits whatever differs.
+@mixin bm-zone-surface-defaults {
+  @each $zone in (secondary, list, wlist, mob-list) {
+    --bm-zone-#{$zone}-bg-secondary: var(--bm-color-bg);
+  }
+  @each $zone in (list, wlist, mob-list, mob-tabs) {
+    --bm-zone-#{$zone}-inbox-bg: var(--bm-color-bg);
+  }
+  --bm-zone-secondary-surface: var(--bm-color-bg-secondary);
+  @each $zone in (header, reply, mc-head, mc, mc-reply, dock, mob-head, mob, mob-reply) {
+    --bm-zone-#{$zone}-bg-elevated: var(--bm-color-bg);
+  }
+}
+
+:root {
+  @each $zone in $bm-zone-names {
+    @each $name in $bm-zone-colors {
+      --bm-zone-#{$zone}-#{$name}: var(--bm-color-#{$name});
+    }
+  }
+  @include bm-zone-surface-defaults;
+}
+
+@mixin bm-zone-surface($zone) {
+  @each $name in $bm-zone-colors {
+    --bm-color-#{$name}: var(--bm-zone-#{$zone}-#{$name});
+  }
+  // Re-derived here so it follows the surface's muted text, not the root's.
+  --bm-color-typing: var(--bm-color-text-tertiary);
+}
+
+// The side conversations list, the collapsed rail and the info panel.
+@mixin bm-secondary-surface {
+  @include bm-zone-surface(secondary);
+}
+
+// The conversations list on its own: the single-column messenger, the
+// mobile list and the mini widget panes.
+@mixin bm-list-surface {
+  @include bm-zone-surface(list);
+}
+
+@mixin bm-dark-tokens {
+
+  // surfaces
+  --bm-color-bg: 15, 23, 42;
+  --bm-color-bg-secondary: 17, 25, 47;
+  --bm-color-bg-elevated: 24, 33, 56;
+  --bm-color-bg-hover: 30, 41, 70;
+  --bm-color-bg-active: 38, 46, 70;
+
+  --bm-color-toast-bg: 241, 245, 249;
+  --bm-color-toast-text: 24, 33, 56;
+  --bm-color-toast-border: 211, 215, 222;
+
+  // text
+  --bm-color-text-primary: 241, 245, 249;
+  --bm-color-text-secondary: 203, 213, 225;
+  --bm-color-text-tertiary: 148, 163, 184;
+  --bm-color-text-disabled: 95, 105, 125;
+  --bm-color-text-link: 241, 245, 249;
+
+  // borders
+  --bm-color-border: 51, 65, 95;
+  --bm-color-border-strong: 100, 116, 139;
+  --bm-color-border-subtle: 38, 50, 82;
+
+  // The tint under an active row or tab: the accent taken 18% into the dark
+  // background, quiet next to bg-hover and of a piece with the accent. It
+  // stood at a maroon (65, 30, 30) that matched no accent the plugin ships.
+  --bm-color-accent-subtle: 19, 37, 77;
+
+  // semantic state in dark
+  --bm-color-success-bg: 19, 79, 38;
+  --bm-color-warning-bg: 78, 49, 8;
+  --bm-color-danger-bg: 78, 18, 24;
+  --bm-color-info-bg: 8, 49, 78;
+
+  // bubbles
+  --bm-color-bubble-other-bg: 38, 50, 82;
+  --bm-color-bubble-other-text: 241, 245, 249;
+  --bm-color-bubble-other-nickname: 203, 213, 225;
+  --bm-color-bubble-other-link: 241, 245, 249;
+  --bm-color-bubble-other-outline: 51, 65, 95;
+  --bm-color-bubble-self-bg: 37, 99, 235;
+  --bm-color-bubble-self-text: 255, 255, 255;
+  --bm-color-bubble-self-nickname: 203, 213, 225;
+  --bm-color-bubble-self-link: 255, 255, 255;
+  --bm-color-bubble-self-outline: 37, 99, 235;
+  // The dark accent is 2.03:1 on this own bubble, under the 3:1 the seen
+  // tick asks for, so it keeps the text here too.
+  --bm-color-bubble-self-seen: 255, 255, 255;
+
+  // The floating launcher in dark: a quiet card with a ring rather than the
+  // accent disc it is in light — a filled circle that size is loud on a dark
+  // page. This is the same treatment a hard-coded dark rule used to apply on
+  // top of the light colours; said as stock values, the admin can now move it.
+  // In step with inc/design-schema.php, as above.
+  --bm-color-bubble-button-bg: 17, 25, 47;
+  --bm-color-bubble-button-icon: 241, 245, 249;
+  --bm-color-bubble-button-border: 38, 50, 82;
+  --bm-color-bubble-button-badge-bg: 220, 53, 69;
+  --bm-color-bubble-button-badge-text: 255, 255, 255;
+
+  // mention / sticky-date / tooltip
+  --bm-color-mention-bg: 63, 72, 95;
+  --bm-color-mention-text: 255, 255, 255;
+  --bm-color-sticky-date-bg: 24, 33, 56;
+  --bm-color-sticky-date-text: 241, 245, 249;
+  --bm-color-tooltip-bg: 0, 0, 0;
+  --bm-color-tooltip-text: 255, 255, 255;
+
+  // scrollbar
+  --bm-color-scrollbar: rgba(255, 255, 255, 0.1);
+  --bm-color-scrollbar-hover: rgba(255, 255, 255, 0.55);
+  --bm-color-scrollbar-active: rgba(255, 255, 255, 0.7);
+
+  // Dark theme matches light: shadows are disabled. Surfaces rely on
+  // borders / background contrast for separation. Only the input focus
+  // halo keeps a single accent ring so the focus state stays visible.
+  --bm-shadow-card: none;
+  --bm-shadow-popover: none;
+  --bm-shadow-modal: none;
+  --bm-shadow-input-focus: 0 0 0 3px rgba(var(--bm-color-accent), 0.35);
+
+  // the press tints and the alert ink in dark
+  --bm-button-hover: rgba(255, 255, 255, 0.14);
+  --bm-button-active: rgba(255, 255, 255, 0.27);
+  --bm-alert-error-color: #ea868f;
+  --bm-alert-info-color: #6edff6;
+
+  // registry-owned tokens that also change in dark
+  --bm-color-accent: 96, 165, 250;
+  --bm-color-accent-hover: 59, 130, 246;
+  --bm-color-accent-pressed: 37, 99, 235;
+  // Dark ink, unlike the light scheme's white above: this accent is a LIGHT
+  // blue, and white on it is 2.54:1 — under every floor. Must stay in step
+  // with the same token's `dark` stock in inc/design-schema.php, because
+  // Better_Messages_Design::render_css() only prints a token that DIFFERS
+  // from stock. On an untouched palette it prints nothing at all, so this
+  // line is what the browser actually reads.
+  --bm-color-text-on-accent: 17, 24, 39;
+  --bm-color-card-bg: 15, 23, 42;
+  --bm-color-card-border: 51, 65, 95;
+  --bm-color-inbox-bg: 17, 25, 47;
+  --bm-color-inbox-text: 241, 245, 249;
+  --bm-color-inbox-border: 51, 65, 95;
+  --bm-color-inbox-field: 15, 23, 42;
+  --bm-color-inbox-accent: 96, 165, 250;
+  --bm-color-inbox-accent-text: 255, 255, 255;
+  --bm-color-inbox-accent-text-auto: 255, 255, 255;
+  --bm-color-inbox-muted: 148, 163, 184;
+  --bm-color-inbox-preview: 148, 163, 184;
+  --bm-color-inbox-icon: 148, 163, 184;
+  --bm-color-list-bg: 15, 23, 42;
+  --bm-color-list-text: 241, 245, 249;
+  --bm-color-list-border: 51, 65, 95;
+  --bm-color-list-field: 15, 23, 42;
+  --bm-color-list-accent: 96, 165, 250;
+  --bm-color-list-accent-text: 255, 255, 255;
+  --bm-color-list-accent-text-auto: 255, 255, 255;
+  --bm-color-list-muted: 148, 163, 184;
+  --bm-color-list-preview: 148, 163, 184;
+  --bm-color-list-icon: 148, 163, 184;
+  --bm-color-icon: 148, 163, 184;
+  --bm-color-preview: 148, 163, 184;
+  --bm-color-preview-unread: 203, 213, 225;
+  --bm-color-field-text-fallback: 241, 245, 249;
+  --bm-color-field-text: 241, 245, 249;
+  --bm-color-field-placeholder: 148, 163, 184;
+  @include bm-cell-stock($bm-cell-stock-dark, (15, 23, 42));
+  --bm-color-surface: 15, 23, 42;
+  --bm-color-chat-bg: 15, 23, 42;
+  --bm-color-composer-bg: 15, 23, 42;
+  --bm-color-online: 61, 165, 18;
+  // The dot keeps the light scheme's green: it is read as a shape, and one
+  // green is what makes presence recognisable across both. The label goes
+  // the other way here — the vivid cast reads at 10.5:1 on this surface
+  // where the dot's own green manages 5.6:1, so the text takes it.
+  --bm-color-online-text: 67, 228, 67;
+  --bm-color-away: 245, 158, 11;
+  --bm-color-busy: 220, 53, 69;
+  --bm-color-offline: 156, 163, 175;
+  --bm-color-recording: 232, 65, 65;
+
+  // Re-point the zone fallbacks at the dark values, here where they are.
+  //
+  // The :root block above declares --bm-zone-<zone>-<name>: var(--bm-color-<name>),
+  // and a custom property substitutes at the point it is declared — so on :root
+  // those froze at the LIGHT value, and every zone stayed light under dark
+  // unless PHP printed all 919 of them per scheme on every page of the site.
+  // Declared again here, on the same element the dark colours land on, they
+  // follow the dark values on their own and PHP has nothing left to say.
+  @each $zone in $bm-zone-names {
+    @each $name in $bm-zone-colors {
+      --bm-zone-#{$zone}-#{$name}: var(--bm-color-#{$name});
+    }
+  }
+  @include bm-zone-surface-defaults;
+}
+
+// OS-driven default (opt-out only via .bm-messages-light)
+@media (prefers-color-scheme: dark) {
+  body:not(.bm-messages-light) {
+    @include bm-dark-tokens;
+  }
+}
+
+// Explicit class override (wins over OS preference)
+body.bm-messages-dark {
+  @include bm-dark-tokens;
+}
+
+
+// ============================================================================
+// DENSITY PRESETS (set on <body> via JS or admin setting)
+// ============================================================================
+
+
+
+// ============================================================================
+// REDUCED MOTION (collapse all durations to instant)
+// ============================================================================
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --bm-duration-instant: 1ms;
+    --bm-duration-fast: 1ms;
+    --bm-duration-base: 1ms;
+    --bm-duration-slow: 1ms;
+    --bm-duration-slower: 1ms;
+  }
+}

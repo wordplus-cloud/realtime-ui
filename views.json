@@ -1,0 +1,45 @@
+{
+    "call-screen": {
+        "about": "The call screen: a call between two (ringing out and in, connected), the group video call's grid and the group audio call's roster, each person's tile, the dock with its controls, the devices, Add Person, and the ring's card. The call itself runs in the package (usePrivateCall, useGroupCall, CallsController): its states, the ring in every tab, the devices and permissions, reconnecting and encryption, picture in picture.",
+        "files": {
+            "call-screen.tsx": "src/components/calls/call-screen.tsx",
+            "private-call.tsx": "src/components/calls/private-call.tsx",
+            "group-video-call.tsx": "src/components/calls/group-video-call.tsx",
+            "group-audio-call.tsx": "src/components/calls/group-audio-call.tsx",
+            "group-video-grid.tsx": "src/components/calls/group-video-grid.tsx",
+            "group-video-grid-item.tsx": "src/components/calls/group-video-grid-item.tsx",
+            "group-audio-grid.tsx": "src/components/calls/group-audio-grid.tsx",
+            "group-audio-grid-item.tsx": "src/components/calls/group-audio-grid-item.tsx",
+            "call-dock.tsx": "src/components/calls/call-dock.tsx",
+            "folding-dock.tsx": "src/components/calls/folding-dock.tsx",
+            "device-switch.tsx": "src/components/calls/device-switch.tsx",
+            "add-person.tsx": "src/components/calls/add-person.tsx",
+            "incoming-call-card.tsx": "src/components/calls/incoming-call-card.tsx"
+        },
+        "index": "export { default as CallView } from './call-screen';\nexport { default as RingCard } from './incoming-call-card';\n",
+        "tests": { "call-screen.test.tsx": "test/views/call-screen.test.tsx" },
+        "react": "<CallScreen rt={ rt } view={ CallView } components={ { RingCard } } />",
+        "elements": "view: CallView, components: { RingCard }"
+    },
+    "online-list": {
+        "about": "Who is in a presence room, with a row for each person and what may be done with them, who is typing, and the live count. The room runs in the package (useRoom, useProfiles, useTyping).",
+        "files": {
+            "online-list.tsx": "src/sdk/presence-views.tsx",
+            "online-rows.tsx": "src/components/presence/online-list.tsx"
+        },
+        "index": "export { RoomOnline as OnlineList, RoomTyping as Typing, RoomCount as OnlineCount } from './online-list';\n",
+        "tests": { "online-list.test.tsx": "test/views/online-list.test.tsx" },
+        "react": "<OnlineList rt={ rt } room=\"shop\" />",
+        "elements": "OnlineList"
+    },
+    "chat": {
+        "about": "The conversation: its days, a sender's stacks, the bubbles with their time and ticks, reactions, who is typing, and the composer. The conversation runs in the package (useChat): its history and the app's pages, sending with an ack, typing, reactions and reads.",
+        "files": {
+            "chat.tsx": "src/sdk/chat.tsx"
+        },
+        "index": "export { Chat } from './chat';\n",
+        "tests": { "chat.test.tsx": "test/views/chat.test.tsx" },
+        "react": "<Chat rt={ rt } room=\"chat:34:42\" />",
+        "elements": "Chat"
+    }
+}

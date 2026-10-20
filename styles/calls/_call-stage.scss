@@ -1,0 +1,1951 @@
+// Call stage — the 3.0 look for every call screen: the 1:1 call while it
+// rings and once it is connected, the group video grid and the group
+// audio roster, their control docks, device panels and connection badge.
+//
+// The components are the 2.0 ones (src/main/components/calls/*.tsx,
+// call-container.tsx, parts/connection-status.tsx) with their markup and
+// class names intact; this partial replaces the 2.0 call stylesheets.
+//
+// A call is a media surface, so the stage stays dark in both themes — the
+// way the camera capture does — because video on a light card reads as a
+// hole. The stage colours are literals scoped here; the accents (speaking
+// ring, latched toggles, hang up, answer) come from the messenger tokens
+// so a site's palette carries through.
+
+.bm-call-surface {
+    --bm-call-canvas: 17, 19, 24;
+    --bm-call-tile: 30, 33, 41;
+    --bm-call-fg: 255, 255, 255;
+    // 2.0's dock button, to the pixel (bp-messages.scss: the group controls
+    // drew 34×34 with a 15px glyph). 3.0 had taken it to 40, which reads as a
+    // row of buttons rather than as call chrome — and on the stages that
+    // matter, a phone or the call column beside the chat, four of those are
+    // most of the width.
+    --bm-call-btn: 34px;
+}
+
+// A translucent black fill, no backdrop blur: blurring live video behind
+// every chip costs a compositor pass per frame, and WebKit has drawn the
+// blurred region square behind rounded corners.
+@mixin bm-call-glass($alpha: 0.5) {
+    background: rgba(0, 0, 0, $alpha);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+// One round stage control. 2.0 renders every call button as a bare span
+// with a class per action; the tone comes from the class or, for the
+// latched extras (sharing, picture in picture), from data-active.
+@mixin bm-call-btn {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: none;
+    box-sizing: border-box;
+    width: var(--bm-call-btn);
+    height: var(--bm-call-btn);
+    margin: 0;
+    padding: 0;
+    border: 0;
+    &:not(#\9) { border-radius: var(--bm-radius-circle); }
+    background: rgba(255, 255, 255, 0.12);
+    color: rgba(var(--bm-call-fg), 1);
+    font-size: 0;
+    line-height: 0;
+    text-transform: none;
+    cursor: pointer;
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+    transition: background 0.12s ease, color 0.12s ease, transform 0.12s ease, filter 0.12s ease;
+
+    > svg {
+        position: static;
+        width: calc(var(--bm-call-btn) * 0.5);
+        height: calc(var(--bm-call-btn) * 0.5);
+        margin: 0 !important;
+        // A touch heavier than the header's hairline: a thin white stroke
+        // on a solid dark disc reads wiry at this size.
+        stroke-width: 1.85;
+    }
+
+    &:hover { background: rgba(255, 255, 255, 0.2); }
+    &:active { transform: scale(0.94); }
+}
+
+// The medium is off: white button, the glyph in the recording red.
+@mixin bm-call-btn-off {
+    background: rgba(255, 255, 255, 0.92);
+    color: rgba(var(--bm-color-recording), 1);
+    &:hover { background: rgba(255, 255, 255, 1); }
+}
+
+// A latched extra: accent.
+@mixin bm-call-btn-on {
+    background: rgba(var(--bm-color-accent), 1);
+    color: rgba(var(--bm-color-text-on-accent), 1);
+    &:hover { background: rgba(var(--bm-color-accent-hover), 1); }
+}
+
+// A restriction the admin holds (hand up, room locked, everyone muted).
+@mixin bm-call-btn-warning {
+    background: rgba(var(--bm-color-warning), 1);
+    color: rgba(17, 19, 24, 1);
+    &:hover { background: rgba(var(--bm-color-warning), 0.88); }
+}
+
+// Hang up / leave: a wider red pill so it can't be mistaken for a toggle.
+@mixin bm-call-btn-danger {
+    width: calc(var(--bm-call-btn) + 16px);
+    &:not(#\9) { border-radius: var(--bm-radius-pill); }
+    background: rgba(var(--bm-color-recording), 1);
+    color: rgba(255, 255, 255, 1);
+    &:hover { background: rgba(var(--bm-color-recording), 1); filter: brightness(1.08); }
+}
+
+@mixin bm-call-btn-answer {
+    width: calc(var(--bm-call-btn) + 16px);
+    &:not(#\9) { border-radius: var(--bm-radius-pill); }
+    background: rgba(var(--bm-color-success), 1);
+    color: rgba(255, 255, 255, 1);
+    &:hover { background: rgba(var(--bm-color-success), 1); filter: brightness(1.08); }
+}
+
+// A translucent pill of controls, centered, and ONE row high at every width:
+// CallDock measures the row and folds its tail into a "More" sheet rather
+// than letting it wrap (src/main/components/calls/call-dock.tsx).
+//
+// `flex-wrap: wrap` stays as the fallback — if that measurement never runs,
+// the dock wraps the way it used to instead of clipping controls out of
+// reach, which is also why there is no `overflow: hidden` here. The sheet is
+// positioned against this box, hence the relative.
+@mixin bm-call-dock {
+    position: relative;
+    display: inline-flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    // 2.0's spacing too, which puts the pill at 44px tall — the height the
+    // group bar has always reserved for it (min-height below).
+    gap: 5px;
+    padding: 5px;
+    max-width: 100%;
+    box-sizing: border-box;
+    @include bm-call-glass(0.5);
+    &:not(#\9) { border-radius: 26px; }
+    pointer-events: auto;
+}
+
+// The tone each action wears, keyed off the class 2.0 gives its button.
+// Included wherever those buttons are drawn — the dock itself, and the More
+// sheet they fold into — so a control looks the same in either place and one
+// list decides it.
+@mixin bm-call-dock-items {
+    > span {
+        @include bm-call-btn;
+    }
+
+    // Camera / microphone off.
+    > .bm-enable-video,
+    > .bm-enable-mic {
+        @include bm-call-btn-off;
+    }
+
+    // Sharing, picture in picture, full screen on, the chat shown beside.
+    > .bm-switch-share-screen[data-active],
+    > .bm-pic-in-pic[data-active],
+    > .bm-toggle-chat[data-active],
+    > .bm-call-more[data-active],
+    > .bm-fs-disable,
+    > .bm-set-participatory-mode {
+        @include bm-call-btn-on;
+    }
+
+    > .bm-hand-active,
+    > .bm-unlock-room,
+    > .bm-unmute-all {
+        @include bm-call-btn-warning;
+    }
+
+    > .bm-cancel,
+    > .bm-exit-room {
+        @include bm-call-btn-danger;
+    }
+
+    // The handset tilted into the hang-up glyph — the same turn the
+    // incoming-call toast gives its reject button.
+    > .bm-cancel > svg {
+        transform: rotate(135deg);
+    }
+
+    > .bm-answer {
+        @include bm-call-btn-answer;
+    }
+
+    // Waiting on its request: the glyph is a spinner and a second press is
+    // turned away (inc/calls/pending.ts), so the pointer says so too.
+    > [data-busy] {
+        cursor: progress;
+    }
+}
+
+// A small round badge on a tile or a roster row.
+@mixin bm-call-chip {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: none;
+    width: 24px;
+    height: 24px;
+    &:not(#\9) { border-radius: var(--bm-radius-circle); }
+    background: rgba(0, 0, 0, 0.55);
+    color: rgba(var(--bm-call-fg), 1);
+    line-height: 0;
+
+    > svg {
+        position: static;
+        width: 13px;
+        height: 13px;
+        margin: 0 !important;
+    }
+}
+
+@keyframes bm-call-ring {
+    0%   { transform: scale(0.96); opacity: 0.9; }
+    100% { transform: scale(1.38); opacity: 0; }
+}
+
+@keyframes bm-call-hand {
+    0%, 100% { transform: scale(1); }
+    50%      { transform: scale(1.12); }
+}
+
+// The own camera's picture a little larger than its chip or its group tile,
+// which clips it: a resize for WebKit on iOS to fit the camera's turned frame
+// by (see the ready chip below).
+@keyframes bm-call-self-refit {
+    from, to {
+        width: calc(100% + 2px);
+        height: calc(100% + 2px);
+        max-width: none;
+    }
+}
+
+// ─── The wrap: dark canvas under everything ───────────────────────────────
+
+.bm-call-wrap {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background: rgba(var(--bm-call-canvas), 1);
+    color: rgba(var(--bm-call-fg), 1);
+    // The dock sizes its buttons to the stage's own width (see the
+    // container query at the end), not the viewport's.
+    container-type: inline-size;
+
+    &:fullscreen,
+    &:-webkit-full-screen {
+        background: rgba(var(--bm-call-canvas), 1);
+    }
+
+    .bm-call-container {
+        position: relative;
+        width: 100%;
+        height: 100%;
+        border: 0;
+    }
+}
+
+// ─── Shared: buttons, docks, device panel, connection badge ───────────────
+
+.bm-call-wrap {
+    .bm-call-buttons,
+    .bm-group-call-controls-buttons {
+        @include bm-call-dock;
+        @include bm-call-dock-items;
+
+        // The sheet hangs off this button in the markup but is placed against
+        // the DOCK — every dock button is relative by default, and anchored to
+        // this one the sheet ran off the near edge of a narrow stage, because
+        // the button sits a hang-up pill short of the dock's own edge.
+        > .bm-call-more {
+            position: static;
+        }
+
+        // The registry's ellipsis is drawn vertically (it is the thread row's
+        // menu glyph); a horizontal row of controls wants it lying down.
+        > .bm-call-more > svg {
+            transform: rotate(90deg);
+        }
+
+        // The press-scale every dock button gets would take the open sheet
+        // down with it — the sheet is a child of this button, so a transform
+        // here both shrinks it and makes this button its containing block,
+        // moving it mid-press. Nothing to show anyway: the button is already
+        // latched while its sheet is open.
+        > .bm-call-more[data-active]:active {
+            transform: none;
+        }
+    }
+
+    // The folded tail. Anchored to the DOCK rather than to the More button so
+    // it uses the stage's full width — the button sits one hang-up pill short
+    // of the dock's edge, and a sheet hung off it would run past the opposite
+    // edge on a phone. Above the dock, because the dock is already at the
+    // stage floor.
+    .bm-call-dock-sheet {
+        position: absolute;
+        bottom: calc(100% + 8px);
+        inset-inline-end: 0;
+        z-index: 4;
+        display: flex;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 2px;
+        box-sizing: border-box;
+        min-width: 180px;
+        max-width: 260px;
+        // …and never wider than the stage it hangs over. The stage is the
+        // query container (see .bm-call-wrap), so this is its width, not the
+        // window's. Second declarations, so a browser without container units
+        // keeps the flat pair above.
+        //
+        // The floor is clamped as well as the ceiling: a min-width outranks a
+        // max-width whatever the order, so on a stage narrower than the sheet
+        // wants to be, 180px alone hung it off the left edge.
+        min-width: min(180px, calc(100cqw - 32px));
+        max-width: min(260px, calc(100cqw - 32px));
+        padding: 6px;
+        @include bm-call-glass(0.82);
+        &:not(#\9) { border-radius: var(--bm-radius-card); }
+        box-shadow: var(--bm-shadow-card);
+        // The dock's buttons are glyph-only, so the mixin zeroes the text
+        // metrics — the sheet spells its actions out and needs them back.
+        font-size: var(--bm-font-size-sm);
+        line-height: var(--bm-line-height-normal);
+        text-align: start;
+        cursor: default;
+
+        @include bm-call-dock-items;
+
+        // Same button, same tone, unrolled from a circle into a line. The
+        // element IS the control that was in the row — it keeps its handler
+        // and its class — so nothing here may narrow it back to a disc.
+        > .bm-call-dock-sheet__row {
+            width: 100%;
+            height: auto;
+            min-height: 34px;
+            justify-content: flex-start;
+            gap: 10px;
+            padding: 0 10px;
+            &:not(#\9) { border-radius: var(--bm-radius-button); }
+            font-size: inherit;
+            line-height: inherit;
+
+            > svg {
+                flex: none;
+                width: 17px;
+                height: 17px;
+            }
+        }
+    }
+
+    .bm-call-dock-sheet__label {
+        flex: 1 1 auto;
+        min-width: 0;
+        overflow: hidden;
+        font-weight: var(--bm-font-weight-medium);
+        white-space: nowrap;
+        text-overflow: ellipsis;
+        text-align: start;
+    }
+
+    // Device pickers and traffic — a sheet above the dock.
+    .bm-call-settings {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: flex-start;
+        justify-content: center;
+        gap: 10px 14px;
+        box-sizing: border-box;
+        width: auto;
+        max-width: min(100%, 560px);
+        height: auto;
+        padding: 12px 14px;
+        text-align: start;
+        @include bm-call-glass(0.55);
+        &:not(#\9) { border-radius: var(--bm-radius-card); }
+        color: rgba(var(--bm-call-fg), 1);
+        line-height: var(--bm-line-height-normal);
+        pointer-events: auto;
+
+        > .bm-call-setting {
+            flex: 1 1 150px;
+            min-width: 0;
+            max-width: 240px;
+            width: auto;
+            padding: 0;
+            text-align: start;
+
+            label {
+                display: block;
+                margin: 0 0 6px;
+                padding: 0;
+                background: none;
+                &:not(#\9) { border-radius: 0; }
+                font-size: 11px;
+                font-weight: 600;
+                letter-spacing: 0.04em;
+                text-transform: uppercase;
+                color: rgba(255, 255, 255, 0.62);
+            }
+
+            .bm-call-statistics {
+                margin: 0;
+                padding: 0;
+                background: none;
+                &:not(#\9) { border-radius: 0; }
+                font-size: var(--bm-font-size-sm);
+                color: rgba(var(--bm-call-fg), 1);
+
+                .bm-call-traffic {
+                    display: flex;
+                    flex-wrap: wrap;
+                    gap: 4px 14px;
+                    font-variant-numeric: tabular-nums;
+
+                    span {
+                        display: inline-block;
+                        margin: 0;
+                        white-space: nowrap;
+                    }
+                }
+            }
+        }
+    }
+
+    .bm-switch-device-select-wrap {
+        display: grid;
+        grid-template-areas: "select";
+        align-items: center;
+        position: relative;
+        max-width: 100%;
+        box-sizing: border-box;
+        padding: 0 10px;
+        border: 1px solid rgba(255, 255, 255, 0.16);
+        &:not(#\9) { border-radius: var(--bm-radius-input); }
+        background: rgba(255, 255, 255, 0.08);
+        color: rgba(var(--bm-call-fg), 1);
+        font-size: var(--bm-font-size-sm);
+        line-height: var(--bm-line-height-tight);
+        cursor: pointer;
+        pointer-events: auto;
+        transition: border-color 0.12s ease, background 0.12s ease;
+
+        &:hover {
+            background: rgba(255, 255, 255, 0.12);
+            border-color: rgba(255, 255, 255, 0.28);
+        }
+
+        &:focus-within {
+            border-color: rgba(var(--bm-color-accent), 1);
+        }
+
+        select,
+        &::after {
+            grid-area: select;
+        }
+
+        &::after {
+            content: "";
+            justify-self: end;
+            width: 0.7em;
+            height: 0.45em;
+            background-color: rgba(255, 255, 255, 0.6);
+            clip-path: polygon(100% 0%, 0 0%, 50% 100%);
+            pointer-events: none;
+        }
+
+        select {
+            appearance: none;
+            -webkit-appearance: none;
+            width: 100%;
+            margin: 0;
+            padding: 8px 1.4em 8px 0;
+            border: 0;
+            outline: none;
+            background: none;
+            background-color: transparent;
+            color: inherit;
+            font-family: inherit;
+            font-size: inherit !important;
+            line-height: inherit;
+            cursor: inherit;
+            z-index: 1;
+            visibility: visible !important;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+
+            &::-ms-expand { display: none; }
+
+            // The native list opens on the OS surface, not on the stage.
+            option {
+                color: rgba(17, 24, 39, 1);
+                background: rgba(255, 255, 255, 1);
+            }
+        }
+    }
+
+    .bm-connection-control {
+        display: flex;
+        align-items: center;
+        min-width: 0;
+    }
+
+    // Connection badge: a state dot while connected, the spinner or the
+    // cross otherwise, the state text after it. Sits back at 72% and comes
+    // forward on hover and for three seconds after a change (.bm-opacity).
+    .bm-connection-quality {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        box-sizing: border-box;
+        height: 28px;
+        max-width: 100%;
+        padding: 0 10px 0 9px;
+        @include bm-call-glass(0.42);
+        &:not(#\9) { border-radius: var(--bm-radius-pill); }
+        color: rgba(255, 255, 255, 0.88);
+        font-size: var(--bm-font-size-xs);
+        font-weight: 600;
+        letter-spacing: 0.02em;
+        white-space: nowrap;
+        overflow: hidden;
+        opacity: 0.72;
+        cursor: default;
+        transition: opacity var(--bm-duration-base) ease;
+
+        &::before {
+            content: "";
+            flex: none;
+            width: 7px;
+            height: 7px;
+            border-radius: var(--bm-radius-circle);
+            background: rgba(var(--bm-color-success), 1);
+        }
+
+        &.bm-quality-poor::before { background: rgba(var(--bm-color-warning), 1); }
+        &.bm-quality-lost::before { background: rgba(var(--bm-color-danger), 1); }
+
+        &:not(.bm-state-connected)::before { display: none; }
+        &.bm-state-connected > svg { display: none; }
+
+        > svg {
+            flex: none;
+            position: static;
+            width: 13px;
+            height: 13px;
+            margin: 0 !important;
+        }
+
+        > span {
+            margin: 0;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            text-transform: capitalize;
+        }
+
+        &:hover,
+        &.bm-opacity {
+            opacity: 1;
+        }
+    }
+}
+
+// ─── 1:1 call ─────────────────────────────────────────────────────────────
+
+.bm-call-wrap .bm-video-container {
+    position: relative;
+    display: block;
+    width: 100%;
+    height: 100%;
+    min-height: 200px;
+    z-index: 5;
+
+    // Pre-connect and no-remote-media: the peer's avatar and a status line,
+    // centered, with room under them for the dock.
+    .bm-main-placeholder {
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 14px;
+        box-sizing: border-box;
+        width: 100%;
+        height: 100%;
+        min-height: 0;
+        margin: 0;
+        padding: 24px 16px 96px;
+        overflow: hidden;
+        background: transparent;
+        text-align: center;
+    }
+
+    // The own camera (or screen) fills the stage while the call rings.
+    // Never mirrored: you see yourself the way the others do, as 2.0
+    // showed it, and as the picture stays once the call connects.
+    .bm-placeholder-video {
+        position: absolute;
+        inset: 0;
+        z-index: 0;
+        width: 100%;
+        height: 100%;
+
+        video {
+            display: block;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        &.bm-video-contain video {
+            object-fit: contain;
+            background: rgba(0, 0, 0, 1);
+        }
+    }
+
+    // A scrim over the live preview keeps the labels readable on it.
+    .bm-main-placeholder:has(.bm-placeholder-video)::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        z-index: 0;
+        background: linear-gradient(to bottom, rgba(0, 0, 0, 0.38) 0%, rgba(0, 0, 0, 0.06) 40%, rgba(0, 0, 0, 0.6) 100%);
+        pointer-events: none;
+    }
+
+    .bm-call-animation {
+        position: relative;
+        z-index: 1;
+        flex: none;
+        width: 100px;
+        height: 100px;
+        margin: 0;
+        pointer-events: none;
+
+        > .avatar {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+
+        img {
+            display: block;
+            position: static;
+            width: 100px;
+            height: 100px;
+            &:not(#\9) { border-radius: var(--bm-radius-avatar) !important; }
+            animation: none;
+        }
+
+        // Two rings widening out of the avatar while it rings.
+        &::before,
+        &::after {
+            content: "";
+            position: absolute;
+            inset: -4px;
+            border-radius: calc(var(--bm-radius-avatar) + 4px);
+            border: 2px solid rgba(255, 255, 255, 0.35);
+            animation: bm-call-ring 2.2s ease-out infinite;
+            pointer-events: none;
+        }
+
+        &::after {
+            animation-delay: 1.1s;
+        }
+
+        &.bm-animation-pause::before,
+        &.bm-animation-pause::after {
+            animation: none;
+            opacity: 0;
+        }
+    }
+
+    .bm-placeholder-message {
+        position: relative;
+        z-index: 1;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 4px;
+        margin: 0;
+        color: rgba(var(--bm-call-fg), 1);
+        text-align: center;
+        pointer-events: none;
+
+        .bm-placeholder-status,
+        .bm-placeholder-incoming-text,
+        .bm-placeholder-outgoing-text {
+            font-size: var(--bm-font-size-md);
+            font-weight: 500;
+            color: rgba(255, 255, 255, 0.8);
+        }
+
+        .bm-timer {
+            font-family: var(--bm-font-family-mono);
+            font-variant-numeric: tabular-nums;
+            font-size: 20px;
+            font-weight: 600;
+            letter-spacing: 0.02em;
+        }
+    }
+
+    // Notices: no media access, nothing coming from the other side, the
+    // other side dropped or muted — glass cards on the stage.
+    .bm-placeholder-no-access-message,
+    .bm-placeholder-no-source-message,
+    .bm-placeholder-participant-lost-message,
+    .bm-placeholder-participant-muted-message {
+        position: relative;
+        z-index: 2;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        box-sizing: border-box;
+        width: auto;
+        max-width: min(100% - 32px, 420px);
+        margin: 0 auto;
+        padding: 10px 14px;
+        @include bm-call-glass(0.55);
+        &:not(#\9) { border-radius: var(--bm-radius-card); }
+        color: rgba(var(--bm-call-fg), 1);
+        font-size: var(--bm-font-size-sm);
+        line-height: 1.35;
+        text-align: start;
+        opacity: 1;
+
+        > svg {
+            flex: none;
+            position: static;
+            width: 20px;
+            height: 20px;
+            margin: 0 !important;
+        }
+
+        p {
+            margin: 0;
+        }
+
+        p + p {
+            margin-top: 4px;
+        }
+    }
+
+    .bm-placeholder-no-access-message {
+        background: rgba(var(--bm-color-danger), 0.88);
+        border-color: transparent;
+
+        .bm-placeholder-no-access-message-icon {
+            flex: none;
+            font-size: 0;
+            line-height: 0;
+
+            svg {
+                width: 22px;
+                height: 22px;
+            }
+        }
+
+        .bm-placeholder-no-access-message-text {
+            margin: 0;
+            font-size: var(--bm-font-size-sm);
+        }
+    }
+
+    .bm-placeholder-no-source-message .bm-placeholder-participant-no-source-message-text,
+    .bm-placeholder-participant-lost-message .bm-placeholder-participant-lost-message-text,
+    .bm-placeholder-participant-muted-message .bm-placeholder-participant-muted-message-text {
+        display: block;
+        font-size: var(--bm-font-size-sm);
+    }
+
+    // The other side's microphone is off while their camera or screen is
+    // on: a chip in the top start corner of the picture. Without a picture
+    // the placeholder card above carries the message instead.
+    .bm-placeholder-participant-muted-message {
+        position: absolute;
+        z-index: 2;
+        top: 14px;
+        inset-inline-start: 14px;
+        margin: 0;
+        width: max-content;
+        max-width: min(100% - 28px, 360px);
+    }
+
+    // Floats over the remote video, or above the avatar when there is none.
+    .bm-placeholder-participant-lost-message {
+        position: absolute;
+        top: 14px;
+        left: 50%;
+        right: auto;
+        bottom: auto;
+        transform: translateX(-50%);
+        margin: 0;
+        width: max-content;
+    }
+
+    // Connected: the remote camera or screen on the canvas.
+    .bm-main-video {
+        position: absolute;
+        inset: 0;
+        display: block;
+        width: 100%;
+        height: 100%;
+        margin: 0;
+        padding: 0;
+        overflow: hidden;
+        background: rgba(var(--bm-call-canvas), 1);
+
+        > video {
+            display: block;
+            width: 100%;
+            height: 100%;
+            margin: 0;
+            padding: 0;
+            object-fit: contain;
+        }
+    }
+
+    .bm-video-contain video {
+        object-fit: contain !important;
+    }
+
+    // Own camera, own screen and the second remote source: framed thumbnails
+    // in the corners, draggable and resizable as before.
+    //
+    // The chip is given a width (Resizable, before the first paint) and takes
+    // its height from the shape of the media, which the layouts hand over as
+    // --bm-chip-ratio once the stream reports it. The picture is then pinned
+    // to the chip rather than sized by it. Letting the two size each other —
+    // a height:auto box around a height:100% video — leaves the browsers to
+    // break the circle their own way: Safari settled on a box a different
+    // shape from the picture, so `cover` quietly cropped the own camera.
+    .bm-call-small-video,
+    .bm-call-small-video-2,
+    .bm-call-small-video-3 {
+        position: absolute;
+        z-index: 9;
+        height: auto;
+        aspect-ratio: var(--bm-chip-ratio, 16 / 9);
+        min-width: 72px;
+        min-height: 48px;
+        max-width: 45%;
+        max-height: 45%;
+        overflow: hidden;
+        &:not(#\9) { border-radius: var(--bm-radius-card); }
+        border: 1px solid rgba(255, 255, 255, 0.16);
+        background: rgba(0, 0, 0, 1);
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+
+        > video {
+            position: absolute;
+            inset: 0;
+            display: block;
+            width: 100%;
+            height: 100%;
+            max-width: 100%;
+            margin: 0;
+            padding: 0;
+            vertical-align: middle;
+            object-fit: cover;
+            object-position: center;
+        }
+    }
+
+    .bm-call-small-video {
+        bottom: 84px;
+        inset-inline-end: 12px;
+        // Invisible until the browser has drawn a frame of the own camera
+        // (usePictureDrawn, in inc/calls/ratio.ts).
+        opacity: 0;
+        transition: opacity 0.2s ease;
+
+        // Until then the picture is laid out at another size, so that
+        // becoming ready resizes it. WebKit on a phone fits the camera's
+        // frame, turned upright, into the picture only when the picture's box
+        // changes size: a box that already had its final size when the first
+        // frame came in kept a 16:9 frame fitted to the chip's width, a
+        // picture about half the chip's width sitting in a black frame, until
+        // something else happened to resize it.
+        &:not(.bm-call-small-video--ready) > video {
+            width: 50%;
+            height: 50%;
+        }
+
+        // A picture shown before the browser counted a frame of it, which is
+        // how one not yet seen counting them is believed, is laid out a pixel
+        // taller, where the chip's overflow hides it. WebKit counts only the
+        // frames its video layer has taken, so a count that comes later says
+        // the layer took its first frame after the picture grew, and the
+        // resize back is what fits that frame.
+        &.bm-call-small-video--ready:not(.bm-call-small-video--counted) > video {
+            height: calc(100% + 1px);
+        }
+    }
+
+    .bm-call-small-video--ready {
+        opacity: 1;
+    }
+
+    // And on iOS it waits a moment more before it fades in. WebKit there
+    // re-fits a resized video only after the resize has settled (the
+    // WebAVPlayerLayer around an inline video puts it off by the animation
+    // duration plus 0.1 s, 0.35 s in all), and until then shows the old
+    // picture stretched to the new box. The picture takes its size the moment
+    // the chip becomes ready, so a chip that faded in at once showed that
+    // stale picture — the half-width one — for the first half second or so.
+    //
+    // And becoming ready can be too soon for WebKit to act on at all. A chip
+    // that takes over a camera already running, as it does when a call
+    // connects, has a frame counted a few dozen milliseconds after it mounts,
+    // and on an iPhone that resize was lost: the half-width picture stayed
+    // for the whole call, while any resize later on fitted it. So the picture
+    // is made a little larger half a second after the chip is ready and put
+    // back a second after that, and the chip fades in once the first of those
+    // has been fitted.
+    //
+    // Only iOS and iPadOS WebKit, which is every browser there, supports
+    // -webkit-touch-callout.
+    @supports (-webkit-touch-callout: none) {
+        .bm-call-small-video--ready {
+            transition-delay: 1s;
+        }
+
+        .bm-call-small-video--ready > video {
+            animation: bm-call-self-refit 1s 0.5s;
+        }
+    }
+
+    .bm-call-small-video-2 {
+        bottom: 84px;
+        inset-inline-start: 12px;
+    }
+
+    .bm-call-small-video-3 {
+        top: 12px;
+        inset-inline-end: 12px;
+    }
+
+    .bm-switch-videos {
+        @include bm-call-chip;
+        position: absolute;
+        z-index: 3;
+        bottom: 6px;
+        inset-inline-start: 6px;
+        width: 26px;
+        height: 26px;
+        padding: 0;
+        cursor: pointer;
+        transition: background 0.12s ease;
+
+        &:hover {
+            background: rgba(0, 0, 0, 0.75);
+        }
+    }
+}
+
+// The dock. While connected it stays out of the way until the pointer
+// comes back to the call (or, on touch, until a tap), and it also stays
+// while a device sheet is open, so choosing from a native list can't
+// hide it mid-pick.
+.bm-call-wrap .bm-call-controls {
+    position: absolute;
+    inset-inline: 0;
+    bottom: 0;
+    z-index: 10;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    padding: 0 12px 14px;
+    box-sizing: border-box;
+    line-height: normal;
+    text-align: center;
+    -webkit-user-select: none;
+    user-select: none;
+    pointer-events: none;
+    transition: opacity 0.18s ease, transform 0.18s ease;
+
+    &.bm-show-on-hover,
+    &.show-on-tap {
+        opacity: 0;
+        visibility: hidden;
+        transform: translateY(10px);
+        transition: opacity 0.18s ease, transform 0.18s ease, visibility 0s linear 0.18s;
+    }
+
+    &:has(.bm-call-settings) {
+        opacity: 1;
+        visibility: visible;
+        transform: none;
+        transition-delay: 0s;
+    }
+}
+
+.bm-call-wrap .bm-private-call:hover > .bm-call-controls.bm-show-on-hover,
+.bm-call-wrap .bm-private-call.bm-tapped > .bm-call-controls.show-on-tap {
+    opacity: 1;
+    visibility: visible;
+    transform: none;
+    transition-delay: 0s;
+}
+
+// A keyboard on the call, on its window or one of its controls, brings the dock back as a pointer over it does: a
+// hidden dock keeps its controls out of the Tab order and from screen readers (an SDK review, 2026-10-14). A focus a
+// script moved after a click stays no keyboard focus, so a pointer user sees the dock as before.
+.bm-call-wrap .bm-private-call:focus-visible > .bm-call-controls,
+.bm-call-wrap .bm-private-call:has(:focus-visible) > .bm-call-controls {
+    opacity: 1;
+    visibility: visible;
+    transform: none;
+    transition-delay: 0s;
+}
+
+// The window as a whole needs no ring of its own: the dock it brings back is what shows the keyboard is there.
+.bm-call-wrap .bm-private-call:focus-visible {
+    outline: none;
+}
+
+// The Design preview's call is photographed, and a photograph never hovers
+// or taps — so the dock a real call reveals on either would be absent from
+// every store screenshot of a call, which is most of what makes it a call.
+// Shown outright, and only while the preview is the one driving.
+.bm-call-wrap--preview .bm-call-controls.bm-show-on-hover,
+.bm-call-wrap--preview .bm-call-controls.show-on-tap {
+    opacity: 1;
+    visibility: visible;
+    transform: none;
+    transition-delay: 0s;
+}
+
+// ─── Group calls: what the chat is waiting for ───────────────────────────
+// The 1:1 screen says it under the avatar (.bm-placeholder-status). A group
+// chat has its tiles or its roster there, so the same words float over the
+// top of the stage as a glass chip, the way the 1:1 screen's notices do.
+
+.bm-call-wrap .bm-group-call-container .bm-group-call-status {
+    position: absolute;
+    z-index: 3;
+    top: 14px;
+    left: 50%;
+    transform: translateX(-50%);
+    box-sizing: border-box;
+    width: max-content;
+    max-width: min(100% - 28px, 420px);
+    margin: 0;
+    padding: 10px 14px;
+    @include bm-call-glass(0.55);
+    &:not(#\9) { border-radius: var(--bm-radius-card); }
+    color: rgba(255, 255, 255, 0.8);
+    font-size: var(--bm-font-size-md);
+    font-weight: 500;
+    line-height: 1.35;
+    text-align: center;
+    pointer-events: none;
+}
+
+// ─── Group calls: the bar under the grid or the roster ───────────────────
+
+.bm-call-wrap .bm-group-call-controls-v2 {
+    position: absolute;
+    inset-inline: 0;
+    bottom: 0;
+    z-index: 2;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    box-sizing: border-box;
+    width: 100%;
+    min-height: 64px;
+    // Less room above the dock than below it. The bar's height is what the
+    // video grid subtracts from the stage to size itself (group-video-grid.tsx),
+    // so its top padding is dead space between the last row of tiles and the
+    // dock — 8px here plus the tile's own 4px gutter puts the tiles the same
+    // 12px clear of the dock as the dock is clear of the stage floor.
+    padding: 8px 14px 12px;
+    border: 0;
+    background: linear-gradient(to top, rgba(var(--bm-call-canvas), 0.96) 0%, rgba(var(--bm-call-canvas), 0.6) 70%, rgba(var(--bm-call-canvas), 0) 100%);
+    text-align: start;
+    flex-wrap: nowrap;
+
+    .bm-connection-control {
+        flex: none;
+    }
+
+    .bm-group-call-controls-buttons {
+        flex: 0 1 auto;
+        min-width: 0;
+        margin-inline-start: auto;
+        justify-content: flex-end;
+    }
+
+    .bm-call-settings {
+        position: absolute;
+        bottom: 100%;
+        inset-inline-end: 14px;
+        inset-inline-start: auto;
+        z-index: 3;
+        width: auto;
+        max-width: calc(100% - 28px);
+        margin: 0 0 4px;
+        justify-content: flex-end;
+    }
+}
+
+// ─── Group video: the tiles ───────────────────────────────────────────────
+
+.bm-call-wrap.bm-call-wrap-group {
+    .bm-group-call-container {
+        position: relative;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+    }
+
+    .bm-group-call-videos-grid {
+        position: relative;
+        box-sizing: border-box;
+        width: 100%;
+        margin: 0;
+        padding: 4px;
+        transition: height var(--bm-duration-slow) ease;
+
+        .bm-group-call-videos-grid-primary,
+        .bm-group-call-videos-grid-secondary {
+            position: relative;
+            transition: height var(--bm-duration-slow) ease, width var(--bm-duration-slow) ease;
+        }
+
+        .bm-group-call-videos-grid-secondary {
+            overflow-x: auto;
+            overflow-y: hidden;
+        }
+
+        // Someone pinned whose picture is taller than it is wide — a phone's
+        // shared screen — stands beside the call rather than over it, and the
+        // rest have the width they do not need as a column. The two widths
+        // are worked out in group-video-grid.tsx and set inline; `row` puts
+        // the pinned block at the inline start, so it follows an RTL site.
+        &[data-split="beside"] {
+            display: flex;
+            flex-direction: row;
+            align-items: stretch;
+
+            > .bm-group-call-videos-grid-primary,
+            > .bm-group-call-videos-grid-secondary {
+                flex: none;
+            }
+        }
+    }
+
+    .bm-group-call-input-video {
+        display: block;
+        position: absolute;
+        z-index: 1;
+        box-sizing: border-box;
+        margin: 0;
+        padding: 4px;
+        color: rgba(var(--bm-call-fg), 1);
+        transition: top var(--bm-duration-slow) ease, left var(--bm-duration-slow) ease, height var(--bm-duration-slow) ease, width var(--bm-duration-slow) ease;
+
+        &.bm-cover-video > .bm-group-call-input-video-inner video {
+            object-fit: cover;
+        }
+
+        // The own tile is not mirrored: you see yourself the way the others
+        // do, as in 2.0 and in a 1:1 call.
+    }
+
+    // The tile. The component paints the participant's avatar as the
+    // tile's background image; it is hidden there (size 0) and drawn again
+    // by ::before as a centered avatar the size of the tile allows —
+    // background: inherit carries the image over. When a camera or a
+    // screen is on, the media covers the tile and the avatar steps aside.
+    .bm-group-call-input-video-inner {
+        position: relative;
+        box-sizing: border-box;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        &:not(#\9) { border-radius: var(--bm-radius-card); }
+        border: 1px solid rgba(255, 255, 255, 0.06);
+        background-color: rgba(var(--bm-call-tile), 1);
+        background-repeat: no-repeat;
+        background-position: center;
+        background-size: 0 0;
+        transition: box-shadow var(--bm-duration-slow) ease-in-out, border-color var(--bm-duration-slow) ease-in-out;
+
+        &::before {
+            content: "";
+            position: absolute;
+            z-index: 0;
+            left: 50%;
+            top: 50%;
+            width: min(38%, 96px);
+            aspect-ratio: 1;
+            transform: translate(-50%, -50%);
+            background: inherit;
+            background-color: transparent;
+            background-size: cover;
+            background-position: center;
+            border-radius: var(--bm-radius-avatar);
+            pointer-events: none;
+        }
+
+        &:has(.bm-media-container video)::before {
+            display: none;
+        }
+
+        &.bm-active-speaker {
+            border-color: rgba(var(--bm-color-accent), 0.9);
+        }
+
+        .bm-media-container {
+            position: absolute;
+            inset: 0;
+            z-index: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            &:not(#\9) { border-radius: inherit; }
+            transform: translate3d(0, 0, 0);
+
+            &.bm-screen-shared .bm-small-video {
+                position: absolute;
+                bottom: 8px;
+                inset-inline-end: 8px;
+                max-height: 72px;
+                overflow: hidden;
+                &:not(#\9) { border-radius: var(--bm-radius-md); }
+                border: 1px solid rgba(255, 255, 255, 0.16);
+                background: rgba(0, 0, 0, 1);
+                opacity: 0.85;
+                cursor: grab;
+                transition: opacity var(--bm-duration-fast) ease-in-out;
+
+                &:hover {
+                    opacity: 1;
+                }
+            }
+        }
+
+        video {
+            position: relative;
+            display: block;
+            max-width: 100%;
+            height: 100%;
+            margin: 0 auto;
+            object-fit: contain;
+        }
+
+        // The own camera, held back the way the 1:1 call's own chip is and
+        // for the same reason (see .bm-call-small-video): invisible and half
+        // the tile until the browser has drawn a frame of it, so that becoming
+        // ready resizes it, and a pixel larger until a frame is counted, so
+        // the count is one more resize. It spans the whole tile, both ways,
+        // where the picture is contained as before: a box that grew in height
+        // alone, past a width already at the tile's, gave WebKit the same
+        // contained frame and so nothing to fit again.
+        video.bm-group-call-self-video {
+            flex: none;
+            width: 100%;
+            height: 100%;
+            max-width: none;
+            opacity: 0;
+            transition: opacity 0.2s ease;
+
+            &:not(.bm-group-call-self-video--ready) {
+                width: 50%;
+                height: 50%;
+            }
+
+            &.bm-group-call-self-video--ready {
+                opacity: 1;
+            }
+
+            &.bm-group-call-self-video--ready:not(.bm-group-call-self-video--counted) {
+                width: calc(100% + 1px);
+                height: calc(100% + 1px);
+            }
+        }
+
+        // On iOS the later resize and the fade that waits for it, as the
+        // chip's.
+        @supports (-webkit-touch-callout: none) {
+            video.bm-group-call-self-video--ready {
+                transition-delay: 1s;
+                animation: bm-call-self-refit 1s 0.5s;
+            }
+        }
+
+        audio {
+            display: none !important;
+        }
+
+        // Name, bottom start.
+        .bm-group-call-input-video-inner-info {
+            position: absolute;
+            inset-inline: 0;
+            bottom: 0;
+            z-index: 2;
+            display: flex;
+            width: auto;
+            padding: 8px;
+            padding-inline-end: 40px;
+            background: none;
+            pointer-events: none;
+            transform: translate3d(0, 0, 0);
+
+            .bm-info-avatar {
+                display: none;
+            }
+
+            .bm-caller-info {
+                display: flex;
+                align-items: center;
+                gap: 6px;
+                min-width: 0;
+                max-width: 100%;
+                padding: 0;
+                pointer-events: auto;
+
+                > * {
+                    padding: 0;
+                }
+
+                .bm-info-name {
+                    display: inline-flex;
+                    align-items: center;
+                    min-width: 0;
+                    max-width: 100%;
+                    padding: 3px 9px;
+                    @include bm-call-glass(0.55);
+                    border-color: transparent;
+                    &:not(#\9) { border-radius: var(--bm-radius-pill); }
+                    color: rgba(var(--bm-call-fg), 1);
+                    font-size: var(--bm-font-size-xs);
+                    font-weight: 600;
+                    line-height: 1.3;
+                    white-space: nowrap;
+                    overflow: hidden;
+                    text-overflow: ellipsis;
+
+                    .bm-caller-name {
+                        min-width: 0;
+                        overflow: hidden;
+                        text-overflow: ellipsis;
+                    }
+
+                    a {
+                        color: rgba(var(--bm-call-fg), 1) !important;
+                    }
+                }
+            }
+        }
+
+        // Microphone off: bottom end.
+        .bm-caller-status {
+            position: absolute;
+            z-index: 2;
+            bottom: 8px;
+            inset-inline-end: 8px;
+            display: flex;
+            gap: 4px;
+            padding: 0;
+            background: none;
+            &:not(#\9) { border-radius: 0; }
+            text-align: start;
+
+            > span {
+                margin: 0;
+            }
+
+            .bm-mic-disabled {
+                @include bm-call-chip;
+                background: rgba(var(--bm-color-recording), 0.92);
+            }
+        }
+
+        // Raised hand: top end.
+        .bm-hand-raised-status {
+            position: absolute;
+            z-index: 2;
+            top: 8px;
+            inset-inline-end: 8px;
+            padding: 0;
+            text-align: start;
+
+            .bm-hand-raised {
+                @include bm-call-chip;
+                background: rgba(var(--bm-color-warning), 1);
+                color: rgba(17, 19, 24, 1);
+                font-size: 0;
+                animation: bm-call-hand 1.5s ease-in-out infinite;
+            }
+        }
+
+        // Listener in a broadcast: top end, sliding under the raised-hand
+        // chip when the listener has a hand up.
+        .bm-viewer-badge {
+            position: absolute;
+            z-index: 2;
+            top: 8px;
+            inset-inline-end: 8px;
+            display: inline-flex;
+        }
+
+        .bm-hand-raised-status + .bm-viewer-badge {
+            top: 40px;
+        }
+
+        .bm-viewer-badge {
+
+            > span {
+                display: inline-block;
+                padding: 3px 8px;
+                @include bm-call-glass(0.55);
+                border-color: transparent;
+                &:not(#\9) { border-radius: var(--bm-radius-pill); }
+                color: rgba(255, 255, 255, 0.82);
+                font-size: 10px;
+                font-weight: 700;
+                letter-spacing: 0.06em;
+                text-transform: uppercase;
+            }
+        }
+
+        // Moderation: top start, on hover (and on show for touch, which
+        // has no hover).
+        .bm-admin-controls {
+            position: absolute;
+            z-index: 3;
+            top: 8px;
+            inset-inline-start: 8px;
+            display: flex;
+            gap: 4px;
+            padding: 4px;
+            @include bm-call-glass(0.55);
+            &:not(#\9) { border-radius: var(--bm-radius-pill); }
+            text-align: start;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.15s ease, visibility 0s linear 0.15s;
+
+            > span {
+                @include bm-call-chip;
+                width: 26px;
+                height: 26px;
+                margin: 0;
+                background: rgba(255, 255, 255, 0.12);
+                cursor: pointer;
+                transition: background 0.12s ease;
+
+                > svg {
+                    width: 14px;
+                    height: 14px;
+                }
+
+                &:hover {
+                    background: rgba(255, 255, 255, 0.26);
+                }
+
+                &.bm-promote-highlighted {
+                    background: rgba(var(--bm-color-warning), 1);
+                    color: rgba(17, 19, 24, 1);
+                    animation: bm-call-hand 1.5s ease-in-out infinite;
+                }
+
+                &[data-busy] {
+                    cursor: progress;
+                }
+            }
+        }
+
+        &:hover .bm-admin-controls,
+        .bm-admin-controls:focus-within {
+            opacity: 1;
+            visibility: visible;
+            transition-delay: 0s;
+        }
+
+        // A control waiting on the server keeps the row up: the pointer
+        // leaving the tile would otherwise take the spinner with it, and the
+        // moderator would not see the action land. A rule of its own: a
+        // browser that does not know :has() drops the whole rule it is in,
+        // and in the one above it took the hover and focus reveal with it.
+        .bm-admin-controls:has([data-busy]) {
+            opacity: 1;
+            visibility: visible;
+            transition-delay: 0s;
+        }
+    }
+}
+
+// ─── Group audio: the roster ──────────────────────────────────────────────
+
+.bm-call-wrap.bm-group-audio-call-container {
+    height: 100%;
+    overflow: hidden;
+
+    .bm-group-call-container {
+        position: relative;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+    }
+
+    .bm-group-call-audios-grid {
+        position: absolute;
+        inset: 0;
+        bottom: 64px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        box-sizing: border-box;
+        height: auto;
+        padding: 10px;
+        overflow-x: hidden;
+        overflow-y: auto;
+    }
+
+    .bm-group-call-input-audio {
+        display: block;
+        flex: none;
+        z-index: 1;
+        width: 100%;
+        margin: 0;
+    }
+
+    // Somebody sharing their screen takes the stage.
+    //
+    // An audio call has no pictures in it, so the roster is a list of rows
+    // and a share used to be squeezed into the sharer's row as a band 320px
+    // tall. That was a tolerable answer while a share was a laptop's, 16:9,
+    // and the band was most of a picture; a phone's share is 9:19.5, and the
+    // same band drew it as a sliver about a seventh of the row wide with the
+    // rest of the row black — under fifteen hundred pixels of stage that
+    // nothing was using.
+    //
+    // The share is the thing everyone in the call is looking at, so its row
+    // takes the height the roster is not using and the rest of the roster
+    // stays a strip of rows beneath it. The grid already floats a sharer to
+    // the top (group-audio-grid.tsx sorts them above even a speaker), so the
+    // stage is where the eye already is.
+    //
+    // Two people sharing at once get half the stage each, which falls out of
+    // `flex` rather than being written down. A roster long enough to fill the
+    // stage by itself scrolls, and `min-height` is what stops the share being
+    // squeezed to nothing on the way — the grid scrolls, it does not compress.
+    .bm-group-call-input-audio.bm-group-call-input-audio-screen {
+        display: flex;
+        flex: 1 1 auto;
+        min-height: 45%;
+
+        > .bm-group-call-input-audio-inner {
+            display: flex;
+            flex-direction: column;
+            width: 100%;
+            min-height: 0;
+        }
+    }
+
+    .bm-group-call-input-audio-inner {
+        position: relative;
+        display: block;
+        box-sizing: border-box;
+        padding: 0;
+        overflow: hidden;
+        &:not(#\9) { border-radius: var(--bm-radius-card); }
+        border: 1px solid rgba(255, 255, 255, 0.06);
+        background: rgba(var(--bm-call-tile), 1);
+        color: rgba(var(--bm-call-fg), 1);
+        box-shadow: none;
+        transition: box-shadow var(--bm-duration-slow) ease-in-out, background var(--bm-duration-slow) ease-in-out, border-color var(--bm-duration-slow) ease-in-out;
+
+        &.bm-active-speaker {
+            border-color: rgba(var(--bm-color-accent), 0.9);
+        }
+
+        // The picture, at its own shape, as large as the stage allows.
+        //
+        // The element is given the share's ratio rather than a box to be
+        // letterboxed inside, so the black IS the picture: no bars either
+        // side of a phone's share, none above and below a laptop's. The ratio
+        // is read off the playing element, since the stream is the only thing
+        // that knows it (group-audio-grid-item.tsx); the fallback is what a
+        // camera publishes at, for the moment before it reports.
+        //
+        // Fitting a shape into a box needs both of the box's sides at once,
+        // and `max-width` / `max-height` cannot do it: each clamps its own
+        // axis without pulling the other back through the ratio, so whichever
+        // of the two is written comes out exact for one orientation and
+        // leaves the other with a box the wrong shape — measured, not
+        // assumed. Container units hand the arithmetic both sides, and it is
+        // then right either way up. The width/height pair above is what a
+        // browser without them falls back to: the picture letterboxed rather
+        // than hugged, which is the old behaviour minus the 320px ceiling.
+        .bm-group-call-input-audio-screen-wrapper {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex: 1 1 auto;
+            min-height: 0;
+            line-height: 0;
+            container-type: size;
+
+            video {
+                position: relative;
+                display: block;
+                width: 100%;
+                height: 100%;
+                object-fit: contain;
+                background: rgba(0, 0, 0, 1);
+
+                width: auto;
+                aspect-ratio: var(--bm-screen-ratio, 1.7777);
+                height: min(100cqh, calc(100cqw / var(--bm-screen-ratio, 1.7777)));
+            }
+        }
+
+        .bm-group-call-input-audio-inner-info {
+            display: block;
+            flex: none;
+            padding: 8px 10px;
+        }
+
+        .bm-caller-info {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            min-width: 0;
+
+            .bm-info-avatar {
+                flex: none;
+                padding: 0;
+                line-height: 0;
+
+                .avatar {
+                    display: block;
+                }
+
+                img {
+                    display: block;
+                    width: 40px;
+                    height: 40px;
+                    &:not(#\9) { border-radius: var(--bm-radius-avatar) !important; }
+                }
+            }
+
+            .bm-info-name {
+                flex: 1 1 auto;
+                min-width: 0;
+                font-size: var(--bm-font-size-sm);
+                font-weight: 600;
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+
+                a {
+                    color: rgba(var(--bm-call-fg), 1) !important;
+                }
+            }
+
+            .bm-caller-actions {
+                display: flex;
+                align-items: center;
+                flex: none;
+                gap: 6px;
+                margin-inline-start: auto;
+                padding: 0;
+
+                > .bm-admin-controls {
+                    display: flex;
+                    gap: 4px;
+                    opacity: 0;
+                    visibility: hidden;
+                    transition: opacity 0.15s ease, visibility 0s linear 0.15s;
+
+                    > span {
+                        @include bm-call-chip;
+                        width: 28px;
+                        height: 28px;
+                        margin: 0;
+                        background: rgba(255, 255, 255, 0.12);
+                        cursor: pointer;
+                        transition: background 0.12s ease;
+
+                        > svg {
+                            width: 14px;
+                            height: 14px;
+                        }
+
+                        &:hover {
+                            background: rgba(255, 255, 255, 0.26);
+                        }
+
+                        &.bm-promote-highlighted {
+                            background: rgba(var(--bm-color-warning), 1);
+                            color: rgba(17, 19, 24, 1);
+                            animation: bm-call-hand 1.5s ease-in-out infinite;
+                        }
+
+                        &[data-busy] {
+                            cursor: progress;
+                        }
+                    }
+                }
+
+                .bm-mic-status {
+                    line-height: 0;
+
+                    > span {
+                        @include bm-call-chip;
+                        width: 28px;
+                        height: 28px;
+                    }
+
+                    .bm-mic-disabled {
+                        background: rgba(var(--bm-color-recording), 0.92);
+                    }
+
+                    .bm-mic-enabled {
+                        background: rgba(var(--bm-color-success), 0.22);
+                        color: rgba(var(--bm-color-success), 1);
+                    }
+                }
+
+                .bm-hand-raised {
+                    @include bm-call-chip;
+                    width: 28px;
+                    height: 28px;
+                    background: rgba(var(--bm-color-warning), 1);
+                    color: rgba(17, 19, 24, 1);
+                    animation: bm-call-hand 1.5s ease-in-out infinite;
+                }
+
+                .bm-viewer-badge {
+                    display: inline-block;
+                    margin: 0;
+                    padding: 3px 8px;
+                    &:not(#\9) { border-radius: var(--bm-radius-pill); }
+                    background: rgba(255, 255, 255, 0.1);
+                    color: rgba(255, 255, 255, 0.72);
+                    font-size: 10px;
+                    font-weight: 700;
+                    letter-spacing: 0.06em;
+                    text-transform: uppercase;
+                }
+            }
+        }
+
+        &:hover .bm-caller-actions > .bm-admin-controls,
+        .bm-caller-actions > .bm-admin-controls:focus-within {
+            opacity: 1;
+            visibility: visible;
+            transition-delay: 0s;
+        }
+
+        // Kept up while a control waits, as on a video tile, in a rule of its
+        // own for the same reason.
+        .bm-caller-actions > .bm-admin-controls:has([data-busy]) {
+            opacity: 1;
+            visibility: visible;
+            transition-delay: 0s;
+        }
+    }
+}
+
+// Touch has no hover: moderation controls stay on show, as they do on
+// every other hover-only affordance in 3.0.
+@media (pointer: coarse) {
+    .bm-call-wrap.bm-call-wrap-group .bm-group-call-input-video-inner .bm-admin-controls,
+    .bm-call-wrap.bm-group-audio-call-container .bm-group-call-input-audio-inner .bm-caller-actions > .bm-admin-controls {
+        opacity: 1;
+        visibility: visible;
+    }
+}
+
+// Narrow stages (a 350px call column beside the chat, a tablet split, a
+// phone): the controls ease down a little, and the connection badge folds to
+// its dot once its label would crowd the dock. The stage (.bm-call-wrap) is
+// the container.
+//
+// This ladder used to be how the dock fitted — it shrank the buttons for as
+// long as one row could be had that way, then gave up and wrapped. Fitting is
+// CallDock's job now, so the steps are small ones for the look of a cramped
+// stage rather than a chase after room that stops at a 32px target.
+@container (max-width: 719px) {
+    .bm-call-container {
+        --bm-call-btn: 32px;
+    }
+}
+
+@container (max-width: 559px) {
+    .bm-call-container {
+        --bm-call-btn: 30px;
+    }
+
+    .bm-call-buttons,
+    .bm-group-call-controls-buttons {
+        gap: 4px;
+        padding: 5px;
+    }
+
+    .bm-connection-quality {
+        width: 28px;
+        padding: 0;
+        justify-content: center;
+
+        > span {
+            display: none;
+        }
+    }
+}
+
+// A participant tile scales up as it joins. Was an animation library's
+// initial/animate pair, same 300ms linear.
+//
+// The keyframe is deliberately NOT on the tile's base class. The grid re-sorts
+// as people speak, React moves the reordered nodes with insertBefore, and
+// moving a node restarts any CSS animation on it — which made every tile
+// collapse to scale(0) and grow back on each re-sort. group-audio-grid-item
+// carries .bm-call-tile-entering for the first 300ms of a tile's life only, so
+// a tile that is merely changing places has no animation left to restart.
+//
+// `backwards` rather than `both`: the tile must already be at scale(0) on the
+// frame before the animation starts, but must NOT keep a transform once it has
+// finished — useFlipReorder animates transform on these same elements when
+// speakers change places, and a filled-forwards animation would be one more
+// thing competing for the property.
+//
+// There is no leaving animation. Fading a tile out means holding its LiveKit
+// participant alive for the length of the fade, which is not worth it.
+@keyframes bm-call-tile-in {
+  from { opacity: 0; transform: scale(0); }
+  to   { opacity: 1; transform: none; }
+}
+
+.bm-group-call-input-audio.bm-call-tile-entering {
+  animation: bm-call-tile-in 300ms linear backwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bm-group-call-input-audio.bm-call-tile-entering { animation-duration: 1ms; }
+}
+
+// A participant away for a moment (call-container's participantAway): the
+// tile keeps its place, dimmed over the avatar, and says so, so the layout
+// doesn't shift while they reconnect or move between servers.
+.bm-call-wrap .bm-call-reconnecting {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px;
+  &:not(#\9) { border-radius: inherit; }
+  background: rgba(0, 0, 0, 0.45);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.3;
+  text-align: center;
+  pointer-events: none;
+}
+
+// A picture the media server paused for this page's download: its last frame
+// stays, dimmed as a tile away for a moment is, with a chip that says why
+// (group-video-grid-item.tsx, private-call.tsx). Only the chip takes the
+// pointer, for its explanation; the tile's controls stay reachable. Over the
+// tile's media (z-index 1), under its name, microphone and controls, which
+// come after it.
+.bm-call-wrap .bm-call-paused {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px;
+  &:not(#\9) { border-radius: inherit; }
+  background: rgba(0, 0, 0, 0.45);
+  pointer-events: none;
+  animation: bm-call-paused-in 0.3s ease both;
+
+  .bm-call-paused-notice {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    max-width: 100%;
+    box-sizing: border-box;
+    padding: 6px 10px;
+    @include bm-call-glass(0.55);
+    &:not(#\9) { border-radius: var(--bm-radius-card); }
+    color: #fff;
+    font-size: 13px;
+    font-weight: 500;
+    line-height: 1.3;
+    text-align: start;
+    pointer-events: auto;
+
+    // the weak signal in the warning colour, its faint arcs too
+    > svg {
+      flex: none;
+      margin: 0 !important;
+      color: rgba(var(--bm-color-warning), 1);
+    }
+
+    p {
+      margin: 0;
+    }
+
+    p + p {
+      margin-top: 4px;
+      font-weight: 400;
+      opacity: 0.85;
+    }
+  }
+
+  // The call between two people: the whole stage, room for the explanation.
+  // Over the picture, under the chips before it (the other side's muted
+  // microphone, z-index 2).
+  &.bm-call-paused-main {
+    z-index: 1;
+  }
+
+  &.bm-call-paused-main .bm-call-paused-notice {
+    gap: 10px;
+    max-width: min(100% - 32px, 420px);
+    padding: 10px 14px;
+    font-size: var(--bm-font-size-sm);
+    line-height: 1.35;
+  }
+}
+
+@keyframes bm-call-paused-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bm-call-wrap .bm-call-paused { animation: none; }
+}

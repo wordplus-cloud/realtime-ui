@@ -1,0 +1,1784 @@
+// The message list, Better Messages' (its thread-column.tsx's): the list and its wrap, the day separator, the unread
+// divider, the system line, a deleted or encrypted message, a sender's stack, a message's body, bubble and meta with its
+// delivery ticks, the hover actions, the narrow surfaces, the pinned typing line, the scroll pill, the reply chip, the
+// empty conversation and the start of the history.
+//
+// Source: src/components/chat/message-parts.tsx, and Better Messages' thread-column.tsx, which imports this file into
+// its stylesheet where these rules stood (its column, pinned banner and bot welcome stay its own).
+
+.bm-msg-list-wrap {
+    position: relative;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+}
+
+.bm-msg-list {
+    flex: 1;
+    // Named container for the message lane's width. Attachments carry design
+    // sizes in absolute px and need to know when the lane cannot afford them
+    // — a phone, a mini chat, a narrow embed — which is a question about this
+    // column, not about the viewport: the same messenger is a full page on a
+    // phone and a 380px panel beside a desktop site. Inline-size containment
+    // is free here: the column is a flex child filling the thread, so its
+    // width never depended on its contents, and it is already the scroll
+    // container its own sticky avatars stick to.
+    container: bm-thread / inline-size;
+    overflow-y: auto;
+    // Clips the full-line hover bands (.bm-msg-body::after) — the column
+    // itself never scrolls horizontally.
+    overflow-x: hidden;
+    // Typing lives in the header subtitle by default, so the list keeps
+    // only its own breathing room at the bottom. The pinned indicator opens
+    // the foot below for as long as someone writes, and this is the easing
+    // that carries the messages up out of its way and back down after.
+    padding: calc(20px * var(--bm-density)) calc(12px * var(--bm-density)) calc(12px * var(--bm-density));
+    transition: padding-bottom 0.2s ease-out;
+    @media (prefers-reduced-motion: reduce) {
+        transition: none;
+    }
+    display: flex;
+    // column-reverse anchors the scroll to the bottom natively, so newly
+    // added or resized content (images loading, reactions, edits) never
+    // shifts the read position. Content is rendered newest-first so it still
+    // reads chronologically (oldest at top, newest at bottom). scrollTop is
+    // 0 at the bottom and goes negative when scrolling up.
+    flex-direction: column-reverse;
+    // Underfilled conversations read from the TOP (v2): the auto margin on
+    // the bottom-most flex item absorbs the free space below the content.
+    // Once the list overflows there is no free space and this is inert, so
+    // the bottom-anchored scrolling behavior is untouched.
+    > :first-child {
+        margin-bottom: auto;
+    }
+    // Chrome's scroll anchoring assumes normal flow — in a column-reverse
+    // scroller its compensations run the wrong way when history pages insert
+    // DOM at the visual top mid-scroll (observed as sudden jumps toward the
+    // bottom during fast scrolling). column-reverse already pins the read
+    // position; the browser anchoring is pure interference here.
+    overflow-anchor: none;
+    gap: calc(var(--bm-space-sm) * 2);
+    min-height: 0;
+    // The room the pinned typing indicator needs, held open only while
+    // somebody is actually writing — about the indicator's own height, and
+    // nothing at all the rest of the time, rather than the permanently
+    // reserved band that read as a hole under the conversation. Because
+    // column-reverse holds the list against its bottom edge, opening the
+    // foot lifts the messages instead of scrolling them.
+    &[data-typing="list"] {
+        padding-bottom: calc(28px * var(--bm-density));
+    }
+}
+
+// The message list's custom overlay scrollbar (ScrollThumb, reverse mode) is
+// shared with the lists — its .bm-scroll-bar styles live in _scrollbars.scss.
+// .bm-msg-list-wrap (position: relative, above) is its positioning context.
+
+.bm-msg-day {
+    display: flex;
+    flex-direction: column;
+    gap: calc(var(--bm-space-sm) * 1.5);
+}
+
+// Sticky day separator pill — pinned to top of scroll area while
+// the day's messages are in view.
+.bm-day-sep {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    padding: 8px 0 4px;
+    // The row spans the full line width while stuck — it must not
+    // swallow pointer events over content beneath it (sticky avatars,
+    // bubbles near the top edge). Only the pill itself is interactive.
+    pointer-events: none;
+
+    .bm-day-pill {
+        pointer-events: auto;
+    }
+}
+
+// The pinned (stuck) day pill is a scroll affordance — at rest it would
+// float over the messages underneath, so it fades out when the list stops
+// scrolling. Both facts are written onto the separator itself by
+// ThreadColumn's markStuckDaySeps: --stuck that it is pinned, --faded that
+// it is pinned with the list at rest. Keying the rest state off the list
+// instead put it on an ancestor of every message, and each flip restyled
+// the whole conversation.
+.bm-day-pill {
+    transition: opacity 0.25s ease;
+}
+
+// A conversation opening shows its labels as they are, with no fade: --instant
+// is written in the same flip as --faded (ThreadColumn's markStuckDaySeps).
+.bm-day-sep--instant .bm-day-pill {
+    transition: none;
+}
+
+.bm-day-sep--faded .bm-day-pill {
+    opacity: 0;
+    // The faded pill must not keep intercepting the pointer — it sat
+    // invisibly over messages, swallowing clicks and popping its
+    // tooltip on hover.
+    pointer-events: none;
+}
+
+.bm-day-pill {
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: rgba(var(--bm-color-sticky-date-text), 1);
+    padding: 4px 12px;
+    background: rgba(var(--bm-color-sticky-date-bg), 0.82);
+    backdrop-filter: blur(8px);
+    border: 1px solid rgba(var(--bm-color-sticky-date-bg), 0.18);
+    &:not(#\9) { border-radius: var(--bm-radius-date-pill); }
+    box-shadow: var(--bm-shadow-card);
+    cursor: default;
+}
+
+// Unread divider — accent line + "New messages" pill anchored to first
+// un-seen message at thread-open.
+.bm-unread-divider {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 2px 0;
+
+    &__line {
+        flex: 1;
+        height: 1px;
+        background: rgba(var(--bm-color-accent), 0.32);
+    }
+
+    &__label {
+        font-size: 10.5px;
+        font-weight: 700;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: rgba(var(--bm-color-accent), 1);
+        padding: 2px 10px;
+        background: rgba(var(--bm-color-accent-subtle), 1);
+        &:not(#\9) { border-radius: var(--bm-radius-pill); }
+    }
+}
+// System row — sender_id === 0; centered pill with icon + text +
+// timestamp. Used for "X joined the room", thread rename events, etc.
+.bm-system-row {
+    display: flex;
+    justify-content: center;
+    padding: 6px 0;
+
+    &__pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 5px 12px;
+        &:not(#\9) { border-radius: var(--bm-radius-pill); }
+        background: rgba(var(--bm-color-bg-elevated), 1);
+        border: 1px solid rgba(var(--bm-color-border), 1);
+        color: rgba(var(--bm-color-text-tertiary), 1);
+        font-size: 12px;
+        font-weight: 500;
+        max-width: 88%;
+        line-height: 1.5;
+        // One uniform pill for every event type — per-type tints read as
+        // inconsistency once several kinds sit in the same thread.
+
+        > svg {
+            flex-shrink: 0;
+        }
+    }
+
+    &__text {
+        font-style: italic;
+        // Wrap onto further lines in a narrow pane instead of ellipsizing —
+        // a clipped "Probe Alpha and …" hides who joined, and the squeezed
+        // trailing mention chip shrank its avatar with it. Wrapped lines
+        // center under each other (v2), and the exact time lives in the
+        // pill's hover tooltip rather than a span eating pill width.
+        min-width: 0;
+        overflow-wrap: anywhere;
+        text-align: center;
+
+        .bm-mention {
+            font-style: normal;
+        }
+    }
+}
+
+// The time of a tombstone ends the last line of its label, as a text
+// bubble's does (.bm-msg-meta): the spacer keeps its room there, so the line
+// wraps around it and drops the time to a short line of its own only when it
+// is full, and the time is pinned over that room, at the bottom end of the
+// padding. As a column of its own beside the label it left the label ~98px in
+// a narrow mini chat: "Message hidden / (User / blocked)" (Better Messages
+// ticket 10499).
+@mixin bm-tombstone-time {
+    position: relative;
+    display: inline-block;
+
+    &__spacer,
+    &__time {
+        font-size: 10.5px;
+        font-family: var(--bm-font-family-mono);
+        font-variant-numeric: tabular-nums;
+        font-style: normal;
+        white-space: nowrap;
+    }
+
+    &__spacer {
+        display: inline-block;
+        visibility: hidden;
+        margin-inline-start: 12px;
+
+        &::after {
+            content: attr(data-time);
+        }
+    }
+
+    &__time {
+        position: absolute;
+        bottom: 7px;
+        inset-inline-end: 12px;
+        // Inherit the bubble's own text colour: a fixed grey stayed dark
+        // on an own tombstone, whose label is white on the tinted accent.
+        color: inherit;
+        opacity: var(--bm-tombstone-dim);
+    }
+}
+
+// Deleted bubble — replaces the entire message body when v2 emits one
+// of the tombstone markers. Italic placeholder + the original time so
+// the user still sees the "when".
+.bm-msg-deleted {
+    @include bm-tombstone-time;
+    padding: 7px 12px;
+    background: rgba(var(--bm-color-bubble-other-bg), 1);
+    color: rgba(var(--bm-color-text-tertiary), 1);
+    &:not(#\9) { border-radius: var(--bm-radius-lg); }
+    font-size: var(--bm-font-size-sm);
+    max-width: 100%;
+    overflow-wrap: break-word;
+    // Same dim levels .bm-msg-meta uses, so the time tracks whatever
+    // colour the bubble's text is instead of a fixed grey.
+    --bm-tombstone-dim: 0.55;
+
+    .bm-msg-stack[data-is-me="1"] & {
+        background: rgba(var(--bm-color-bubble-self-bg), 0.45);
+        color: rgba(var(--bm-color-bubble-self-text), 0.85);
+        --bm-tombstone-dim: 0.75;
+    }
+
+    &__label {
+        font-style: italic;
+    }
+
+    &__time {
+        cursor: default;
+    }
+}
+
+// Encrypted (locked) bubble — E2E ciphertext this browser holds no keys
+// for. Same silhouette as the deleted tombstone, but clickable: tapping
+// runs the v2 key-recovery ladder (re-decrypt / restore / set up).
+.bm-msg-encrypted {
+    @include bm-tombstone-time;
+    padding: 7px 12px;
+    background: rgba(var(--bm-color-bubble-other-bg), 1);
+    color: rgba(var(--bm-color-text-secondary), 1);
+    &:not(#\9) { border-radius: var(--bm-radius-lg); }
+    font-size: var(--bm-font-size-sm);
+    max-width: 100%;
+    cursor: pointer;
+    --bm-tombstone-dim: 0.55;
+
+    .bm-msg-stack[data-is-me="1"] & {
+        background: rgba(var(--bm-color-bubble-self-bg), 0.45);
+        color: rgba(var(--bm-color-bubble-self-text), 0.85);
+        --bm-tombstone-dim: 0.75;
+    }
+
+    &:hover {
+        background: rgba(var(--bm-color-bg-hover), 1);
+    }
+
+    // The lock, at the start of the first line of the label.
+    > svg {
+        vertical-align: -2px;
+        margin-inline-end: 8px;
+    }
+
+    &__label {
+        font-style: italic;
+    }
+}
+
+// Stack — consecutive messages from one sender; reverses for self.
+.bm-msg-stack {
+    display: flex;
+    flex-direction: row;
+    // The bubble tail reaches out of the column into this gutter, so the gutter
+    // grows by exactly its length: 6px of air is left beside the avatar either
+    // way, instead of the triangle crossing the whole gap and touching the
+    // face it points at. Zero when the option is off (see --bm-bubble-tail in
+    // _design-options.scss).
+    gap: calc(6px + var(--bm-tail-size, 0px));
+    align-items: stretch;
+
+    // Sender blocked by the viewer — dimmed stack with hidden-message
+    // bubbles (v2's .bm-stack-hidden).
+    &[data-blocked] {
+        opacity: 0.5;
+    }
+
+    &[data-side="right"] {
+        flex-direction: row-reverse;
+    }
+
+    // v2 .bm-pic parity: the avatar column spans the stack, and the
+    // avatar itself rides level with the stack's top bubble, sticking
+    // to the scrollport while a tall sender stack scrolls past. The
+    // sticky sits on the column's direct child so it works both bare
+    // and wrapped in the profile link.
+    //
+    // z-index 3: each .bm-msg-body is a later-DOM z-0 stacking context
+    // whose full-line hover band (::after, ±100vw) and highlight overlay
+    // paint OVER the avatar — and the sticky day separator row sits at
+    // z 2. The avatar column must clear both so a stuck avatar is never
+    // covered or click-blocked.
+    &__avatar {
+        flex: 0 0 auto;
+        position: relative;
+        z-index: 3;
+
+        // The sticky constraint is inset by the scroller's own
+        // padding-top (20px on .bm-msg-list), so a stuck avatar rested
+        // 20px lower than the offset suggests. The negative top
+        // compensates: net rest = 20 - 16 = 4px below the list's
+        // visual top edge, right under the header/pinned banner.
+        > a,
+        > .bm-avatar-wrap {
+            position: sticky;
+            top: -16px;
+        }
+
+        > a {
+            display: block;
+            line-height: 0;
+            cursor: pointer;
+        }
+    }
+
+    &__bubbles {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        align-items: flex-start;
+        max-width: var(--bm-bubble-max-width);
+        min-width: 0;
+    }
+
+    // The actions lane is reserved with a MARGIN on this column, not by
+    // subtracting it from the column's own max-width.
+    //
+    // `calc(100% - var(--bm-msg-actions-space))` measured the STACK, but this
+    // column is a flex item sitting after the avatar inside it, so the
+    // avatar's width never came out of the reservation and the bubble ended
+    // that much further along than the lane claimed. The strip is positioned
+    // at the bubble's outer edge, so it hung past the list by exactly the
+    // avatar column — invisible in a wide gutter, and on a phone the far
+    // button was clipped by the viewport. A margin is part of the item's
+    // outer size, so the flex line does the subtraction for us, whatever the
+    // avatar is set to and whether it is there at all.
+    //
+    // Each side reserves on the side its own strip opens towards: a left
+    // bubble pushes it right, an own bubble pushes it left
+    // (.bm-hover-actions, below).
+    &[data-side="left"] &__bubbles {
+        margin-inline-end: var(--bm-msg-actions-space);
+    }
+
+    &[data-side="right"] &__bubbles {
+        margin-inline-start: var(--bm-msg-actions-space);
+    }
+
+    // The option is a TEXT-bubble width. Composed fixed-layout cards (call
+    // events, location cards, the refused-send banner) carry icon + time or
+    // action columns that leave the label ~90px once 70% of a 390px phone is
+    // split up. Their stacks span the whole lane (the actions reservation
+    // stays, as the margin above); text stacks keep honouring the option. On
+    // wide surfaces the card fits either way, so this only changes narrow
+    // renders.
+    &:has(.bm-call-event, .bm-location-bubble, .bm-outbox-banner) &__bubbles {
+        max-width: 100%;
+    }
+
+    &[data-side="right"] &__bubbles {
+        align-items: flex-end;
+    }
+
+    // v2 .bm-info parity: sender name row above the stack's first
+    // bubble — linked name with verified / moderator badges, plus the
+    // per-stack time in datePosition: "stack" mode. Mirrors to the
+    // right edge above own bubbles.
+    &__info {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        padding: 0 4px;
+        margin-bottom: 2px;
+        font-size: var(--bm-font-size-name);
+        line-height: 1.3;
+        user-select: none;
+
+        .bm-name {
+            display: inline-flex;
+            align-items: center;
+            gap: 3px;
+            font-weight: 600;
+            // The sender name IS the nickname 2.x let you colour per side
+            // ("Modern Message: Left/Right Nickname Color"). It was painting
+            // from the generic secondary text colour, so both of those
+            // controls set tokens nothing read.
+            color: rgba(var(--bm-color-bubble-other-nickname), 1);
+
+            // The name is a profile link, and a host theme's content-link
+            // colour outranks this scope (see the bubble link rule below) —
+            // it was painting over the nickname colour both of those controls
+            // set, so the link has to say so outright.
+            a {
+                color: inherit !important;
+                text-decoration: none;
+
+                &:hover {
+                    color: rgba(var(--bm-color-text-primary), 1) !important;
+                }
+            }
+
+            svg {
+                width: 1em;
+                height: 1em;
+                display: block;
+            }
+
+            .bm-name-verified,
+            .bm-name-moderator {
+                display: inline-flex;
+                align-items: center;
+            }
+
+            // The tick takes the name's colour, wherever the name got it.
+            .bm-name-verified {
+                color: inherit;
+            }
+
+            .bm-name-moderator {
+                color: rgba(var(--bm-color-accent), 1);
+            }
+        }
+    }
+
+    &[data-side="right"] &__info {
+        justify-content: flex-end;
+    }
+
+    // Colour by sender, alignment by side: with "Mine on the left" the two
+    // are opposites, and keying the nickname to the side handed your colour
+    // to everyone else.
+    &[data-is-me="1"] &__info .bm-name {
+        color: rgba(var(--bm-color-bubble-self-nickname), 1);
+    }
+
+    // datePosition: "stack" — one muted time label per sender stack,
+    // replacing the per-bubble time (which InlineMeta hides in that mode).
+    &__time {
+        font-size: var(--bm-font-size-xs);
+        color: rgba(var(--bm-color-text-tertiary), 1);
+        user-select: none;
+    }
+}
+
+// Message body wrapper. data-is-me drives self/other styling for every
+// nested piece (bubble, reply-chip, hover-actions).
+.bm-msg-body {
+    display: flex;
+    flex-direction: column;
+    max-width: 100%;
+    position: relative;
+    // Own stacking context so the hover band below stays sandwiched
+    // between the list background and the message content.
+    z-index: 0;
+
+    // Surface hover actions on hover (replaces the React useState
+    // approach in the prototype). The buttons fade one by one rather than
+    // the strip as a whole, so a favorited message's star can stay on show
+    // between hovers (see .bm-hover-actions__btn.is-active).
+    // [data-actions="open"] is the touch equivalent: a tap sets it, because
+    // :hover never matches on a finger and the strip was unreachable there.
+    &:hover .bm-hover-actions,
+    &[data-actions="open"] .bm-hover-actions {
+        pointer-events: auto;
+    }
+    &:hover .bm-hover-actions__btn,
+    &[data-actions="open"] .bm-hover-actions__btn {
+        opacity: 1;
+
+        // Mounted by the pointer arriving (see MessageBubble), so the button
+        // is inserted already matching this rule and the transition above
+        // has no value to start from. @starting-style supplies the frame
+        // before; browsers without it show the strip at once.
+        @starting-style {
+            opacity: 0;
+        }
+    }
+
+    // Full-line hover band: the actions reveal when the pointer is
+    // anywhere on the message's horizontal line, not only over the
+    // bubble. Hit-area-only pseudo behind the content (z -1 inside the
+    // body's own context, absolute so it never joins the flex flow)
+    // spanning the whole row; the list clips it horizontally.
+    // The context menu does NOT open from this band — useMessageMenu
+    // gates the open to the body's own box, so a right-click beside the
+    // bubble falls through to the browser menu (v2 scoped its menu to
+    // the content element the same way).
+    &::after {
+        content: "";
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        left: -100vw;
+        right: -100vw;
+        z-index: -1;
+    }
+}
+
+// Touch devices open the message menu with a long-press (useMessageMenu),
+// which native long-press text selection and the iOS link/image callout
+// would race — suppress both inside bubbles, Telegram/WhatsApp style. The
+// menu carries "Copy message text"; desktop selection is untouched.
+//
+// The selection half stands down while the pointer in use is a mouse
+// (bm-pointer-mouse, watchPointerKind in thread-column.tsx). A Windows 2-in-1
+// the system takes for a tablet reports a coarse pointer with a mouse in
+// hand, and its member could not select a word of a message.
+@media (pointer: coarse) {
+    .bm-msg-body,
+    .bm-location-pair {
+        -webkit-touch-callout: none;
+        -webkit-tap-highlight-color: transparent;
+    }
+
+    :root:not(.bm-pointer-mouse) {
+        .bm-msg-body,
+        .bm-location-pair {
+            user-select: none;
+            -webkit-user-select: none;
+        }
+    }
+
+    // The callout is only half of what iOS does to a picture. Every <img>
+    // is also a drag source in WebKit, and that half is what a long-press
+    // on a photo actually lands on: around 500ms in — ahead of our own
+    // 600ms timer — iOS lifts the image, floats it above the page, and
+    // sends the document a pointercancel, which is exactly the signal
+    // useLongPress treats as "the browser took this gesture". So the press
+    // never fires and the message menu never opens; the reader gets a
+    // picture hanging off their finger instead. The lift is drawn from the
+    // image's own frame rather than from the tile, so it also ignores the
+    // object-fit crop the album cut it to and shows the whole picture
+    // squashed into the tile's proportions. Taking the element out of the
+    // drag machinery leaves the press to us — and there is nothing lost
+    // with it: the message menu carries the actions, and the lightbox
+    // (which keeps its native long-press) is where a reader goes to save
+    // the full-size file.
+    .bm-msg-body img {
+        -webkit-user-drag: none;
+    }
+}
+
+// Hover-actions anchor: wraps the visual message content (attachments +
+// bubble + below-meta / location card / call card) but not the reactions
+// row, so the actions center on the whole content stack — for a combined
+// attachment+bubble message they sit at the middle of both elements
+// instead of the bubble strip alone.
+.bm-msg-main {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    max-width: 100%;
+}
+
+// Arrival animation — ThreadColumn marks exactly the one bubble whose
+// message just arrived or was sent (v2 behavior). Never runs on the
+// initial render or on history loads; the old structural :last-child
+// selector actually targeted the OLDEST day in the column-reverse DOM
+// and animated an old bubble on every conversation open.
+.bm-msg-body--new {
+    animation: bm-msg-in 0.22s ease-out both;
+}
+
+// The slide itself is the list-level FLIP in thread-column.tsx — the whole
+// column glides up by the new message's height, the way 2.0's smooth scroll
+// to bottom moved it. The bubble only fades in on top of that ride; a
+// translateY here would start it a second height too low.
+@keyframes bm-msg-in {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+}
+
+.bm-msg-bubble {
+    &:not(#\9) { border-radius: var(--bm-radius-bubble); }
+    background: rgba(var(--bm-color-bubble-other-bg), 1);
+    color: rgba(var(--bm-color-bubble-other-text), 1);
+    padding: calc(8px * var(--bm-density)) calc(14px * var(--bm-density));
+    font-size: var(--bm-font-size-base);
+    line-height: var(--bm-line-height-normal);
+    word-break: break-word;
+    position: relative;
+    // BFC so the floated meta is contained when it drops below the last
+    // text line (flow-root, not overflow — the hover actions hang outside).
+    display: flow-root;
+
+    // Text wrapper — the inline meta's positioning context, so the time
+    // stays pinned to the text's last line even when the in-bubble
+    // reactions row extends the bubble below it. flow-root contains the
+    // meta's width-reservation float.
+    &__text {
+        position: relative;
+        display: flow-root;
+
+        // Rich block content (pasted or formatted HTML). UA defaults give
+        // headings and lists big block margins sized for documents — in a
+        // bubble the first one opens a hole above the text and the sizes
+        // dwarf the chat. Compact them, scale with the density setting,
+        // and zero the leading/trailing margins so content hugs the
+        // bubble padding. !important throughout: host themes style content
+        // headings and lists with selectors this scope cannot outrank
+        // (.entry-content h1 and friends), and inside a bubble these
+        // metrics are the messenger's to own.
+        // The bubble's own ink and type, as in the message field
+        // (_composer.scss): a theme's heading colour is picked for its page,
+        // and on an own bubble or a dark one it drew the heading near black.
+        h1, h2, h3, h4, h5, h6 {
+            margin: calc(10px * var(--bm-density)) 0 calc(4px * var(--bm-density)) !important;
+            padding: 0 !important;
+            border: 0 !important;
+            background: none !important;
+            color: inherit !important;
+            font-family: inherit !important;
+            font-weight: 600 !important;
+            line-height: 1.25 !important;
+            letter-spacing: normal !important;
+            text-transform: none !important;
+        }
+        h1 { font-size: 1.35em !important; }
+        h2 { font-size: 1.25em !important; }
+        h3 { font-size: 1.15em !important; }
+        h4, h5, h6 { font-size: 1.05em !important; }
+        p, ul, ol, blockquote, pre, table, figure {
+            margin-block: calc(6px * var(--bm-density)) !important;
+        }
+        // Markers too, whatever list-style a theme's reset gives lists.
+        ul, ol {
+            margin-inline: 0 !important;
+            padding-inline-start: calc(20px * var(--bm-density)) !important;
+            list-style-position: outside !important;
+        }
+        ul > li { list-style-type: disc !important; }
+        ol > li { list-style-type: decimal !important; }
+        li {
+            display: list-item !important;
+            margin-block: calc(2px * var(--bm-density)) !important;
+            padding: 0 !important;
+
+            > p { margin-block: 0 !important; }
+        }
+        blockquote {
+            margin-inline: 0 !important;
+            padding-inline-start: calc(10px * var(--bm-density)) !important;
+            border-inline-start: 2px solid rgba(var(--bm-color-border), 1);
+        }
+        hr {
+            margin-block: calc(6px * var(--bm-density)) !important;
+            padding: 0 !important;
+            border: 0 !important;
+            border-block-start: 1px solid currentColor !important;
+            height: auto !important;
+            background: none !important;
+            opacity: 0.2;
+        }
+        // Code: one box per block that scrolls sideways inside the bubble, and
+        // a small pill for code in a sentence. Left to the page, a block's code
+        // element took the page's inline-code look line by line (the WordPress
+        // admin's grey bars and padding, a theme's likewise) and its long
+        // lines ran out past the bubble's edge.
+        pre {
+            display: block !important;
+            max-width: 100%;
+            overflow-x: auto;
+            padding: calc(8px * var(--bm-density)) calc(10px * var(--bm-density)) !important;
+            border: 1px solid rgba(var(--bm-color-border), 1) !important;
+            &:not(#\9) { border-radius: var(--bm-radius-sm) !important; }
+            background: rgba(var(--bm-color-text-primary), 0.04) !important;
+            color: inherit !important;
+            font-family: var(--bm-font-family-mono) !important;
+            font-size: 0.85em !important;
+            line-height: 1.5 !important;
+            white-space: pre !important;
+            word-break: normal !important;
+            overflow-wrap: normal !important;
+        }
+        pre code {
+            display: block !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            border: 0 !important;
+            background: none !important;
+            color: inherit !important;
+            font: inherit !important;
+            white-space: inherit !important;
+            word-break: inherit !important;
+            overflow-wrap: inherit !important;
+        }
+        // The renderer sets line breaks around a block as well, which doubled
+        // the gap its own margins already make.
+        br:has(+ pre), br:has(+ br + pre), pre + br { display: none; }
+        :not(pre) > code {
+            margin: 0 !important;
+            padding: 0.1em 0.35em !important;
+            &:not(#\9) { border-radius: var(--bm-radius-xs) !important; }
+            background: rgba(var(--bm-color-text-primary), 0.07) !important;
+            font-family: var(--bm-font-family-mono) !important;
+            font-size: 0.88em !important;
+        }
+        > :first-child { margin-block-start: 0 !important; }
+        > :last-child { margin-block-end: 0 !important; }
+    }
+
+    .bm-msg-stack[data-is-me="1"] .bm-msg-body & {
+        background: rgba(var(--bm-color-bubble-self-bg), 1);
+        color: rgba(var(--bm-color-bubble-self-text), 1);
+    }
+
+    // Attached to a file grid above — square top corners.
+    .bm-msg-body[data-has-files="1"] & {
+        &:not(#\9) { border-radius: 0 0 var(--bm-radius-bubble) var(--bm-radius-bubble); }
+    }
+
+    // Sticker / GIF — float the asset free on a transparent background
+    // so the image is the visual, not the bubble. The side-scoped variants
+    // out-specify the self-bubble background rule above, which otherwise
+    // kept own stickers/GIFs on accent paint.
+    .bm-msg-body[data-content-kind="sticker"] &,
+    .bm-msg-body[data-content-kind="gif"] &,
+    .bm-msg-stack[data-side] .bm-msg-body[data-content-kind="sticker"] &,
+    .bm-msg-stack[data-side] .bm-msg-body[data-content-kind="gif"] & {
+        background: transparent;
+        padding: 0;
+    }
+}
+
+// Every link in a bubble takes the bubble's own text colour (v2 painted every
+// descendant with the side text colour, so links were never accent-on-accent).
+// The cards (url preview, WooCommerce product, cart and order) and the mention
+// chip paint their own insides, and keep it.
+//
+// !important because host themes colour content links from selectors this
+// scope cannot outrank — buddyx ships `.entry-content a:not(.wp-element-button)
+// :not(.wp-block-button__link):not(.button):not([class*="button"])`, five
+// classes deep, and it repainted every link in the messenger its own near
+// black: on an accent bubble the url card's title came out dark on blue. The
+// WooCommerce product card already had to harden itself the same way.
+.bm-msg-bubble a {
+    color: inherit !important;
+}
+
+// A plain link in the text, one with no class of its own (every card and the
+// mention chip carry one), takes the link colours on Appearance → Colors:
+// Own messages → Links and Other messages → Links on bubbles, and one
+// Conversation → Links under Outlined and Classic, where both sides are drawn
+// in the conversation's text on its background. Each follows the text around
+// the link until it is set, so a site that never touches them keeps the look
+// 2.0 and 3.0 always had.
+//
+// The side and the design sit in :where(), so each rule weighs what the one
+// above does, (0,1,1), and wins it only by coming later. A site's own
+// `.bm-message-content-text a { color: … !important }` — how a link colour
+// was set before these existed — weighs the same and still wins by loading
+// later still.
+.bm-msg-bubble__text a:where(:not([class])) {
+    color: rgba(var(--bm-color-bubble-other-link), 1) !important;
+}
+
+:where(.bm-msg-stack[data-is-me="1"]) .bm-msg-bubble__text a:where(:not([class])) {
+    color: rgba(var(--bm-color-bubble-self-link), 1) !important;
+}
+
+// Last, so it wins among equals on both sides.
+:where(.bm-msg-stack:is([data-bubble="outline"], [data-bubble="none"])) .bm-msg-bubble__text a:where(:not([class])) {
+    color: rgba(var(--bm-color-text-link), 1) !important;
+}
+
+.bm-msg-bubble__text a:not(.url-wrap):not(.bm-mention-link) {
+    text-decoration: underline;
+}
+
+// Inline sticker / GIF asset styling. v2 emits stickers as
+// <span class="bm-sticker"><img …></span> and GIFs the same way; we
+// constrain dimensions + apply the prototype's drop-shadow.
+// .bpbm- alias: messages stored before the 3.0 class rename keep rendering.
+//
+// Both design widths are a CAP, not a size: the lane they sit in is 70% of a
+// column that a call squeezes to 350px, and a flat 280px asset overflowed it
+// and was cut off by the column's edge — half a GIF, mid-frame. What shrinks
+// now is the picture, whole.
+//
+// The cap belongs to the SPAN, and the asset takes the span. The other way
+// round, a percentage in the asset's own max-width reads as indefinite while
+// the browser sizes the span around it, so the span took the width the
+// asset's height cap implied — 71px wider than the picture on a landscape
+// GIF, which put the "GIF" badge out in the bubble beside it.
+//
+// And the span's cap is a plain length, for the same reason one level up. A
+// percentage there — min(280px, 100%) — is a share of the bubble, which is
+// the box being sized around it, so while the bubble measured its content
+// the whole cap counted as none: the bubble took the picture's natural width
+// up to its own limit and the picture was capped inside it. A square GIF hid
+// that, its height cap coming through the ratio as a width. A 480x270 one sat
+// 280px wide in a 388px bubble with its time 108px away. A narrow lane still
+// shrinks the picture whole without the percentage: the asset's own
+// max-width: 100% lets it go to nothing, so the span takes the room there is.
+.bm-msg-body[data-content-kind="sticker"] .bm-sticker,
+.bm-msg-body[data-content-kind="sticker"] .bpbm-sticker {
+    display: inline-block;
+    line-height: 0;
+    max-width: 160px;
+
+    img {
+        max-width: 100%;
+        max-height: 160px;
+        width: auto;
+        height: auto;
+        filter: drop-shadow(0 6px 18px rgba(0, 0, 0, 0.12));
+    }
+}
+
+.bm-msg-body[data-content-kind="gif"] .bm-gif,
+.bm-msg-body[data-content-kind="gif"] .bpbm-gif {
+    display: inline-block;
+    line-height: 0;
+    max-width: 280px;
+    &:not(#\9) { border-radius: var(--bm-radius-md); }
+    overflow: hidden;
+    position: relative;
+
+    img,
+    video {
+        display: block;
+        max-width: 100%;
+        max-height: 280px;
+        width: auto;
+        height: auto;
+        &:not(#\9) { border-radius: var(--bm-radius-md); }
+    }
+
+    // Tiny "GIF" badge in the top-right corner matching the prototype.
+    &::after {
+        content: "GIF";
+        position: absolute;
+        top: 6px;
+        inset-inline-end: 6px;
+        display: inline-flex;
+        align-items: center;
+        padding: 2px 6px;
+        background: rgba(0, 0, 0, 0.5);
+        backdrop-filter: blur(6px);
+        color: white;
+        border-radius: 3px;
+        font-size: 9px;
+        font-weight: 800;
+        font-family: var(--bm-font-family-mono);
+        letter-spacing: 0.04em;
+        line-height: 1;
+        text-decoration: none;
+    }
+
+    // A GIF that carries its provider's watermark says what it is already.
+    &.bm-gif--credited::after {
+        content: none;
+    }
+}
+
+// oEmbed iframe (urls addon: <span class="bp-messages-iframe-container">) —
+// the raw embed ships at its provider default size (300×200); pin it to a
+// 16:9 block that fills the bubble.
+.bm-msg-bubble .bm-iframe-container,
+.bm-msg-bubble .bp-messages-iframe-container {
+    display: block;
+    width: 420px;
+    max-width: 100%;
+    aspect-ratio: 16 / 9;
+    margin: 4px 0;
+    &:not(#\9) { border-radius: var(--bm-radius-md); }
+    overflow: hidden;
+    // Transparent, not a dark scrim — the scrim edge peeked out above the
+    // iframe as a gray line over light bubbles.
+    background: transparent;
+
+    iframe {
+        display: block;
+        width: 100% !important;
+        height: 100% !important;
+        border: 0;
+    }
+
+    // Privacy-embeds variant: poster + play overlay, iframe loads on click.
+    // The play button and title had no rules here at all, so the poster was
+    // an invisible click target over a background image — and with the embed
+    // rendered as raw HTML there was nothing listening for the click either.
+    // Ported from the 2.0 rules with the same tokens.
+    .bm-embed-consent {
+        position: relative;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-direction: column;
+        gap: var(--bm-space-sm);
+        width: 100%;
+        height: 100%;
+        cursor: pointer;
+        touch-action: manipulation;
+        background-color: #000;
+        background-size: cover;
+        background-position: center;
+
+        // A plain :hover costs iOS the first tap — Safari spends it applying
+        // the hover state instead of firing the click.
+        @media (hover: hover) {
+            &:hover .bm-embed-consent-play {
+                transform: scale(1.1);
+                background-color: rgba(255, 0, 0, 0.9);
+            }
+        }
+
+        .bm-embed-consent-play {
+            width: 68px;
+            height: 48px;
+            background-color: rgba(255, 0, 0, 0.8);
+            &:not(#\9) { border-radius: var(--bm-radius-lg); }
+            position: relative;
+            flex-shrink: 0;
+            transition: transform var(--bm-duration-fast) ease,
+                        background-color var(--bm-duration-fast) ease;
+
+            &::after {
+                content: '';
+                position: absolute;
+                top: 50%;
+                left: 50%;
+                transform: translate(-35%, -50%);
+                border-style: solid;
+                border-width: 10px 0 10px 18px;
+                border-color: transparent transparent transparent #fff;
+            }
+        }
+
+        .bm-embed-consent-title {
+            color: #fff;
+            font-size: var(--bm-font-size-sm);
+            text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
+            max-width: 80%;
+            text-align: center;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+    }
+}
+
+// URL preview card (urls addon: <a class="url-wrap">) — thumb + title +
+// site name. Colors adapt to the bubble side.
+.bm-msg-bubble .url-wrap {
+    display: flex;
+    align-items: stretch;
+    gap: 10px;
+    width: 360px;
+    max-width: 100%;
+    margin: 6px 0 2px;
+    padding: 8px;
+    &:not(#\9) { border-radius: var(--bm-radius-md); }
+    background: rgba(var(--bm-color-text-primary), 0.05);
+    text-decoration: none !important;
+    color: inherit;
+    overflow: hidden;
+
+    .url-image {
+        flex: 0 0 auto;
+        width: 54px;
+        &:not(#\9) { border-radius: var(--bm-radius-sm); }
+        background-size: cover;
+        background-position: center;
+        background-color: rgba(var(--bm-color-text-primary), 0.08);
+    }
+
+    .url-description {
+        flex: 1;
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        gap: 2px;
+    }
+
+    .url-title {
+        font-size: var(--bm-font-size-sm);
+        font-weight: 600;
+        line-height: 1.3;
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+    }
+
+    .url-site {
+        font-size: var(--bm-font-size-xs);
+        color: rgba(var(--bm-color-text-tertiary), 1);
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    &:hover {
+        background: rgba(var(--bm-color-text-primary), 0.09);
+    }
+
+    // Self paint follows the sender, not the side — under "Mine on the left"
+    // the accent bubble sits on the left and this must still apply. The wash
+    // is cut from the bubble's own ink rather than white, so it stays a
+    // visible tint on a light own bubble as well as a dark one.
+    .bm-msg-stack[data-bubble="filled"][data-is-me="1"] .bm-msg-body & {
+        background: rgba(var(--bm-color-bubble-self-text), 0.14);
+
+        .url-site { color: rgba(var(--bm-color-bubble-self-text), 0.75); }
+
+        &:hover { background: rgba(var(--bm-color-bubble-self-text), 0.2); }
+    }
+}
+
+// Forwarded label — caption above a forwarded message bubble.
+.bm-msg-forwarded {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    margin-bottom: 4px;
+    font-size: var(--bm-font-size-xs);
+    font-weight: 600;
+    color: rgba(var(--bm-color-text-tertiary), 1);
+    letter-spacing: 0.01em;
+
+    .bm-msg-stack[data-is-me="1"] .bm-msg-body & {
+        color: rgba(var(--bm-color-text-tertiary), 1);
+    }
+}
+
+// oEmbed / iframe content inside a text bubble. v2's oEmbed enrichment
+// drops iframes / blockquotes for YouTube, Twitter, Instagram, WP
+// embeds, etc. straight into the message HTML. Constrain them so they
+// don't blow past the bubble's max width + round their corners.
+.bm-msg-bubble iframe {
+    max-width: 100%;
+    width: 100%;
+    border: 0;
+    &:not(#\9) { border-radius: var(--bm-radius-md); }
+    margin-top: 6px;
+    display: block;
+}
+
+.bm-msg-bubble .wp-embedded-content,
+.bm-msg-bubble blockquote.wp-embedded-content {
+    max-width: 100%;
+    border: 0;
+    &:not(#\9) { border-radius: var(--bm-radius-md); }
+    display: block;
+}
+
+.bm-msg-bubble .twitter-tweet,
+.bm-msg-bubble .instagram-media {
+    max-width: 100% !important;
+    margin: 6px 0 0 !important;
+    &:not(#\9) { border-radius: var(--bm-radius-md); }
+}
+
+// Inline meta — time + edited badge + status ticks. The default
+// ("inline") variant is TWO cooperating elements: an invisible float
+// spacer reserves the meta's exact measured width in the text flow (so
+// the last line wraps around it, dropping to its own short line when
+// full — v2 modern-template behavior, same as Telegram), while the
+// visible meta is pinned to the bubble's bottom-right corner where no
+// tall line (emoji, big glyphs) can float it above the text. The
+// `below` variant is a static right-aligned row for text-less messages
+// (media grids, stickers, GIFs) — the meta sits under the content,
+// never over it.
+.bm-msg-status[data-detailed="1"] {
+    cursor: pointer;
+}
+
+// AI answer being generated — a breathing dot in the otherwise empty
+// streaming bubble (v2's bm-ai-waiting). Opacity/scale only, so the
+// flat-chrome box-shadow sweep cannot touch it.
+.bm-ai-waiting {
+    display: inline-flex;
+    align-items: center;
+    min-height: calc(18px * var(--bm-density));
+
+    &__dot {
+        width: 10px;
+        height: 10px;
+        background: currentColor;
+        opacity: 0.7;
+        animation: bm-rec 1.6s ease-in-out infinite;
+        &:not(#\9) { border-radius: 50%; }
+    }
+}
+
+.bm-msg-meta {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    line-height: 1;
+    font-size: 10.5px;
+    font-family: var(--bm-font-family-mono);
+    white-space: nowrap;
+    user-select: none;
+
+    // v2 .bm-message-info parity, done with a spacer instead of a float:
+    // the hidden copy reserves the meta's footprint in the text flow (the
+    // text wraps around it on the last line, and it drops to its own
+    // right-aligned line when the line is full), while the visible copy
+    // pins to the text block's bottom corner — __text carries no padding,
+    // so that corner IS the last line's bottom whatever the line height
+    // (a plain line and an emoji-stretched one land identically).
+    &[data-variant="spacer"] {
+        visibility: hidden;
+        margin-inline-start: 10px;
+    }
+
+    &[data-variant="overlay"] {
+        position: absolute;
+        bottom: 0;
+        inset-inline-end: 0;
+    }
+    // Dim level for the meta pieces. It sits on the CHILDREN (not the
+    // container) so the seen tick can escape it — a container opacity
+    // caps every descendant.
+    --bm-meta-dim: 0.55;
+
+    .bm-msg-stack[data-is-me="1"] .bm-msg-body & {
+        --bm-meta-dim: 0.75;
+    }
+
+    &[data-variant="below"] {
+        float: none;
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        width: 100%;
+        height: auto;
+        margin: 3px 0 0;
+        color: rgba(var(--bm-color-text-tertiary), 1);
+        --bm-meta-dim: 1;
+    }
+
+    // The in-bubble pill row's last item (see _message-reactions.scss).
+    // An auto inline-start margin eats whatever the pills leave and parks
+    // the meta on the row's end edge — the flex equivalent of the spacer
+    // the text flow needs, with none of its measuring. The padding keeps
+    // the 10px the spacer reserves even on a row the pills fill, and the
+    // shrink is off so a crowded row wraps a pill rather than squeezing
+    // the time into an ellipsis. It rides the row's centre line, not its
+    // bottom: bottom-aligned against a 24px pill the time hangs lower than
+    // the bubble's own bottom padding reads.
+    &[data-variant="row"] {
+        margin-inline-start: auto;
+        padding-inline-start: 6px;
+        flex: 0 0 auto;
+    }
+
+    // The same row, but outside a bubble — the pills under a sticker, a GIF,
+    // a voice note or attachments with no caption, which carry the meta too
+    // rather than leaving it a line of its own. There is no bubble surface to
+    // take the ink from there, so it keeps what it had while it WAS that line
+    // (the "below" variant): page-tertiary, undimmed. Declared after the
+    // is-me rule above, which it ties with on specificity.
+    .bm-msg-body > .bm-reactions &[data-variant="row"] {
+        color: rgba(var(--bm-color-text-tertiary), 1);
+        --bm-meta-dim: 1;
+    }
+
+    &__edited,
+    &__pinned {
+        display: inline-flex;
+        align-items: center;
+        opacity: var(--bm-meta-dim);
+    }
+
+    // A favorited message's star, where the strip carries none to latch: a
+    // phone or a mini chat set to ⋯ alone or to no buttons. 2.0's colour,
+    // filled, and not dimmed with the rest, because it is that same star
+    // moved in beside the time. The call and location cards print it in their
+    // own time too.
+    &__favorite {
+        display: inline-flex;
+        align-items: center;
+        color: rgba(var(--bm-color-favorite), 1);
+
+        svg { fill: currentColor; }
+    }
+
+    &__time {
+        cursor: default;
+        opacity: var(--bm-meta-dim);
+    }
+
+    // The tick's slot is a fixed 12px square — the size every icon in it
+    // is drawn at — because the states replace one another in place:
+    // waiting → sending → sent → delivered → seen, and a refusal. A slot
+    // that measured its contents moved the meta by a couple of pixels on
+    // each swap, and through the spacer it moved the last line of the
+    // text with it.
+    &__status {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        flex: 0 0 auto;
+        width: 12px;
+        height: 12px;
+        margin-inline-start: 1px;
+        opacity: var(--bm-meta-dim);
+    }
+
+    // The translate glyph — 2.0's bm-translation-toggle: the click target
+    // that flips the bubble between the translation and the original. Dimmed
+    // like the other pieces, dimmer still while the original is showing, and
+    // pulsing while the translation is on its way.
+    &__translate {
+        display: inline-flex;
+        align-items: center;
+        opacity: var(--bm-meta-dim);
+        cursor: pointer;
+
+        &:hover { opacity: 1; }
+
+        &.is-original {
+            opacity: 0.3;
+            &:hover { opacity: 0.7; }
+        }
+
+        &.is-pending {
+            opacity: 0.3;
+            cursor: default;
+            animation: bm-translation-pulse 1.5s ease-in-out infinite;
+        }
+    }
+
+    // The seen tick wears the accent, as it does in the conversations list
+    // and as 2.0's did beside the bubble. Inside a filled bubble the ground
+    // is the own bubble, which every shipped palette paints the accent
+    // itself, so an accent tick there vanished: it takes the own bubble's
+    // seen colour instead, the accent where that reads 3:1 on the bubble
+    // and the bubble's text where it does not. Outlined and Classic leave
+    // the bubble unpainted and go back to the accent (_design-options.scss).
+    // Either way seen also pops at full opacity while the rest of the meta
+    // stays dimmed, which is what tells it from delivered on a text-coloured
+    // tick.
+    &[data-variant="overlay"] .bm-status-read,
+    &[data-variant="row"] .bm-status-read {
+        color: rgba(var(--bm-color-bubble-self-seen), 1);
+    }
+
+    // The pill row under a sticker, a GIF or files with no caption carries
+    // the meta outside any bubble, on the conversation's own background, as
+    // the "below" variant it replaces did — so the tick keeps the accent the
+    // global rule gives it there.
+    .bm-msg-body > .bm-reactions &[data-variant="row"] .bm-status-read {
+        color: rgba(var(--bm-color-accent), 1);
+    }
+
+    &__status:has(.bm-status-read) {
+        opacity: 1;
+    }
+}
+
+// StatusTicks — sending spinner / sent check / read check.
+//
+// 12px including its border, like every icon it stands in for. It was a
+// 10px content box, which a theme with no border-box reset drew at 12.8
+// and one with a reset drew at 10 — either way not 12, and the tick
+// jumped sideways when the send landed.
+.bm-status-spinner {
+    display: inline-block;
+    box-sizing: border-box;
+    width: 12px;
+    height: 12px;
+    border: 1.4px solid currentColor;
+    &:not(#\9) { border-radius: 50%; }
+    border-top-color: transparent;
+    animation: bm-spin 0.9s linear infinite;
+}
+
+.bm-status-read {
+    color: rgba(var(--bm-color-accent), 1);
+}
+
+// Hover actions — fade in on bubble hover, float against the inner side
+// of the row.
+.bm-hover-actions {
+    position: absolute;
+    // Vertically centered on the anchor (.bm-msg-main, or the caption
+    // body) — bottom-pinning parked the cluster at the foot of tall GIF /
+    // media bubbles (3.0 live-test report). The earlier "centering reads
+    // as detached" complaint was about an anchor that still included the
+    // reactions row; the current anchor excludes it, so the center always
+    // lands on the visible bubble stack.
+    top: 50%;
+    transform: translateY(-50%);
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    pointer-events: none;
+    padding: 2px 4px;
+    white-space: nowrap;
+    z-index: 1;
+
+    // Sit flush against the bubble (no empty gap) and recreate the visual
+    // spacing with padding instead. The padding is part of the element's box,
+    // so it bridges the bubble→buttons hover: the pointer never crosses dead
+    // space, so the actions stay revealed while you move onto them.
+    .bm-msg-stack[data-side="left"] .bm-msg-body & {
+        left: 100%;
+        padding-inline-start: 8px;
+        // Mirrored beside a left bubble, so the star — the one button that
+        // stays visible — sits next to the bubble on both sides instead of
+        // floating two hidden buttons away from it.
+        flex-direction: row-reverse;
+    }
+
+    .bm-msg-stack[data-side="right"] .bm-msg-body & {
+        right: 100%;
+        padding-inline-end: 8px;
+    }
+
+    &__btn {
+        width: 24px;
+        height: 24px;
+        border: 0;
+        padding: 0;
+        background: transparent;
+        color: rgba(var(--bm-color-text-secondary), 1);
+        &:not(#\9) { border-radius: var(--bm-radius-button); }
+        display: grid;
+        place-items: center;
+        cursor: default;
+        opacity: 0;
+        transition: opacity 0.12s ease-out;
+
+        &:hover {
+            background: rgba(var(--bm-color-bg-hover), 1);
+        }
+
+        // Latched toggle (the favorited star): filled, and on show without
+        // the hover — 2.0 kept the active star visible on every favorited
+        // message while the other controls waited for the pointer.
+        &.is-active {
+            opacity: 1;
+            pointer-events: auto;
+
+            svg { fill: currentColor; }
+        }
+
+        // 2.0's star: yellow-orange in both states, never the accent.
+        &--favorite {
+            color: rgba(var(--bm-color-favorite), 1);
+        }
+    }
+
+    // A finger needs more than the 24px a cursor is happy with. The icons stay
+    // the same size; only the boxes around them grow, and the gap closes to pay
+    // for it, so three of them still fit the --bm-msg-actions-space the bubble
+    // reserves beside itself (3 x 30 + 2 x 3 padding = 96px exactly). Growing
+    // them past that would narrow every bubble on the phone to make room for a
+    // strip that is only on screen while a message is tapped.
+    @media (pointer: coarse) {
+        gap: 0;
+        padding: 2px 3px;
+
+        &__btn {
+            width: 30px;
+            height: 30px;
+        }
+    }
+}
+
+// ─── Narrow surfaces: a phone and a mini chat ──────────────────────────
+// ThreadColumn marks the list data-msg-buttons there, with the buttons the
+// site picked for that surface (inc/message-buttons.ts): "all", "menu" (⋯
+// alone, which opens every action) or "none". It also says how many buttons
+// each side's strip holds (--bm-actions-own / --bm-actions-peer). The
+// full-size messenger carries no attribute and keeps everything above.
+//
+// Two things change here. The lane beside a message is exactly as wide as
+// the strip standing in it, not the fixed 96px sized for three buttons: a
+// strip of one leaves the rest to the text, and a strip of none leaves all of
+// it. And the bubble takes whatever the lane leaves, in every message design:
+// Maximum bubble width is a percentage written for a full-size messenger, and
+// on a 390px phone its 70% is what wrapped a message early while a third of
+// the line stood empty. With no lane at all a message stops 24px short of the
+// far edge, so an own message never runs edge to edge with nothing left to
+// say which side it is on. A lane of 24px or more is that gap already.
+.bm-msg-list[data-msg-buttons] {
+    // A button, and the bridge the strip keeps against the bubble: its 8px
+    // hover padding less the gap the last button does not carry. The strip's
+    // outer padding goes (below), since the list's own gutter already holds
+    // it off the edge, so both formulas are the strip's exact width and the
+    // lane never carries slack. A finger's buttons are 30px with the gaps
+    // closed (.bm-hover-actions above).
+    --bm-action-btn: 26px;
+    --bm-action-bridge: 6px;
+
+    @media (pointer: coarse) {
+        --bm-action-btn: 30px;
+        --bm-action-bridge: 8px;
+    }
+
+    // Declared on the stack, not on the list: a custom property substitutes
+    // its var()s where it is DECLARED, so the width has to be worked out where
+    // the sender is known. [data-is-me], not [data-side]: the layout option
+    // can put own messages on either side, and it is the sender the reply
+    // button follows. A strip of none keeps no bridge either.
+    .bm-msg-stack {
+        --bm-msg-actions-space: calc(var(--bm-actions-peer, 3) * var(--bm-action-btn) + min(var(--bm-actions-peer, 3), 1) * var(--bm-action-bridge));
+    }
+
+    .bm-msg-stack[data-is-me="1"] {
+        --bm-msg-actions-space: calc(var(--bm-actions-own, 3) * var(--bm-action-btn) + min(var(--bm-actions-own, 3), 1) * var(--bm-action-bridge));
+    }
+
+    // One own message does not carry the strip the count describes: a message
+    // still waiting to be sent trades every settled action for its own
+    // "cancel sending", ⋯ plus one. Where the settled strip is the shorter
+    // (favorites off leaves an own message ⋯ alone) the lane would be a
+    // button too narrow, and the cancel button — the one thing a queued
+    // message is there to offer — would be drawn into the edge that clips it.
+    // With ⋯ alone the cancel is in its menu, so only "all" needs this.
+    &[data-msg-buttons="all"] .bm-msg-stack[data-is-me="1"]:has(.bm-msg-body[data-outbox]) {
+        --bm-msg-actions-space: calc(max(var(--bm-actions-own, 3), 2) * var(--bm-action-btn) + var(--bm-action-bridge));
+    }
+
+    // Without bubbles there is no lane at all, here or on the desktop: the
+    // buttons stand on the message's first line, just before its time, as
+    // 2.0 had them (_design-options.scss). A lane per sender would also put
+    // the rows of one side out of line with the other's, where every
+    // message is on the same side and every time at the same edge. These
+    // outrank the lanes above.
+    .bm-msg-stack[data-bubble="none"],
+    &[data-msg-buttons="all"] .bm-msg-stack[data-bubble="none"][data-is-me="1"]:has(.bm-msg-body[data-outbox]) {
+        --bm-msg-actions-space: 0px;
+    }
+
+    // Deeper than the mini chat's adaptive wildcard (_mini-chat.scss), so it
+    // wins there too, and than every design's own width rule.
+    .bm-msg-stack .bm-msg-stack__bubbles:not(#\9) {
+        max-width: calc(100% - max(0px, 24px - var(--bm-msg-actions-space)));
+    }
+
+    // The 24px is there to say which side a message is on, and a list with
+    // one side has nothing to say: it only held the rows without an avatar
+    // short of the others.
+    .bm-msg-stack[data-bubble="none"] .bm-msg-stack__bubbles:not(#\9) {
+        max-width: 100%;
+    }
+
+    .bm-msg-stack[data-side="left"] .bm-hover-actions:not(#\9) {
+        padding-inline-end: 0;
+    }
+
+    .bm-msg-stack[data-side="right"] .bm-hover-actions:not(#\9) {
+        padding-inline-start: 0;
+    }
+
+    // The adaptive wildcard would clamp the strip itself to the width of the
+    // bubble it sits beside, and its buttons are shrinkable flex items — a
+    // two-letter message squashed all three.
+    .bm-hover-actions:not(#\9) {
+        max-width: none;
+    }
+}
+
+// Typing indicator pinned under the last message (`typingPosition` set to
+// "list" — 1.0's home for it). A small overlay at the foot of the message
+// list (.bm-msg-list-wrap is the positioning context), in the room the
+// padding rule above opens for it while someone writes — it fades up as
+// the conversation eases aside, and both reverse together when they stop.
+// Deliberately slight — a marker at the edge of the eye rather than
+// another bubble competing with the real ones.
+.bm-typing-pinned {
+    position: absolute;
+    bottom: calc(3px * var(--bm-density));
+    inset-inline-start: calc(12px * var(--bm-density));
+    z-index: 2;
+    pointer-events: none;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    animation: bm-fade-up 0.15s ease-out both;
+
+    &__bubble {
+        padding: calc(3px * var(--bm-density)) calc(8px * var(--bm-density));
+        &:not(#\9) { border-radius: var(--bm-radius-bubble); }
+        background: rgba(var(--bm-color-bubble-other-bg), 1);
+        color: rgba(var(--bm-color-text-secondary), 1);
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        line-height: 1.3;
+    }
+}
+
+// Scroll-to-latest pill — appears when user scrolls > 200 px above
+// the bottom.
+.bm-scroll-pill {
+    position: absolute;
+    inset-inline-end: 16px;
+    bottom: 12px;
+    width: 36px;
+    height: 36px;
+    &:not(#\9) { border-radius: 50%; }
+    border: 1px solid rgba(var(--bm-color-border), 1);
+    background: rgba(var(--bm-color-bg-elevated), 0.96);
+    color: rgba(var(--bm-color-text-primary), 1);
+    box-shadow: var(--bm-shadow-popover);
+    display: grid;
+    place-items: center;
+    cursor: default;
+    backdrop-filter: blur(8px);
+    animation: bm-fade-up 0.15s ease-out both;
+    padding: 0;
+    z-index: 3;
+
+    // Unread-below counter — messages that arrived at the live tail while
+    // the viewer was scrolled up or anchored deep in history.
+    &__badge {
+        position: absolute;
+        top: -7px;
+        left: 50%;
+        transform: translateX(-50%);
+        min-width: 18px;
+        height: 18px;
+        padding: 0 5px;
+        &:not(#\9) { border-radius: var(--bm-radius-pill); }
+        background: rgba(var(--bm-color-accent), 1);
+        color: rgba(var(--bm-color-text-on-accent), 1);
+        font-size: 10.5px;
+        font-weight: 700;
+        line-height: 18px;
+        text-align: center;
+        box-sizing: border-box;
+    }
+}
+
+// Downward-pagination spinner (anchored window nearing its bottom
+// edge) — absolutely positioned so it adds NO layout height: an in-flow
+// row here changed scrollHeight outside the insert compensation and
+// nudged the viewport by its own height.
+.bm-loading-newer {
+    position: absolute;
+    left: 50%;
+    bottom: 10px;
+    transform: translateX(-50%);
+    z-index: 3;
+    display: grid;
+    place-items: center;
+    width: 34px;
+    height: 34px;
+    &:not(#\9) { border-radius: 50%; }
+    background: rgba(var(--bm-color-bg-elevated), 0.96);
+    border: 1px solid rgba(var(--bm-color-border), 1);
+    animation: bm-fade-up 0.15s ease-out both;
+
+    .bm-jump-traveling__spinner {
+        width: 18px;
+        height: 18px;
+        border-width: 2px;
+    }
+}
+
+// Deep-jump traveling overlay — shown while an `around` page for a
+// jump target is fetched and the view re-anchors. Swallows interaction
+// so the user can't scroll a window that is about to be replaced.
+.bm-jump-traveling {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    background: rgba(var(--bm-color-chat-bg), 0.55);
+    backdrop-filter: blur(2px);
+    z-index: 4;
+    animation: bm-loc-fade 0.15s ease-out both;
+
+    &__spinner {
+        width: 26px;
+        height: 26px;
+        border: 2.5px solid rgba(var(--bm-color-accent), 0.25);
+        border-top-color: rgba(var(--bm-color-accent), 1);
+        &:not(#\9) { border-radius: 50%; }
+        animation: bm-spin 0.8s linear infinite;
+    }
+}
+
+// Reply chip — quoted original above a reply bubble.
+.bm-reply-chip {
+    border-inline-start: 3px solid rgba(var(--bm-color-accent), 1);
+    padding: 4px 10px;
+    margin-bottom: 6px;
+    background: rgba(var(--bm-color-accent-subtle), 1);
+    &:not(#\9) { border-radius: var(--bm-radius-sm); }
+    font-size: var(--bm-font-size-xs);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+
+    // Sender over snippet, with the quoted message's thumbnail beside the
+    // pair at the end of the chip.
+    &__text {
+        display: flex;
+        flex-direction: column;
+        gap: 1px;
+        min-width: 0;
+        flex: 1 1 auto;
+    }
+
+    // On an own filled bubble the chip washes and inks itself with the
+    // bubble's OWN text colour, not white: a palette is free to paint own
+    // messages light (Graphite's dark scheme uses a near-white bubble with
+    // near-black text), and a hardcoded white quote vanished into it.
+    // bubble-self-text is by definition the ink that reads on that ground,
+    // so it works whichever way round the bubble is.
+    .bm-msg-stack[data-bubble="filled"][data-is-me="1"] .bm-msg-body & {
+        border-left-color: rgba(var(--bm-color-bubble-self-text), 0.5);
+        background: rgba(var(--bm-color-bubble-self-text), 0.12);
+    }
+
+    &__sender {
+        font-weight: 700;
+        color: rgba(var(--bm-color-accent-hover), 1);
+    }
+
+    .bm-msg-stack[data-bubble="filled"][data-is-me="1"] .bm-msg-body &__sender {
+        color: rgba(var(--bm-color-bubble-self-text), 0.95);
+    }
+
+    &__snippet {
+        opacity: 0.78;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        display: -webkit-box;
+        -webkit-line-clamp: 1;
+        -webkit-box-orient: vertical;
+        color: rgba(var(--bm-color-text-primary), 1);
+    }
+
+    .bm-msg-stack[data-bubble="filled"][data-is-me="1"] .bm-msg-body &__snippet {
+        color: rgba(var(--bm-color-bubble-self-text), 0.92);
+    }
+
+    &__placeholder {
+        opacity: 0.62;
+        font-style: italic;
+        color: rgba(var(--bm-color-text-secondary), 1);
+    }
+
+    .bm-msg-stack[data-bubble="filled"][data-is-me="1"] .bm-msg-body &__placeholder {
+        color: rgba(var(--bm-color-bubble-self-text), 0.85);
+    }
+}
+
+// Empty thread hint — shown when a thread is open but has zero messages.
+// Centered tile with a friendly icon + headline.
+.bm-empty-thread {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    padding: 32px 24px;
+    min-height: 200px;
+
+    &__disc {
+        width: 72px;
+        height: 72px;
+        &:not(#\9) { border-radius: 999px; }
+        display: grid;
+        place-items: center;
+        background: linear-gradient(
+            145deg,
+            rgba(var(--bm-color-accent), 0.18),
+            rgba(var(--bm-color-accent), 0.06)
+        );
+        color: rgba(var(--bm-color-accent), 1);
+    }
+
+    &__text {
+        text-align: center;
+        max-width: 360px;
+    }
+
+    &__title {
+        font-size: var(--bm-font-size-lg);
+        font-weight: 700;
+        color: rgba(var(--bm-color-text-primary), 1);
+        letter-spacing: -0.015em;
+    }
+
+    &__sub {
+        margin-top: 4px;
+        font-size: var(--bm-font-size-sm);
+        color: rgba(var(--bm-color-text-tertiary), 1);
+        line-height: 1.5;
+    }
+}
+
+// History-start marker (v2 .bm-conversation-start): "Loading…" while older
+// pages fetch, "Start of conversation" once everything is here. Rendered as
+// the last flex child, which column-reverse places at the visual top.
+.bm-history-start {
+    flex: 0 0 auto;
+    text-align: center;
+    padding: 10px 0 4px;
+    // Constant box in every state — the element stays mounted and only
+    // fades, so appearing/disappearing can never shift the history edge.
+    height: 30px;
+    line-height: 16px;
+    box-sizing: border-box;
+    font-size: var(--bm-font-size-xs);
+    color: rgba(var(--bm-color-text-tertiary), 1);
+    opacity: 0;
+
+    &[data-visible="1"] {
+        opacity: 1;
+    }
+
+    // Only "Loading..." fades in. "Start of conversation" is drawn with the
+    // messages it heads, and a fade had it come up after them as a
+    // conversation opened.
+    &[data-loading="1"] {
+        transition: opacity 0.15s ease;
+    }
+}
+
+

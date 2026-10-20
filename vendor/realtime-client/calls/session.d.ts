@@ -1,0 +1,152 @@
+import { RemoteMediaTrack } from "./remote-track.js";
+import type { CallId, CallTransport } from "./transport.js";
+import { type CallUser } from "./users.js";
+import { MediaState, P2PConnection, P2PQuality, P2PSource, P2PStats, SfuHandoff } from "./types.js";
+export interface P2PParticipantView {
+    identity: string;
+    user_id: CallUser;
+    video: RemoteMediaTrack | null;
+    audio: RemoteMediaTrack | null;
+    screen: RemoteMediaTrack | null;
+    screenAudio: RemoteMediaTrack | null;
+    quality: P2PQuality;
+    mediaState: MediaState;
+    mediaStateKnown: boolean;
+}
+export interface P2PSessionOptions {
+    transport: CallTransport;
+    callId: CallId;
+    threadId?: number;
+    type: 'audio' | 'video';
+    signalKey?: string;
+}
+type SessionEvents = {
+    participant: (view: P2PParticipantView) => void;
+    peerJoined: (userId: CallUser) => void;
+    peerLost: (userId: CallUser) => void;
+    connection: (state: P2PConnection) => void;
+    stats: (stats: P2PStats) => void;
+    fallback: (sfu: SfuHandoff) => void;
+    ended: (reason: string) => void;
+    playbackBlocked: () => void;
+    peerSilent: (source: 'microphone' | 'camera') => void;
+    reacquire: (source: 'microphone' | 'camera') => void;
+};
+type EventName = keyof SessionEvents;
+export declare class P2PCallSession {
+    readonly callId: CallId;
+    readonly threadId: number;
+    private readonly transport;
+    readonly type: 'audio' | 'video';
+    private readonly signaling;
+    private readonly listeners;
+    private readonly localTracks;
+    private readonly blockedElements;
+    private peer;
+    private role;
+    private generation;
+    private iceServers;
+    private epoch;
+    private lastId;
+    private pendingSignals;
+    private remoteState;
+    private remoteStateKnown;
+    private quality;
+    private stateTimer;
+    private aliveTimer;
+    private viewTimer;
+    private sentView;
+    private viewPendingSince;
+    private remoteWanted;
+    private handedOff;
+    private readonly signalKey;
+    private cipher;
+    private sentReport;
+    private sentReportAt;
+    private readonly knownCodecs;
+    private readonly bytesSeen;
+    private caps;
+    private peerCaps;
+    private outbound;
+    private inbound;
+    private traceLines;
+    private traceTimer;
+    private readonly traceStart;
+    private traceDropped;
+    private pulseTicks;
+    private standby;
+    private joinedSocket;
+    private peerLost;
+    private iceExpiresAt;
+    private renewTimer;
+    private ended;
+    private started;
+    private stopReconnectListener;
+    private pageHideListener;
+    peerUserId: CallUser | null;
+    peerPresent: boolean;
+    stats: P2PStats;
+    constructor(options: P2PSessionOptions);
+    on<K extends EventName>(event: K, listener: SessionEvents[K]): () => void;
+    private emit;
+    get peerIdentity(): string;
+    get isConnected(): boolean;
+    leaveAfterHandoff(reason: string): void;
+    start(): Promise<boolean>;
+    private join;
+    private startKeepalive;
+    private stopKeepalive;
+    private pulse;
+    private keepalive;
+    private resume;
+    private markPeerPresent;
+    private onServerMessage;
+    private onReady;
+    private rebuildPeer;
+    private onCodecBroken;
+    /**
+     * One line of this side's account, batched to the call's trace.
+     *
+     * Best effort in every direction: nothing waits on it, a failure is
+     * swallowed, and it must never carry SDP, addresses or names — the trace
+     * is readable precisely because it does not.
+     */
+    private trace;
+    sfuTrace(line: string): void;
+    private queueTrace;
+    private flushTrace;
+    private requeueTrace;
+    private sendCaps;
+    private sendSignal;
+    private onSignal;
+    private handleSignal;
+    private updateExpectInbound;
+    private currentView;
+    private scheduleView;
+    private sendView;
+    private onPeerConnection;
+    private onPeerStats;
+    private sendReport;
+    private onPeerFailed;
+    private onPeerSilent;
+    private fetchIceServers;
+    private takeIceServers;
+    private refreshIceServers;
+    private reviewHold;
+    private setIceExpiry;
+    private scheduleRenewal;
+    private renewRelay;
+    private onPlaybackBlocked;
+    resumePlayback(): Promise<void>;
+    setLocalTrack(source: P2PSource, track: MediaStreamTrack | null): void;
+    private localState;
+    private sendState;
+    participant(): P2PParticipantView | null;
+    private publishParticipant;
+    private handoff;
+    private finish;
+    private teardown;
+    private beaconLeave;
+    end(reason: string): void;
+}
+export {};

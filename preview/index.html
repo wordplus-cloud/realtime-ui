@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>@wordplus/realtime-ui preview</title>
+    <link rel="icon" href="data:,">
+    <link rel="stylesheet" href="ui.css">
+    <style>
+        /* The preview's own page (npx @wordplus/realtime-ui preview): each component in its states, on the theme's ground. */
+        body { margin: 0; background: rgba(var(--bm-color-bg-secondary), 1); color: rgba(var(--bm-color-text-primary), 1);
+               font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+        .preview { display: flex; flex-direction: column; gap: 28px; padding: 16px 16px 48px; margin: 0 auto; }
+        .preview[data-width="phone"] { max-width: 390px; }
+        .preview-bar { display: flex; flex-wrap: wrap; gap: 8px 16px; font-size: 13px; align-items: center; }
+        .preview-bar a { color: inherit; }
+        .preview-bar b { margin-inline-end: 8px; }
+        .preview-shot { width: 100%; }
+        .preview-shot h2 { margin: 0 0 10px; font-size: 13px; font-weight: 600; color: rgba(var(--bm-color-text-secondary), 1); }
+        .preview-shot h2 small { font-weight: 400; margin-inline-start: 6px; }
+        .preview-frame { display: flex; flex-direction: column; gap: 12px; padding: 16px; border-radius: 12px; background: rgba(var(--bm-color-bg), 1);
+                         border: 1px solid rgba(var(--bm-color-border), 1); }
+        .preview-call { position: relative; height: 420px; border-radius: 12px; overflow: hidden; background: rgba(var(--bm-call-canvas), 1); }
+        .preview-call[data-layout="group-audio"] { height: 360px; }
+        .preview-chat { height: 520px; display: flex; flex-direction: column; border-radius: 10px; overflow: hidden; }
+        .preview-online { height: 260px; display: flex; }
+        .preview-online .bm-chat-online { width: 100%; border-radius: 10px; border: 1px solid rgba(var(--bm-color-border), 1); }
+    </style>
+</head>
+<body>
+    <div id="preview"></div>
+    <script type="module" src="preview.js"></script>
+    <script data-live>
+        // Reloads when a copy changes (the command rebuilds as files change). A preview built once (--out) leaves it out.
+        if ( location.protocol.startsWith( 'http' ) ) new EventSource( '/events' ).onmessage = () => location.reload();
+    </script>
+</body>
+</html>

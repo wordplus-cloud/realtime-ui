@@ -1,0 +1,121 @@
+// The live stream elements (src/stream-elements.tsx): <live-stream> and <stream-studio> on the page's calls, one
+// join for every element of a stream, its parts each in its element, and the stream left when the last one goes. The
+// script defines its elements once per window, as on a real page, so this file is one page.
+import { afterEach, beforeAll, expect, it, vi } from 'vitest';
+import { act, waitFor } from '@testing-library/react';
+import { fakeClient } from './fake.tsx';
+
+const shows = new Map<string, ReturnType<typeof fakeClient>>();
+const left = vi.fn();
+
+const calls = {
+    on: () => calls,
+    off: () => calls,
+    start: vi.fn(),
+    group: vi.fn(),
+    people: vi.fn( async () => [] ),
+    stream: vi.fn( async ( name: string, _options?: { video?: boolean } ) => {
+        if ( name === 'show:closed' ) throw Object.assign( new Error( 'forbidden' ), { code: 'forbidden' } );
+        const fake = fakeClient( { stream: { id: name, state: 'live', started_at: 1, ended_at: null } } );
+        shows.set( name, fake );
+        return { name, engine: fake.client, leave: () => left( name ) };
+    } ),
+};
+
+let elements: typeof import( '../../src/stream-elements.tsx' );
+
+beforeAll( async () => {
+    ( globalThis as Record<string, unknown> ).wordplusRealtimeCalls = { page: () => ( { rt: {}, calls } ) };
+    document.documentElement.lang = 'de';
+    elements = await import( '../../src/stream-elements.tsx' );
+    // As @wordplus/realtime's rt.streamScreen() does once the page has its calls.
+    expect( elements.start() ).toBe( true );
+} );
+
+afterEach( async () => {
+    await act( async () => document.body.replaceChildren() );
+    calls.stream.mockClear();
+    left.mockClear();
+    shows.clear();
+} );
+
+const place = ( html: string ) => act( async () => {
+    document.body.insertAdjacentHTML( 'beforeend', html );
+} );
+
+it( 'defines both elements and puts the streams stylesheet in the head once', () => {
+    expect( customElements.get( 'live-stream' ) ).toBeTruthy();
+    expect( customElements.get( 'stream-studio' ) ).toBeTruthy();
+    elements.start();
+    expect( document.querySelectorAll( '#realtime-ui-streams' ) ).toHaveLength( 1 );
+} );
+
+it( 'draws a stream in one piece, joined once with its picture', async () => {
+    await place( '<live-stream name="show:mugs" title="New mugs"></live-stream>' );
+
+    await waitFor( () => expect( document.querySelector( 'live-stream .estream-app' ) ).toBeTruthy() );
+    expect( calls.stream ).toHaveBeenCalledTimes( 1 );
+    expect( calls.stream ).toHaveBeenCalledWith( 'show:mugs', { video: true } );
+} );
+
+it( 'gives every element of a stream one join, each part in its own element', async () => {
+    await place( '<live-stream name="show:mugs" view="player"></live-stream><div><live-stream name="show:mugs" view="chat" height="480"></live-stream></div>' );
+
+    await waitFor( () => expect( document.querySelector( 'live-stream[view="player"] .estream-part--player' ) ).toBeTruthy() );
+    expect( document.querySelector( 'live-stream[view="chat"] .estream-part--chat' ) ).toBeTruthy();
+    expect( calls.stream ).toHaveBeenCalledTimes( 1 );
+    // The chat its own height.
+    expect( ( document.querySelector( '.estream-part--chat' ) as HTMLElement ).style.height ).toBe( '480px' );
+} );
+
+it( 'joins without the picture where no element shows it, and asks for it once one does', async () => {
+    await place( '<live-stream name="show:talk" view="chat"></live-stream>' );
+    await waitFor( () => expect( document.querySelector( '.estream-part--chat' ) ).toBeTruthy() );
+    expect( calls.stream ).toHaveBeenCalledWith( 'show:talk', { video: false } );
+    expect( shows.get( 'show:talk' )!.client.wantVideo ).not.toHaveBeenCalled();
+
+    await place( '<live-stream name="show:talk" view="player"></live-stream>' );
+    await waitFor( () => expect( shows.get( 'show:talk' )!.client.wantVideo ).toHaveBeenCalled() );
+    expect( calls.stream ).toHaveBeenCalledTimes( 1 );
+} );
+
+it( 'shows the studio to the host alone', async () => {
+    await place( '<stream-studio name="show:mugs"></stream-studio>' );
+    await waitFor( () => expect( shows.get( 'show:mugs' ) ).toBeTruthy() );
+    // A viewer: nothing at all.
+    expect( document.querySelector( 'stream-studio .estream-part--studio' ) ).toBeNull();
+
+    shows.get( 'show:mugs' )!.update( { you: { identity: 'u:34', role: 'host', name: 'Ann', chat: 'write', mod: true } } );
+    await waitFor( () => expect( document.querySelector( 'stream-studio .estream-part--studio' ) ).toBeTruthy() );
+} );
+
+it( 'leaves the stream once its last element goes, and keeps it for one moved on the page', async () => {
+    await place( '<live-stream id="a" name="show:mugs" view="player"></live-stream><live-stream id="b" name="show:mugs" view="chat"></live-stream><section id="elsewhere"></section>' );
+    await waitFor( () => expect( shows.get( 'show:mugs' ) ).toBeTruthy() );
+
+    // Moved: out and in again at once.
+    await act( async () => document.getElementById( 'elsewhere' )!.append( document.getElementById( 'a' )! ) );
+    await act( async () => document.getElementById( 'b' )!.remove() );
+    expect( left ).not.toHaveBeenCalled();
+
+    await act( async () => document.getElementById( 'a' )!.remove() );
+    expect( left ).toHaveBeenCalledWith( 'show:mugs' );
+    expect( calls.stream ).toHaveBeenCalledTimes( 1 );
+} );
+
+it( 'says what kept a stream away, in the page language', async () => {
+    await place( '<live-stream name="show:closed"></live-stream>' );
+    await waitFor( () => expect( document.querySelector( 'live-stream .estream-part--refused' ) ).toBeTruthy() );
+    const said = document.querySelector( '.estream-part--refused' )!.textContent!;
+    expect( said ).not.toBe( '' );
+    expect( said ).not.toBe( 'You do not have access to this stream' );
+} );
+
+it( 'joins another stream when an element is renamed', async () => {
+    await place( '<live-stream id="s" name="show:mugs"></live-stream>' );
+    await waitFor( () => expect( shows.get( 'show:mugs' ) ).toBeTruthy() );
+
+    await act( async () => document.getElementById( 's' )!.setAttribute( 'name', 'show:cups' ) );
+    await waitFor( () => expect( shows.get( 'show:cups' ) ).toBeTruthy() );
+    expect( left ).toHaveBeenCalledWith( 'show:mugs' );
+} );

@@ -1,0 +1,616 @@
+// Composer — message input row + recording row + intent (reply / edit)
+// banner. Lives under the message list at the bottom of the chat column.
+//
+// Source: src/components/chat/composer-row.tsx, and Better Messages'
+// composer.tsx (its editor, recorders, formatting bar and attachments), which
+// imports this file into its stylesheet.
+
+// Formatting bar, docked — the row above the input that the formatting
+// button opens, or that is always there (Appearance → Message field). The
+// shared pieces and the floating bar are in _editor-format-tooltip.scss.
+// Source: FormatBar in format-bar.tsx.
+.bm-format-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    margin: 0 0 -2px;
+    padding: 0;
+    min-height: 28px;
+    color: rgba(var(--bm-color-text-secondary), 1);
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: none;
+
+    &::-webkit-scrollbar { display: none; }
+
+    // All ten buttons take about 325px. A narrower row, a mini chat window
+    // or a small phone, wraps onto a second line rather than hiding the last
+    // of them past its edge.
+    &[data-mode="main"] {
+        flex-wrap: wrap;
+        row-gap: 2px;
+    }
+
+    .bm-format-bar__btn:hover {
+        background: rgba(var(--bm-color-bg-hover), 1);
+        color: rgba(var(--bm-color-text-primary), 1);
+    }
+
+    .bm-format-bar__btn[data-active] {
+        background: rgba(var(--bm-color-accent-subtle), 1);
+        color: rgba(var(--bm-color-accent), 1);
+    }
+
+    // The link field takes the row's width: on a phone that is the room the
+    // address needs.
+    input.bm-format-bar__field:not(#\9) {
+        width: auto;
+        max-width: none;
+    }
+}
+
+// The formatting button beside the emoji picker, while its bar is open.
+.bm-icon-btn.bm-composer__format[data-active] {
+    color: rgba(var(--bm-color-accent), 1);
+}
+
+// Inline sticker suggestions — horizontal strip above the input that pops
+// up when the composer holds a single matching word. Source: StickerStrip
+// in composer.tsx.
+.bm-sticker-strip {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin: 0 12px 6px;
+    padding: 4px;
+    max-width: 100%;
+    overflow-x: auto;
+    &:not(#\9) { border-radius: var(--bm-radius-md); }
+    background: rgba(var(--bm-color-bg-elevated), 1);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+    scrollbar-width: none;
+
+    &::-webkit-scrollbar { display: none; }
+
+    &__item {
+        flex: 0 0 auto;
+        width: 56px;
+        height: 56px;
+        padding: 4px;
+        border: 0;
+        &:not(#\9) { border-radius: var(--bm-radius-sm, 6px); }
+        background: transparent;
+        cursor: pointer;
+        transition: background 0.12s;
+
+        &:hover { background: rgba(var(--bm-color-bg-hover), 1); }
+
+        img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            display: block;
+        }
+    }
+}
+
+.bm-composer {
+    flex: 0 0 auto;
+    background: rgba(var(--bm-color-composer-bg), 1);
+    border-top: 1px solid rgba(var(--bm-color-border), 1);
+    padding: 8px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    position: relative;
+
+    // The device holds no private key for this encrypted conversation, so
+    // the input row is replaced by the key setup / restore panel (v2
+    // reply-form parity). Roomier than the row it stands in for — it is a
+    // paragraph and a button, not a single line.
+    &--e2e-setup {
+        padding: 18px 24px 20px;
+        align-items: center;
+        text-align: center;
+    }
+}
+
+.bm-composer-e2e-setup {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    max-width: 460px;
+
+    &__icon {
+        display: inline-grid;
+        place-items: center;
+        color: rgba(var(--bm-color-text-primary), 0.35);
+    }
+
+    &__text {
+        margin: 0;
+        font-size: var(--bm-font-size-sm);
+        line-height: 1.45;
+        color: rgba(var(--bm-color-text-secondary), 1);
+    }
+
+    &__action {
+        padding: 8px 18px;
+        border: 0;
+        &:not(#\9) { border-radius: var(--bm-radius-md); }
+        background: rgba(var(--bm-color-accent), 1);
+        color: rgba(var(--bm-color-text-on-accent), 1);
+        font-size: var(--bm-font-size-sm);
+        font-weight: 600;
+        transition: background 0.12s;
+
+        &:hover { background: rgba(var(--bm-color-accent-hover), 1); }
+        &[aria-disabled="true"] { opacity: 0.6; }
+    }
+}
+
+// Voice recording overlay (v2 .bm-record-voice parity): covers the
+// composer while the editor underneath stays mounted, so the reply
+// area's height NEVER changes when recording starts or ends.
+.bm-composer__record-overlay {
+    position: absolute;
+    inset: 0;
+    z-index: 3;
+    display: flex;
+    align-items: center;
+    padding: 8px 12px;
+    background: rgba(var(--bm-color-composer-bg), 1);
+    animation: bm-record-overlay-in 0.2s ease-out;
+
+    .bm-record-voice {
+        flex: 1;
+        min-width: 0;
+    }
+}
+
+@keyframes bm-record-overlay-in {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+}
+
+// Reply / edit banner that anchors the composer to the message being
+// responded to.
+.bm-composer__intent {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 10px;
+    background: rgba(var(--bm-color-accent-subtle), 1);
+    border-inline-start: 3px solid rgba(var(--bm-color-accent), 1);
+    &:not(#\9) { border-radius: var(--bm-radius-sm); }
+
+    &__icon {
+        flex: 0 0 auto;
+        color: rgba(var(--bm-color-accent-hover), 1);
+        display: inline-grid;
+        place-items: center;
+    }
+
+    &__avatar {
+        flex: 0 0 auto;
+    }
+
+    &__body {
+        flex: 1;
+        min-width: 0;
+    }
+
+    &__label {
+        font-size: var(--bm-font-size-xs);
+        font-weight: 700;
+        color: rgba(var(--bm-color-accent-hover), 1);
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+    }
+
+    &__preview {
+        font-size: var(--bm-font-size-sm);
+        color: rgba(var(--bm-color-text-secondary), 1);
+        margin-top: 1px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+}
+
+// Banned-term warning — sits between the intent banner and the chip row.
+// Composer's Send button is gated to disabled while this is visible. Per
+// the "video call redesign.png" mockup: red border + pink wash + ban
+// icon + the matched word in quotes + Rewrite/Dismiss actions.
+.bm-composer__banned-term {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 10px;
+    background: rgba(var(--bm-color-recording), 0.08);
+    border: 1px solid rgba(var(--bm-color-recording), 0.6);
+    &:not(#\9) { border-radius: var(--bm-radius-sm); }
+    color: rgba(var(--bm-color-text-primary), 1);
+
+    &__icon {
+        flex: 0 0 auto;
+        display: inline-grid;
+        place-items: center;
+        width: 24px;
+        height: 24px;
+        &:not(#\9) { border-radius: 50%; }
+        background: rgba(var(--bm-color-recording), 0.18);
+        color: rgba(var(--bm-color-recording), 1);
+    }
+
+    &__body {
+        flex: 1;
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 1px;
+    }
+
+    &__title {
+        font-size: var(--bm-font-size-xs);
+        font-weight: 700;
+        color: rgba(var(--bm-color-recording), 1);
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+    }
+
+    &__detail {
+        font-size: var(--bm-font-size-sm);
+        color: rgba(var(--bm-color-text-secondary), 1);
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    &__action {
+        flex: 0 0 auto;
+        padding: 6px 12px;
+        border: 0;
+        background: transparent;
+        color: rgba(var(--bm-color-text-secondary), 1);
+        font-size: var(--bm-font-size-sm);
+        font-weight: 600;
+        &:not(#\9) { border-radius: var(--bm-radius-button); }
+        cursor: pointer;
+        transition: background 0.12s, color 0.12s;
+
+        &:hover {
+            background: rgba(var(--bm-color-bg-hover), 1);
+            color: rgba(var(--bm-color-text-primary), 1);
+        }
+
+        &.is-primary {
+            background: rgba(var(--bm-color-recording), 1);
+            color: #fff;
+
+            &:hover { filter: brightness(0.92); }
+        }
+    }
+}
+
+// Per the Claude design (messages.png / file attachments.png) the input
+// row is flat — no border, no background, no inner padding. Only the thin
+// top border on the outer .bm-composer separates it from the chat area.
+// Buttons + textarea sit on the same horizontal centerline so "+" / smile
+// / mic / video line up with the first row of the textarea.
+.bm-composer__row {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 0;
+    background: transparent;
+    border: 0;
+    &:not(#\9) { border-radius: 0; }
+
+    // Edit mode — accent tint applied to the textarea only so the row
+    // chrome stays flat (no bounding box shift).
+}
+
+.bm-composer__attach-wrap {
+    position: relative;
+    flex: 0 0 auto;
+
+    // Staged attachments tint the + button; the count itself is a real
+    // element (a pseudo could not read the wrap's data-count and lost its
+    // radius rule to the ::after:not() parse error).
+    &:has(.bm-composer__attach-badge) {
+        > * > button, > * > .bm-btn { color: rgba(var(--bm-color-accent), 1); }
+    }
+}
+
+.bm-composer__attach-badge {
+    position: absolute;
+    top: -2px;
+    inset-inline-end: -2px;
+    min-width: 14px;
+    height: 14px;
+    padding: 0 4px;
+    box-sizing: border-box;
+    &:not(#\9) { border-radius: var(--bm-radius-pill, 999px); }
+    background: rgba(var(--bm-color-accent), 1);
+    color: rgba(var(--bm-color-text-on-accent), 1);
+    font-size: 9px;
+    font-weight: 700;
+    line-height: 14px;
+    text-align: center;
+    pointer-events: none;
+}
+
+@keyframes bm-spin {
+    to { transform: rotate(360deg); }
+}
+
+.bm-icon-spin svg {
+    animation: bm-spin 0.9s linear infinite;
+    transform-origin: 50% 50%;
+}
+
+// Single-line by default. Autogrow up to 160px is driven by JS in
+// composer.tsx (resets height then snaps to scrollHeight on every change).
+// Initial min-height matches the line-height so the row aligns with the
+// 18px icon buttons next to it.
+
+// ─── Contenteditable input (v2 bm-editor inside the 3.0 composer) ──────
+// The wrapper + .bm-editor-content pair is the DOM shape every v2 editor
+// function expects. Grows with content to 160px, then scrolls.
+
+.bm-composer__editor {
+    flex: 1;
+    min-width: 0;
+}
+
+.bm-composer .bm-editor-content {
+    outline: none !important;
+    border: 0;
+    margin: 0;
+    padding: 1px 4px;
+    min-height: 22px;
+    max-height: 160px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    color: rgba(var(--bm-color-text-primary), 1);
+    font-size: var(--bm-font-size-base);
+    line-height: 1.4;
+    font-family: var(--bm-messenger-font, inherit);
+    cursor: text;
+
+    &:empty::before {
+        content: attr(placeholder);
+        color: rgba(var(--bm-color-text-tertiary), 1);
+        white-space: nowrap;
+        // `clip`, not `hidden`: hidden turns this block into a scroll
+        // container, and Gecko then anchors the empty editable's caret to
+        // that container's bottom edge instead of the placeholder's
+        // baseline — in Firefox the caret sat 5px low, hanging below the
+        // descenders. The ellipsis still renders under clip in all three
+        // engines; hidden stays as the fallback where clip is unknown.
+        overflow: hidden;
+        overflow: clip;
+        text-overflow: ellipsis;
+        pointer-events: none;
+        display: block;
+        max-width: 100%;
+    }
+
+    .bm-inline-emoji {
+        display: inline-block;
+        vertical-align: middle;
+    }
+
+    // Lists, headings and links as the formatting buttons make them: the
+    // bubble's compact metrics (_thread-column.scss), not a document's.
+    // :not(#\9) and !important throughout, because .bm-wrap's own list
+    // rules and a host theme's content rules both reach in here.
+    ul:not(#\9), ol:not(#\9) {
+        margin: 2px 0 !important;
+        padding: 0 !important;
+        padding-inline-start: 22px !important;
+        list-style-position: outside !important;
+    }
+
+    ul:not(#\9) > li { list-style-type: disc !important; }
+    ol:not(#\9) > li { list-style-type: decimal !important; }
+
+    li:not(#\9) {
+        display: list-item !important;
+        margin: 0 !important;
+        padding: 0 !important;
+    }
+
+    h1:not(#\9), h2:not(#\9), h3:not(#\9), h4:not(#\9), h5:not(#\9), h6:not(#\9) {
+        margin: 2px 0 !important;
+        padding: 0 !important;
+        border: 0 !important;
+        color: inherit !important;
+        font-family: inherit !important;
+        font-weight: 600 !important;
+        line-height: 1.25 !important;
+        letter-spacing: normal !important;
+        text-transform: none !important;
+    }
+
+    h1:not(#\9) { font-size: 1.35em !important; }
+    h2:not(#\9) { font-size: 1.25em !important; }
+    h3:not(#\9) { font-size: 1.15em !important; }
+    h4:not(#\9), h5:not(#\9), h6:not(#\9) { font-size: 1.05em !important; }
+
+    a:not(#\9) {
+        color: rgba(var(--bm-color-text-link), 1) !important;
+        text-decoration: underline !important;
+        cursor: text;
+    }
+}
+
+// Inline mention chip (v2 insert-mention markup: avatar + name in a
+// non-editable span).
+//
+// The name sits on the baseline of the line, as the words typed around it do: the
+// chip is aligned on the baseline of its text, and only the avatar is
+// centred in it. Centred as a whole (vertical-align: middle), the chip put
+// its name 1px below the text after it (Better Messages, 2026-10-14).
+.bm-composer .bm-inline-mention {
+    display: inline-flex;
+    align-items: baseline;
+    padding: 0 4px;
+    margin: 0 1px;
+    vertical-align: baseline;
+    &:not(#\9) { border-radius: var(--bm-radius-xs); }
+    background: rgba(var(--bm-color-mention-bg), 1);
+    color: rgba(var(--bm-color-mention-text), 1);
+    font-weight: 500;
+    white-space: nowrap;
+
+    > img.avatar {
+        align-self: center;
+        width: 16px;
+        height: 16px;
+        margin-inline-end: 4px;
+        &:not(#\9) { border-radius: var(--bm-radius-circle); }
+        object-fit: cover;
+    }
+}
+
+.bm-composer__counter {
+    align-self: center;
+    font-family: var(--bm-font-family-mono);
+    font-size: 10.5px;
+    color: rgba(var(--bm-color-text-tertiary), 1);
+    font-variant-numeric: tabular-nums;
+    flex: 0 0 auto;
+
+    &[data-warn="1"] {
+        color: rgba(var(--bm-color-recording), 1);
+    }
+}
+
+// Send over the length limit: drawn like a disabled button, but it still
+// takes a press and answers it with why (composer.tsx), which is all a phone
+// has in place of the tooltip.
+.bm-icon-btn.bm-composer__send--over {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+// Shared recording-pulse keyframe (voice recorder dot, presence "live"
+// indicator).
+@keyframes bm-rec {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50%      { opacity: 0.6; transform: scale(0.85); }
+}
+
+// Mention picker — floats above the composer textarea while the caret
+// is inside an @xxx token. Matches participants by name; click inserts
+// "@FullName " at the cursor.
+.bm-mention-popover {
+    z-index: 9999;
+    background: rgba(var(--bm-color-bg-elevated), 1);
+    border: 1px solid rgba(var(--bm-color-border), 1);
+    &:not(#\9) { border-radius: var(--bm-radius-panel); }
+    box-shadow: var(--bm-shadow-card);
+    padding: 4px;
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+
+    // The list portals to <body>, so it stacks against the messenger rather
+    // than inside it, and on a phone the messenger owns a layer at 100000.
+    // The web raises the list over that with `body.bm-mobile` and
+    // `body.bm-full-screen` (_mobile-toasts-emoji.scss). The native app sets
+    // neither: it marks <body> `bm-mobile-device` and lifts
+    // #better-messages-mobile-app to 100000 over the page, so the list opened
+    // at 9999 underneath an opaque screen — typing "@" showed nothing, and
+    // Enter still completed the first name of a list nobody could see. One
+    // above that layer, the same answer the picker sheet gives it
+    // (_emoji-popover.scss), and still below the context menu (100100).
+    //
+    // No `body` in the selector, on purpose: the web's takeover rules are
+    // that one element more specific, so a phone browser keeps the list
+    // where they already put it and only the app, which matches neither of
+    // them, lands here.
+    .bm-mobile-device & {
+        z-index: 100001;
+    }
+
+    &__row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 5px 8px;
+        background: transparent;
+        border: 0;
+        &:not(#\9) { border-radius: var(--bm-radius-sm); }
+        text-align: start;
+        cursor: default;
+        color: rgba(var(--bm-color-text-primary), 1);
+        font-size: var(--bm-font-size-sm);
+
+        &.is-active,
+        &:hover { background: rgba(var(--bm-color-bg-hover), 1); }
+    }
+
+    &__name { font-weight: 500; }
+}
+
+// v2 GifPickerButton + StickerPickerButton both render their own
+// trigger spans inside the composer; the messenger owns the visible buttons and
+// fires their clicks via ref. Hide the v2 triggers but leave the
+// picker sheet portal (which renders into chatMain) visible.
+.bm-composer__picker-host {
+    position: absolute;
+    width: 0;
+    height: 0;
+    overflow: hidden;
+    pointer-events: none;
+    opacity: 0;
+}
+
+// Points balance beside the composer actions (pointsBalanceChatInput slot) —
+// the v2 partial styles it only inside .bm-wrap, restated for the
+// messenger composer.
+.bm-composer__points {
+  display: inline-flex;
+  align-items: center;
+
+  .bm-points-balance {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: var(--bm-font-size-sm);
+    font-weight: 600;
+    color: rgba(var(--bm-color-text-secondary), 1);
+    text-decoration: none;
+    white-space: nowrap;
+
+    &:hover {
+      color: rgba(var(--bm-color-text-primary), 1);
+    }
+  }
+}
+
+// Colour matrix cells: the reply area is a cell of its own; mini chats and
+// the mobile view re-point it again.
+.bm-composer,
+.bm-format-toolbar,
+.bm-sticker-strip {
+    @include bm-zone-surface(reply);
+}
+
+.bm-mini-chat .bm-composer,
+.bm-mini-chat .bm-format-toolbar,
+.bm-mini-chat .bm-sticker-strip {
+    @include bm-zone-surface(mc-reply);
+}
+
+body.bm-mobile .bm-composer,
+body.bm-mobile .bm-format-toolbar,
+body.bm-mobile .bm-sticker-strip {
+    @include bm-zone-surface(mob-reply);
+}

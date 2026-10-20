@@ -1,0 +1,145 @@
+// The elements' own chrome (src/elements.tsx): the window a call sits in, the rings, and the word a call leaves.
+// Inside them, the screens wear Better Messages' styles. In a shadow root, so nothing of the page's reaches in.
+
+.realtime-calls {
+    font-family: var(--bm-messenger-font, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif);
+    font-size: var(--bm-font-size-base, 15px);
+    line-height: var(--bm-line-height-normal, 1.45);
+    -webkit-font-smoothing: antialiased;
+
+    *, *::before, *::after { box-sizing: border-box; }
+
+    // The card the rings and the notice sit on: the inverse surface Better Messages' toasts take, near-black on a
+    // light page and near-white on a dark one.
+    --wplus-toast-bg: 17, 24, 39;
+    --wplus-toast-fg: 255, 255, 255;
+
+    // The system's dark, unless the page keeps light: its body's class where the screens are in the page (calls.css),
+    // the element's `data-scheme` in a shadow root (src/elements.tsx, schemeOf()). Each half matches nothing in the other.
+    @media (prefers-color-scheme: dark) {
+        body:not(.bm-messages-light) &,
+        :host(:not([data-scheme="light"])) & {
+            --wplus-toast-bg: 241, 245, 249;
+            --wplus-toast-fg: 15, 23, 42;
+        }
+    }
+
+    body.bm-messages-dark &,
+    :host([data-scheme="dark"]) & {
+        --wplus-toast-bg: 241, 245, 249;
+        --wplus-toast-fg: 15, 23, 42;
+    }
+}
+
+// The call: a window in the corner on a wide screen, the whole screen on a phone.
+.realtime-call-window {
+    position: fixed;
+    z-index: 2147483000;
+    inset-inline-end: 24px;
+    bottom: 24px;
+    width: min(880px, calc(100vw - 48px));
+    height: min(600px, calc(100vh - 48px));
+    border-radius: var(--bm-radius-card, 12px);
+    overflow: hidden;
+    box-shadow: 0 24px 64px rgba(0, 0, 0, 0.35), 0 2px 8px rgba(0, 0, 0, 0.2);
+    background: rgba(var(--bm-call-canvas), 1);
+    animation: realtime-call-in var(--bm-duration-base, 200ms) var(--bm-ease-out, ease-out);
+
+    &[data-layout="audio"] {
+        width: min(560px, calc(100vw - 48px));
+    }
+
+    @media (max-width: 640px) {
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        border-radius: 0;
+    }
+}
+
+@keyframes realtime-call-in {
+    from { opacity: 0; transform: translateY(12px) scale(0.98); }
+}
+
+// The calls ringing here, one card each, in a column at the top corner.
+.realtime-call-rings {
+    position: fixed;
+    z-index: 2147483001;
+    top: 16px;
+    inset-inline-end: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    width: min(360px, calc(100vw - 32px));
+}
+
+.realtime-call-ring,
+.realtime-call-notice {
+    padding: 12px 14px;
+    border-radius: var(--bm-radius-lg, 12px);
+    background: rgba(var(--wplus-toast-bg), 1);
+    color: rgba(var(--wplus-toast-fg), 1);
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.25);
+    animation: realtime-call-in var(--bm-duration-base, 200ms) var(--bm-ease-out, ease-out);
+}
+
+.realtime-call-notice {
+    position: fixed;
+    z-index: 2147483001;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%);
+    max-width: calc(100vw - 32px);
+    font-size: var(--bm-font-size-sm, 13px);
+}
+
+// How <chat-room> and <online-list> fill the place the page gives them is theirs (src/elements.tsx, hostCss, and
+// .realtime-online in presence.css), as a page's prefix renames them: no rule here names an element.
+
+// A control's tooltip, on a page without the WordPlus SDK's floater (src/inc/floater.ts), in the shadow root beside
+// the window. It takes the SDK's tokens, so a page that sets them for its WordPlus plugins sets them here too.
+.realtime-tooltip {
+    position: fixed;
+    z-index: var(--wplus-tooltip-z, 2147483647);
+    top: 0;
+    left: 0;
+    max-width: var(--wplus-tooltip-max-width, calc(100vw - 16px));
+    padding: var(--wplus-tooltip-padding, 4px 9px);
+    background: rgba(var(--wplus-tooltip-bg, 17, 24, 39), 1);
+    color: rgba(var(--wplus-tooltip-ink, 255, 255, 255), 1);
+    border-radius: var(--wplus-tooltip-radius, 4px);
+    box-shadow: var(--wplus-tooltip-shadow, none);
+    font-family: var(--wplus-tooltip-font, var(--bm-messenger-font, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif));
+    font-size: var(--wplus-tooltip-font-size, 11.5px);
+    font-weight: 500;
+    line-height: 1.35;
+    text-align: var(--wplus-tooltip-align, center);
+    pointer-events: none;
+    -webkit-font-smoothing: antialiased;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .realtime-call-window,
+    .realtime-call-ring,
+    .realtime-call-notice { animation: none; }
+}
+
+// The in-tree call buttons (react.tsx: CallButton, GroupCallButton), as the elements' own buttons look: the page's text
+// and colour, a light border, a hover. Unlayered, so an app's CSS reset in a layer (Tailwind's preflight) leaves them;
+// an app's own class beside it, or none of this, is its own call.
+.realtime-call-button {
+    font: inherit;
+    color: inherit;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    border-radius: 8px;
+    border: 1px solid rgba(127, 127, 127, 0.35);
+    background: transparent;
+
+    &:hover { background: rgba(127, 127, 127, 0.12); }
+    &:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }
+    &:disabled { cursor: default; opacity: 0.6; }
+}
