@@ -30,6 +30,8 @@ export declare class PlaybackMonitor {
     private lastFrames;
     private progressAt;
     private stalledSince;
+    private slow;
+    onTooSlow: (() => void) | null;
     constructor(onStalled: (stalled: boolean) => void, now?: () => number);
     note(kind: PlaybackEventKind, detail?: string): void;
     joining(): void;
@@ -39,6 +41,7 @@ export declare class PlaybackMonitor {
     private schedule;
     sample(room: Room): Promise<void>;
     private follow;
+    private followSlow;
     private resume;
     private read;
 }

@@ -49,11 +49,11 @@ function page( names : PartName[], options : Partial<Record<PartName, PartOption
     return { parts, dialogs, at };
 }
 
-const show = ( state : Partial<EasyStreamState>, names : PartName[], extra : { options? : Partial<Record<PartName, PartOptions>>, studioUrl? : string, chat? : boolean, guests? : boolean, room? : string, before? : ( client : ReturnType<typeof fakeClient>['client'] ) => void } = {} ) => {
+const show = ( state : Partial<EasyStreamState>, names : PartName[], extra : { options? : Partial<Record<PartName, PartOptions>>, studioUrl? : string, connectUrl? : string, chat? : boolean, guests? : boolean, room? : string, before? : ( client : ReturnType<typeof fakeClient>['client'] ) => void } = {} ) => {
     const fake = fakeClient( state );
     extra.before?.( fake.client );
     const { parts, dialogs, at } = page( names, extra.options );
-    const rendered = render( <EasyStreamParts client={ fake.asClient } parts={ parts } dialogs={ dialogs } title="Friday Q&A" studioUrl={ extra.studioUrl } chat={ extra.chat } guests={ extra.guests } room={ extra.room } manage={ false } /> );
+    const rendered = render( <EasyStreamParts client={ fake.asClient } parts={ parts } dialogs={ dialogs } title="Friday Q&A" studioUrl={ extra.studioUrl } connectUrl={ extra.connectUrl } chat={ extra.chat } guests={ extra.guests } room={ extra.room } manage={ false } /> );
     return { ...fake, parts, dialogs, at, rendered };
 };
 
@@ -71,11 +71,85 @@ describe( 'a stream\'s Better Messages chat room', () => {
         expect( within( at( 'chat' ) ).queryByText( 'Hello there' ) ).toBeNull();
         expect( screen.queryByPlaceholderText( 'Say something…' ) ).toBeNull();
 
-        // The player's full screen has no chat of its own: the room stays where the page put it.
-        expect( within( at( 'player' ) ).queryByLabelText( 'Hide chat' ) ).toBeNull();
+        // On the page with the player, a part of its own, the player hides and shows it, the same room kept unseen.
+        fireEvent.click( within( at( 'player' ) ).getByLabelText( 'Hide chat' ) );
+        expect( at( 'chat' ).hasAttribute( 'data-estream-chat-hidden' ) ).toBe( true );
+        expect( at( 'chat' ).querySelector( '.bm-chat-wrap' ) ).toBe( room );
+        fireEvent.click( within( at( 'player' ) ).getByLabelText( 'Show chat' ) );
+        expect( at( 'chat' ).hasAttribute( 'data-estream-chat-hidden' ) ).toBe( false );
 
         rendered.unmount();
         expect( document.querySelector( '.bm-chat-wrap' ) ).toBeNull();
+    } );
+
+    it( 'is shown and hidden from the player beside it in a ready layout, one block, kept mounted while hidden', () => {
+        // The Live stream block's side layout: the player in its main column, the chat in the one beside.
+        const { parts, dialogs, at } = page( [ 'player', 'details', 'chat' ] );
+        document.body.insertAdjacentHTML( 'beforeend', '<div class="estream-layout estream-layout--side"><div class="estream-layout__grid"><div class="estream-layout__main"></div><div class="estream-layout__side"></div></div></div>' );
+        const layout = document.querySelector( '.estream-layout' )!;
+        layout.querySelector( '.estream-layout__main' )!.append( at( 'player' ), at( 'details' ) );
+        layout.querySelector( '.estream-layout__side' )!.append( at( 'chat' ) );
+        const fake = fakeClient( live() );
+        render( <EasyStreamParts client={ fake.asClient } parts={ parts } dialogs={ dialogs } title="Friday Q&A" room={ ROOM } manage={ false } /> );
+        const room = at( 'chat' ).querySelector( '.bm-chat-wrap' );
+
+        fireEvent.click( within( at( 'player' ) ).getByLabelText( 'Hide chat' ) );
+        expect( layout.classList.contains( 'estream-layout--no-chat' ) ).toBe( true );
+        // Hidden by the layout, not taken down: the same room, for when it shows again.
+        expect( at( 'chat' ).querySelector( '.bm-chat-wrap' ) ).toBe( room );
+
+        fireEvent.click( within( at( 'player' ) ).getByLabelText( 'Show chat' ) );
+        expect( layout.classList.contains( 'estream-layout--no-chat' ) ).toBe( false );
+        expect( at( 'chat' ).querySelector( '.bm-chat-wrap' ) ).toBe( room );
+    } );
+
+    it( 'is taken into the player\'s full screen, the same room, dark there, and given back to its part as it ends', async () => {
+        ( document as any ).fullscreenEnabled = true;
+        document.body.classList.add( 'bm-messages-light' );
+        const { at } = show( live(), [ 'player', 'chat' ], { room: ROOM } );
+        // The room as Better Messages mounted it, with what was typed in it.
+        const room = at( 'chat' ).querySelector( '.bm-chat-wrap' ) as HTMLElement;
+        room.classList.add( 'bm-initialized' );
+        room.innerHTML = '<textarea>half a message</textarea>';
+        const root = at( 'player' ).querySelector( '.estream-theme' )!;
+
+        ( document as any ).fullscreenElement = root;
+        await act( async () => { document.dispatchEvent( new Event( 'fullscreenchange' ) ); } );
+        // The very element, not a copy, beside the picture: one room on the page.
+        expect( root.querySelector( '.estream-app__side > .estream-bm-room > .bm-chat-wrap' ) ).toBe( room );
+        expect( document.querySelectorAll( '.bm-chat-wrap' ) ).toHaveLength( 1 );
+        expect( room.querySelector( 'textarea' )?.value ).toBe( 'half a message' );
+        expect( document.body.classList.contains( 'bm-messages-dark' ) ).toBe( true );
+        // With the button and the key for it, as the light chat has.
+        fireEvent.click( within( at( 'player' ) ).getByLabelText( 'Hide chat' ) );
+        expect( at( 'chat' ).querySelector( '.estream-part--chat > .estream-bm-room > .bm-chat-wrap' ) ).toBe( room );
+        expect( root.querySelector( '.estream-bm-room' ) ).toBeNull();
+        fireEvent.click( within( at( 'player' ) ).getByLabelText( 'Show chat' ) );
+        expect( root.querySelector( '.estream-bm-room > .bm-chat-wrap' ) ).toBe( room );
+
+        delete ( document as any ).fullscreenElement;
+        await act( async () => { document.dispatchEvent( new Event( 'fullscreenchange' ) ); } );
+        expect( at( 'chat' ).querySelector( '.estream-part--chat > .estream-bm-room > .bm-chat-wrap' ) ).toBe( room );
+        expect( document.querySelectorAll( '.bm-chat-wrap' ) ).toHaveLength( 1 );
+        expect( document.body.classList.contains( 'bm-messages-light' ) ).toBe( true );
+        expect( document.body.classList.contains( 'bm-messages-dark' ) ).toBe( false );
+        document.body.className = '';
+    } );
+
+    it( 'has a room of its own in the player\'s full screen where the page shows no chat part', async () => {
+        ( document as any ).fullscreenEnabled = true;
+        const { at } = show( live(), [ 'player' ], { room: ROOM } );
+        expect( document.querySelector( '.bm-chat-wrap' ) ).toBeNull();
+        const root = at( 'player' ).querySelector( '.estream-theme' )!;
+
+        ( document as any ).fullscreenElement = root;
+        await act( async () => { document.dispatchEvent( new Event( 'fullscreenchange' ) ); } );
+        expect( root.querySelector( '.estream-app__side > .estream-bm-room > .bm-chat-wrap' )?.getAttribute( 'data-thread-id' ) ).toBe( '16778' );
+
+        delete ( document as any ).fullscreenElement;
+        await act( async () => { document.dispatchEvent( new Event( 'fullscreenchange' ) ); } );
+        expect( document.querySelector( '.bm-chat-wrap' ) ).toBeNull();
+        document.body.className = '';
     } );
 
     it( 'sits beside the player in one piece, and in the studio page\'s chat tab', () => {
@@ -88,6 +162,23 @@ describe( 'a stream\'s Better Messages chat room', () => {
         const studio = show( { you: host }, [ 'studio-page' ], { room: ROOM, options: { 'studio-page': { page: { back: '#/studio', page: '', createPage: '', nonce: 'n', settings: '' } } } } );
         expect( within( studio.at( 'studio-page' ) ).getByRole( 'tab', { name: 'Chat' } ).getAttribute( 'aria-selected' ) ).toBe( 'true' );
         expect( studio.at( 'studio-page' ).querySelector( '.estream-bm-room > .bm-chat-wrap' ) ).toBeTruthy();
+    } );
+
+    it( 'is dark in the player\'s full screen, as Better Messages is dark by its body class, and the page\'s own after', async () => {
+        ( document as any ).fullscreenEnabled = true;
+        document.body.classList.add( 'bm-messages-light', 'site' );
+        const all = show( live(), [ 'all' ], { room: ROOM } );
+        const root = all.at( 'all' ).querySelector( '.estream-theme' )!;
+
+        ( document as any ).fullscreenElement = root;
+        await act( async () => { document.dispatchEvent( new Event( 'fullscreenchange' ) ); } );
+        expect( root.className ).toContain( 'estream-theme--full' );
+        expect( [ ...document.body.classList ].sort() ).toEqual( [ 'bm-messages-dark', 'site' ] );
+
+        delete ( document as any ).fullscreenElement;
+        await act( async () => { document.dispatchEvent( new Event( 'fullscreenchange' ) ); } );
+        expect( [ ...document.body.classList ].sort() ).toEqual( [ 'bm-messages-light', 'site' ] );
+        document.body.className = '';
     } );
 } );
 
@@ -410,11 +501,17 @@ describe( 'a stream\'s parts placed apart', () => {
         expect( screen.queryByText( 'You host this stream.' ) ).toBeNull();
     } );
 
-    it( 'keeps the chat a part of its own, and gives the player one only in full screen, which may hide it', async () => {
+    it( 'keeps the chat a part of its own, which the player hides and shows on the page, and gives the player one in full screen', async () => {
         ( document as any ).fullscreenEnabled = true;
         const { at } = show( live(), [ 'player', 'chat' ] );
         const player = at( 'player' );
-        expect( within( player ).queryByLabelText( 'Hide chat' ) ).toBeNull();
+
+        // On the page, the chat's own part, wherever it is: its place unseen while hidden, which hides its block too.
+        fireEvent.click( within( player ).getByLabelText( 'Hide chat' ) );
+        expect( at( 'chat' ).hasAttribute( 'data-estream-chat-hidden' ) ).toBe( true );
+        expect( within( at( 'chat' ) ).getByText( 'Hello there' ), 'kept on the page' ).toBeTruthy();
+        fireEvent.click( within( player ).getByLabelText( 'Show chat' ) );
+        expect( at( 'chat' ).hasAttribute( 'data-estream-chat-hidden' ) ).toBe( false );
 
         // The player's root goes full screen: its chat comes beside the picture, and may hide.
         const root = player.querySelector( '.estream-part--player' )!;
@@ -553,6 +650,46 @@ describe( 'the studio page', () => {
         expect( studio.getByText( /Once you are live, viewers can ask to join you on stage/ ) ).toBeTruthy();
     } );
 
+    it( 'sets up a host\'s preview on a site the cloud doesn\'t take yet, with no chat, OBS or going live, and offers to connect the site', async () => {
+        const connect = 'https://site.example/wp-admin/admin.php?page=wordplus-stream-licence';
+        const unconnected = { status: 'unconnected' as const, error: 'not_licensed', you: { ...host, identity: 'local' }, stream: null };
+        const { at, client } = show( unconnected, [ 'studio-page' ], { options, connectUrl: connect } );
+        const part = at( 'studio-page' );
+        const studio = within( part );
+
+        expect( studio.getByText( 'Not connected to WordPlus Cloud yet' ) ).toBeTruthy();
+        expect( studio.getByText( 'Try your camera, microphone and screen below. Only you see the preview.' ) ).toBeTruthy();
+        expect( studio.getByRole( 'link', { name: 'Connect to go live' } ).getAttribute( 'href' ) ).toBe( connect );
+        // No chat to reach, nor OBS to send to: both are the cloud's.
+        expect( studio.getAllByRole( 'tab' ).map( ( t ) => t.textContent ) ).toEqual( [ 'Stream' ] );
+        expect( studio.queryByText( 'Stream from OBS' ) ).toBeNull();
+
+        await act( async () => { fireEvent.click( studio.getByText( 'Turn on camera and microphone' ) ); } );
+        expect( client.startPreview ).toHaveBeenCalled();
+        // The bar: the devices, and Connect to go live where Go live is.
+        expect( studio.getByRole( 'button', { name: 'Camera' } ) ).toBeTruthy();
+        expect( studio.queryByRole( 'button', { name: /Go live/ } ) ).toBeNull();
+        expect( part.querySelector( '.estream-studio__bar a.estream-studio__go' )?.getAttribute( 'href' ) ).toBe( connect );
+        expect( studio.queryByText( 'Stream from OBS' ) ).toBeNull();
+        expect( client.goLive ).not.toHaveBeenCalled();
+        cleanup();
+        document.body.innerHTML = '';
+
+        // A host who may not change the licence: Go live there, and off.
+        const other = show( { ...unconnected, devices: { camera: true, microphone: true } }, [ 'studio-page' ], { options } );
+        const go = other.at( 'studio-page' ).querySelector( '.estream-studio__go' ) as HTMLButtonElement;
+        expect( [ go.tagName, go.disabled, go.textContent ] ).toEqual( [ 'BUTTON', true, 'Go live' ] );
+        expect( go.getAttribute( 'data-estream-tip' ) ).toBe( 'Going live needs the site connected to WordPlus Cloud.' );
+        expect( within( other.at( 'studio-page' ) ).queryByRole( 'link', { name: 'Connect to go live' } ) ).toBeNull();
+        cleanup();
+        document.body.innerHTML = '';
+
+        // The player on the stream's page says it too, without the studio's words.
+        const player = show( unconnected, [ 'player' ], { connectUrl: connect } );
+        expect( within( player.at( 'player' ) ).getByText( 'Going live needs the site connected to WordPlus Cloud.' ) ).toBeTruthy();
+        expect( within( player.at( 'player' ) ).queryByText( /Try your camera/ ) ).toBeNull();
+    } );
+
     it( 'makes a page for a stream nobody can watch yet, and offers its link to share', async () => {
         const fetch = vi.fn( async () => ( { ok: true, json: async () => ( { url: 'https://site.example/friday-qa/' } ) } ) );
         vi.stubGlobal( 'fetch', fetch );
@@ -586,6 +723,23 @@ describe( 'the studio page', () => {
         // Above the controls, inside the card the bar is in.
         expect( stats.closest( '.estream-studio-page__controls' ) ).toBeTruthy();
         expect( within( at( 'studio-page' ) ).getByText( /^Live since / ) ).toBeTruthy();
+    } );
+
+    it( 'says while live that OBS stopped sending, and when the stream ends by itself unless it comes back', async () => {
+        const lost = new Date( 2026, 9, 21, 14, 2 ).getTime();
+        const time = ( at : number ) => new Intl.DateTimeFormat( undefined, { timeStyle: 'short' } ).format( at );
+        const { at, update } = show( live( { you: host } ), [ 'studio-page' ], { options } );
+        const studio = within( at( 'studio-page' ) );
+        expect( studio.queryByText( /OBS stopped sending/ ) ).toBeNull();
+
+        update( { stream: { id: 's', state: 'live', started_at: lost - 600_000, ended_at: null, encoder_lost_at: lost } } );
+        const said = studio.getByText( /OBS stopped sending/ );
+        expect( said.textContent ).toBe( 'OBS stopped sending at ' + time( lost ) + '. Unless it comes back, the stream ends by itself at ' + time( lost + 300_000 ) + '.' );
+        expect( said.closest( '.estream-studio-page__controls' ) ).toBeTruthy();
+
+        // Back: said no more.
+        update( { stream: { id: 's', state: 'live', started_at: lost - 600_000, ended_at: null } } );
+        expect( studio.queryByText( /OBS stopped sending/ ) ).toBeNull();
     } );
 
     it( 'counts those asking to join on the Guests tab while live, and tells someone who isn\'t a host', () => {

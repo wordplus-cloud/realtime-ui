@@ -1949,3 +1949,116 @@
 @media (prefers-reduced-motion: reduce) {
   .bm-call-wrap .bm-call-paused { animation: none; }
 }
+
+// Their camera moving to another codec during the call (optimizing.tsx): their
+// last frame, kept as a still, softly blurred and dimmed, and a glass chip with
+// a breathing dot that says "Optimizing video quality...", so the switch reads as
+// the call looking after the picture, not as a picture lost. It fades in, and
+// out once the new picture's first frame is drawn, so nobody sees the black
+// frame between. Where it is, the tile's paused notice isn't; it sits where that
+// one would (z-index 2, the stage's 1), under the name, microphone and controls.
+.bm-call-wrap .bm-call-optimizing {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px;
+  overflow: hidden;
+  &:not(#\9) { border-radius: inherit; }
+  background: rgba(0, 0, 0, 0.5);
+  pointer-events: none;
+  animation: bm-call-paused-in 0.3s ease both;
+
+  // an animation, not a transition: the one coming in holds its opacity
+  &.bm-call-optimizing--leaving {
+    animation: bm-call-optimizing-out 0.3s ease both;
+  }
+
+  // Past the edges, so the blur has no faded rim.
+  .bm-call-optimizing-backdrop {
+    position: absolute;
+    inset: -24px;
+    background-position: center;
+    background-size: cover;
+    filter: blur(16px) brightness(0.62) saturate(1.15);
+  }
+
+  .bm-call-optimizing-notice {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: 9px;
+    max-width: 100%;
+    box-sizing: border-box;
+    padding: 7px 13px 7px 11px;
+    @include bm-call-glass(0.4);
+    &:not(#\9) { border-radius: var(--bm-radius-pill); }
+    color: rgba(var(--bm-call-fg), 1);
+    font-size: 13px;
+    font-weight: 500;
+    line-height: 1.3;
+    letter-spacing: 0.01em;
+    text-align: start;
+  }
+
+  // A dot in the accent, a ring breathing out of it.
+  .bm-call-optimizing-pulse {
+    position: relative;
+    flex: none;
+    width: 8px;
+    height: 8px;
+    &:not(#\9) { border-radius: var(--bm-radius-circle); }
+    background: rgba(var(--bm-color-accent), 1);
+
+    &::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      border-radius: inherit;
+      background: inherit;
+      animation: bm-call-optimizing-breathe 1.6s cubic-bezier(0.2, 0.6, 0.3, 1) infinite;
+    }
+  }
+
+  // The call between two people: the whole stage, a larger chip. Over the
+  // picture, under the chips before it, as the paused notice there.
+  &.bm-call-optimizing-main {
+    z-index: 1;
+
+    .bm-call-optimizing-backdrop {
+      filter: blur(28px) brightness(0.6) saturate(1.15);
+    }
+
+    .bm-call-optimizing-notice {
+      gap: 11px;
+      padding: 10px 18px 10px 15px;
+      font-size: var(--bm-font-size-sm);
+    }
+
+    .bm-call-optimizing-pulse {
+      width: 10px;
+      height: 10px;
+    }
+  }
+}
+
+@keyframes bm-call-optimizing-breathe {
+  0%   { transform: scale(1); opacity: 0.7; }
+  100% { transform: scale(2.8); opacity: 0; }
+}
+
+@keyframes bm-call-optimizing-out {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bm-call-wrap .bm-call-optimizing,
+  .bm-call-wrap .bm-call-optimizing.bm-call-optimizing--leaving {
+    animation: none;
+
+    .bm-call-optimizing-pulse::after { animation: none; opacity: 0; }
+  }
+}

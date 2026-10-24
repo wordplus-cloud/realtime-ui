@@ -476,6 +476,11 @@ export class P2PPeer {
         this.bwe = { out: null, in: null };
         this.wanted = new Map();
         this.shapedFrom = new Map();
+        // What the screen gives up when the link is short: frames, for text, or
+        // pixels, for a video played on it (setScreenDegradation). And what the
+        // sender was last given, as a browser may not read it back.
+        this.screenDegradation = 'maintain-resolution';
+        this.screenDegradationWritten = null;
         this.paramChains = new Map();
         this.localTracks = new Map();
         this.codecWatch = new Map();
@@ -717,6 +722,16 @@ export class P2PPeer {
             this.applyWanted(source);
         }
     }
+    // What the screen's sender gives up when the link or the CPU can't keep
+    // everything: 'maintain-resolution' for text, 'maintain-framerate' for a
+    // video played on it (the presenter's "Optimize for video"). Written to
+    // the running sender at once, nothing negotiated again.
+    setScreenDegradation(preference) {
+        if (this.screenDegradation === preference)
+            return;
+        this.screenDegradation = preference;
+        this.applyWanted('screen_share');
+    }
     // What the other side can encode and decode; each video sender picks its
     // codec from that and this side's own abilities.
     setPeerCaps(caps) {
@@ -820,7 +835,8 @@ export class P2PPeer {
                 && encoding.scaleResolutionDownBy === shape.scale
                 && (encoding.maxFramerate ?? null) === (shape.maxFramerate ?? null)
                 && currentCodec === wantedCodec
-                && this.shapedFrom.get(source) === trackHeight(sender.track)) {
+                && this.shapedFrom.get(source) === trackHeight(sender.track)
+                && (source !== 'screen_share' || this.screenDegradationWritten === this.screenDegradation)) {
                 return;
             }
             encoding.active = shape.active;
@@ -837,16 +853,20 @@ export class P2PPeer {
                 delete encoding.maxFramerate;
             }
             // Text must stay readable when the link is short: the screen
-            // encoder gives up frames before pixels. The camera keeps the
-            // browser's own balance.
+            // encoder gives up frames before pixels, unless the screen is
+            // sent for a video played on it. The camera keeps the browser's
+            // own balance.
+            const degradation = this.screenDegradation;
             if (source === 'screen_share') {
-                params.degradationPreference = 'maintain-resolution';
+                params.degradationPreference = degradation;
             }
             if (codec) {
                 encoding.codec = { mimeType: codec.mimeType, clockRate: codec.clockRate, sdpFmtpLine: codec.sdpFmtpLine, channels: codec.channels };
             }
             try {
                 await sender.setParameters(params);
+                if (source === 'screen_share')
+                    this.screenDegradationWritten = degradation;
             }
             catch (e) {
                 if (!this.closed)

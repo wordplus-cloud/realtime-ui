@@ -1,6 +1,6 @@
 # @wordplus/realtime-ui
 
-Better Messages' screens for apps on WordPlus Cloud's realtime SDK ([`@wordplus/realtime`](https://www.npmjs.com/package/@wordplus/realtime)):
+The Better Messages screens for apps on WordPlus Cloud's realtime SDK ([`@wordplus/realtime`](https://www.npmjs.com/package/@wordplus/realtime)):
 the call screen with its ring, the group video and audio grids and the call dock, who is online, who is typing, and
 the chat. Better Messages draws its own screens with this package, so every improvement made there reaches your app.
 
@@ -14,14 +14,14 @@ Every screen is optional. An app that draws its own screens on the SDK's rooms a
 | **Elements** (`<call-button>`, `<online-list>`, `<chat-room>`, `<live-stream>` …) | in a shadow root, on any page (a live stream in the page itself) | do not reach in, only its tokens | nothing: `@wordplus/realtime` loads them |
 
 The elements are the quickest: no stylesheet to import, and a theme can't break them. The components are for an app
-that wants Better Messages' screens to belong to its own design. The docs cover both:
+that wants the Better Messages screens to belong to its own design. The docs cover both:
 [the call screen](https://docs.wordplus.cloud/apps/calls/#the-call-screen) and [React](https://docs.wordplus.cloud/apps/react/).
 
-The elements' names are plain words, so your pages name nothing but your app. To put your own name before each, or
+The names of the elements are plain words, so your pages name nothing but your app. To put your own name before each, or
 where another script on the page has one of these names, give them a prefix: `screen: { prefix: 'shop' }` in
 `connect()` (or `data-prefix="shop"` on the script's tag) makes `<shop-call-button>`, `<shop-chat-room>` and
 `<shop-live-stream>`. One prefix a page. Where a name is already another script's, the console says so and names the
-prefix setting. The components' classes are `realtime-` (`.realtime-chat`, `.realtime-call-button`).
+prefix setting. The classes of the components are `realtime-` (`.realtime-chat`, `.realtime-call-button`).
 
 ## In a React app
 
@@ -42,6 +42,7 @@ import { CallScreen, CallButton, GroupCallButton, OnlineList, OnlineCount, Typin
 <OnlineCount rt={ rt } room="product:7" />
 <Typing rt={ rt } room="chat:34:42" />
 <Chat rt={ rt } room="chat:34:42" load={ ( before ) => fetchMessages( before ) } />
+<Chat rt={ rt } room="chat:34:42" to="42" call />          // the other person on top, and your call in the chat
 ```
 
 - **`rt`** is the page's `Realtime` from `@wordplus/realtime` (`useRealtime()` in React, or `connect()`'s).
@@ -49,17 +50,19 @@ import { CallScreen, CallButton, GroupCallButton, OnlineList, OnlineCount, Typin
 - **The hooks under them** are yours too: `useRoom( rt, name )`, `useOnline( rt, ids )`, `useProfiles( rt, ids )`
   and `useTyping( rt, room )`.
 - **`<CallScreen>`** takes `lang`, `strings` and `add`:
-  - `lang` picks the screens' own words in English, German, Spanish, French, Italian, Dutch, Polish, Croatian or
+  - `lang` picks the words of the screens in English, German, Spanish, French, Italian, Dutch, Polish, Croatian or
     Hebrew. The page's language is the default.
   - `strings` puts your words over any of theirs, by the English text.
   - `add` offers Add Person.
 - **`<Chat>`** pages back through the conversation your server keeps (`load`), and the room's last 5 minutes fill in
   what came since. It has typing, reactions and read ticks. `onSent` hears each message the room took, with its id, for
-  your server to keep it and tell the other person (`sent`, an event on `<chat-room>`).
+  your server to keep it and tell the other person (`sent`, an event on `<chat-room>`). In a chat between two, `to`
+  shows the other person on its top bar with their calls, and `call` (`true` for the call named as the room) shows
+  the call in the chat, beside the messages, with Show Chat and Hide Chat in its controls.
 
 ## The look
 
-Better Messages' class names (`bm-…`) and design tokens are kept. Set the tokens on the page to make the screens
+The Better Messages class names (`bm-…`) and design tokens are kept. Set the tokens on the page to make the screens
 your app's own:
 
 ```css
@@ -94,7 +97,7 @@ configureUi( {
 } );
 ```
 
-`domain` is the text domain a string is written with: `bp-better-messages` for the call screens, `wordplus-stream` for
+`domain` is the text domain a string is written with: `bp-better-messages` for the call screens, `wordplus-live-stream` for
 the live streams, for a host that translates more than one product's words.
 
 ## Live streams
@@ -134,11 +137,11 @@ them:
 
 - **Their look:** the `estream-` classes, the `--estream-*` properties on their theme root, and the appearance settings
   as props (`appearance.ts`), the shape Easy Stream's WordPress plugin saves.
-- **Their words:** written once through `src/components/streams/i18n.ts`, in the `wordplus-stream` text domain, apostrophe-
+- **Their words:** written once through `src/components/streams/i18n.ts`, in the `wordplus-live-stream` text domain, apostrophe-
   and semicolon-free, translated in this package's eight languages. Easy Stream's WordPress build puts WordPress's own
-  wp.i18n in that one module's place, so WordPress translates them on its sites; keep every call a literal.
+  wp.i18n in that one module's place, so WordPress translates them on its sites. Keep every call a literal.
 - **Where they draw in Better Messages:** `better-messages.tsx` draws the stream in a Better Messages conversation, in
-  its markup. Better Messages' own build never imports this entry, and its extraction keeps only `bp-better-messages`
+  its markup. The build of Better Messages never imports this entry, and its extraction keeps only `bp-better-messages`
   calls.
 
 Their tests are `test/streams/`. Easy Stream vendors a commit of this package (its scripts/vendor-realtime-ui.sh) and
@@ -153,26 +156,27 @@ npm run gallery   # every component in its states, photographed and compared wit
 ```
 
 - **The builds:** `npm run build` writes:
-  - the ES modules and their types for bundlers (`dist/index.js`, `dist/calls.js`, `dist/react.js`);
-  - the stylesheets (`dist/calls.css`, `presence.css`, `chat.css`);
-  - the elements as one script with React, the styles and the languages inside (`dist/realtime-ui.min.js`);
+  - the ES modules and their types for bundlers (`dist/index.js`, `dist/calls.js`, `dist/react.js`),
+  - the stylesheets (`dist/calls.css`, `presence.css`, `chat.css`),
+  - the elements as one script with React, the styles and the languages inside (`dist/realtime-ui.min.js`),
   - the licences of what that script bundles (`dist/THIRD-PARTY-NOTICES.txt`).
 - **The gallery** (`gallery/`) is a page with every component in each of its states, on fixed people and a faked
   call:
-  - the ring, a call between two, a group video and audio call;
-  - presence, who is online;
+  - the ring, a call between two, a group video and audio call,
+  - presence, who is online,
   - a conversation, a message hovered, the composer, an empty conversation.
 
   `npm run gallery` photographs each one in the light and dark themes and right to left at a computer's width, and in
   the light look at a phone's width (Playwright 1.63). It compares every picture with its own in `gallery/pictures`.
   A change meant to be seen takes the pictures again with `npm run gallery:update`, after looking at them.
-- **Languages** (`src/languages`): the screens' strings in de, es, fr, it, nl, pl, hr and he, from Better Messages'
-  translations (`node scripts/languages.mjs`, `--check` to find one missing or a file not as the script writes it).
-  The live streams' own are apart, in `src/languages/streams`, given to the translator by the streams' views
-  (`addStreamLanguages()`, in their `wordplus-stream` text domain), so `realtime-ui.min.js` carries none of them: its build
+- **Languages** (`src/languages`): the strings of the screens in de, es, fr, it, nl, pl, hr and he, from the
+  translations of Better Messages (`node scripts/languages.mjs`, `--check` to find one missing or a file not as the
+  script writes it). The words of the live streams are apart, in `src/languages/streams`, given to the translator by
+  the views of the streams
+  (`addStreamLanguages()`, in their `wordplus-live-stream` text domain), so `realtime-ui.min.js` carries none of them: its build
   stops if it takes in a stream's view or its words.
 
 ## Licence
 
-MIT. The elements' script bundles React and other packages, each under its own licence, listed in full in
+MIT. The script of the elements bundles React and other packages, each under its own licence, listed in full in
 `dist/THIRD-PARTY-NOTICES.txt`.

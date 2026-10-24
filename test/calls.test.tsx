@@ -6,6 +6,7 @@ import { CallScreen, type CallParticipant } from '../src/calls.ts';
 import { CallContext } from '../src/components/calls/context.ts';
 import GroupVideoGridItem from '../src/components/calls/group-video-grid-item.tsx';
 import { PAUSED_NOTICE_MS } from '../src/inc/hooks/held.ts';
+import { OPTIMIZING_FADE_MS, OPTIMIZING_MAX_MS } from '../src/components/calls/optimizing.tsx';
 import { fakeCall, fakeTrack, participant } from './fake-call.ts';
 
 beforeEach( () => {
@@ -245,6 +246,194 @@ describe( 'a picture the media server paused for this page\'s download', () => {
         rerender( screen( fakeCall( { participants: three( true ), statusMessage: 'Connecting...' } ), 'group-video' ) );
         expect( container.querySelector( '.bm-group-call-status' )?.textContent ).toBe( 'Connecting...' );
     } );
+} );
+
+describe( 'a camera moving to another codec during the call', () => {
+    beforeEach( () => { vi.useFakeTimers(); } );
+    afterEach( () => { vi.useRealTimers(); } );
+
+    const tile = ( key: string, extra: Partial<CallParticipant>, optimizingMaxMs?: number ) =>
+        <CallContext.Provider value={ fakeCall( { optimizingMaxMs } ) }>
+            <GroupVideoGridItem unique_key={ key } participant={ participant( key, extra ) } width={ 50 } height={ 50 } x={ 0 } y={ 0 } />
+        </CallContext.Provider>;
+    const notice = ( container: HTMLElement ) => container.querySelector( '.bm-call-optimizing' );
+
+    it( 'says "Optimizing video quality..." on their tile, for a screen reader too, until their new picture\'s first frame is drawn', () => {
+        // Marked: their camera is taken out of the room, so the tile has no video for a moment.
+        const { container, rerender } = render( tile( 'user_34', { videoOptimizing: true, videoPaused: true } ) );
+        expect( notice( container )?.textContent ).toBe( 'Optimizing video quality...' );
+        expect( notice( container )?.getAttribute( 'role' ) ).toBe( 'status' );
+
+        // The pause it stands in for isn't said beside it.
+        act( () => { vi.advanceTimersByTime( PAUSED_NOTICE_MS + 100 ); } );
+        expect( container.querySelector( '.bm-call-paused' ) ).toBeNull();
+
+        // Ready, and the new picture is there: it stays until a frame of it is drawn, then fades out and goes.
+        rerender( tile( 'user_34', { videoOptimizing: false, video: fakeTrack() } ) );
+        act( () => { vi.advanceTimersByTime( 1000 ); } );
+        expect( notice( container ) ).not.toBeNull();
+        expect( notice( container )?.classList.contains( 'bm-call-optimizing--leaving' ) ).toBe( false );
+
+        act( () => { fireEvent.loadedData( container.querySelector( 'video' )! ); } );
+        expect( notice( container )?.classList.contains( 'bm-call-optimizing--leaving' ) ).toBe( true );
+        act( () => { vi.advanceTimersByTime( OPTIMIZING_FADE_MS ); } );
+        expect( notice( container ) ).toBeNull();
+    } );
+
+    it( 'goes 10 s after it came, whether "ready" never came or the new picture never drew', () => {
+        const marked = render( tile( 'user_34', { videoOptimizing: true } ) );
+        act( () => { vi.advanceTimersByTime( OPTIMIZING_MAX_MS - 100 ); } );
+        expect( notice( marked.container )?.classList.contains( 'bm-call-optimizing--leaving' ) ).toBe( false );
+        act( () => { vi.advanceTimersByTime( 100 ); } );
+        expect( notice( marked.container )?.classList.contains( 'bm-call-optimizing--leaving' ) ).toBe( true );
+        act( () => { vi.advanceTimersByTime( OPTIMIZING_FADE_MS ); } );
+        expect( notice( marked.container ) ).toBeNull();
+        // Still marked, it doesn't come back: only a new "optimizing" brings it.
+        act( () => { vi.advanceTimersByTime( OPTIMIZING_MAX_MS ); } );
+        expect( notice( marked.container ) ).toBeNull();
+        marked.unmount();
+
+        const ready = render( tile( 'user_34', { videoOptimizing: true } ) );
+        act( () => { vi.advanceTimersByTime( 4000 ); } );
+        ready.rerender( tile( 'user_34', { videoOptimizing: false, video: fakeTrack() } ) );
+        act( () => { vi.advanceTimersByTime( OPTIMIZING_MAX_MS - 4000 - 100 ); } );
+        expect( notice( ready.container ) ).not.toBeNull();
+        act( () => { vi.advanceTimersByTime( 100 ); } );
+        act( () => { vi.advanceTimersByTime( OPTIMIZING_FADE_MS ); } );
+        expect( notice( ready.container ) ).toBeNull();
+        ready.unmount();
+
+        // the node's failsafe where the call gives one (its policy's tune.failsafeS)
+        const four = render( tile( 'user_34', { videoOptimizing: true }, 4000 ) );
+        act( () => { vi.advanceTimersByTime( 3999 ); } );
+        expect( notice( four.container )?.classList.contains( 'bm-call-optimizing--leaving' ) ).toBe( false );
+        act( () => { vi.advanceTimersByTime( 1 ); } );
+        act( () => { vi.advanceTimersByTime( OPTIMIZING_FADE_MS ); } );
+        expect( notice( four.container ) ).toBeNull();
+    } );
+
+    it( 'second review B3: is on the user\'s own tile while their own camera moves, rather than their avatar; never on a tile away for a moment', () => {
+        // their camera out of the room for the move: no picture, the placeholder instead of the avatar
+        const own = render( tile( 'me', { videoOptimizing: true, video: null } ) );
+        expect( notice( own.container )?.textContent ).toBe( 'Optimizing video quality...' );
+        own.rerender( tile( 'me', { videoOptimizing: false, video: fakeTrack() } ) );
+        act( () => { fireEvent.loadedData( own.container.querySelector( 'video' )! ); } );
+        act( () => { vi.advanceTimersByTime( OPTIMIZING_FADE_MS ); } );
+        expect( notice( own.container ) ).toBeNull();
+        expect( notice( render( tile( 'user_43', { videoOptimizing: true, reconnecting: true } ) ).container ) ).toBeNull();
+    } );
+
+    it( 'covers the whole stage in a call between two, over their avatar where no frame of them could be kept', () => {
+        const two = new Map<string, CallParticipant>( [
+            [ 'me', participant( 'me' ) ],
+            [ 'user_34', participant( 'user_34', { videoOptimizing: true, videoPaused: true, avatar: 'https://example.com/ann.png' } ) ],
+        ] );
+        const { container } = render( <CallScreen call={ { ...fakeCall( { participants: two } ), wrapper: createRef<HTMLDivElement>() as never } } layout="private" /> );
+        act( () => { vi.advanceTimersByTime( PAUSED_NOTICE_MS + 100 ); } );
+
+        const main = container.querySelector( '.bm-main-video .bm-call-optimizing.bm-call-optimizing-main' ) as HTMLElement;
+        expect( main?.textContent ).toBe( 'Optimizing video quality...' );
+        expect( ( main.querySelector( '.bm-call-optimizing-backdrop' ) as HTMLElement ).style.backgroundImage ).toContain( 'ann.png' );
+        expect( container.querySelector( '.bm-call-paused' ) ).toBeNull();
+    } );
+
+    it( 'never covers a screen they share: not on their tile, not on the stage, and their paused screen is still said', () => {
+        const sharing = render( tile( 'user_34', { videoOptimizing: true, video: fakeTrack(), screen: fakeTrack(), screenPaused: true } ) );
+        expect( notice( sharing.container ) ).toBeNull();
+        act( () => { vi.advanceTimersByTime( PAUSED_NOTICE_MS + 100 ); } );
+        expect( sharing.container.querySelector( '.bm-call-paused' ) ).not.toBeNull();
+
+        const two = new Map<string, CallParticipant>( [
+            [ 'me', participant( 'me' ) ],
+            [ 'user_34', participant( 'user_34', { videoOptimizing: true, video: fakeTrack(), screen: fakeTrack() } ) ],
+        ] );
+        const stage = render( <CallScreen call={ { ...fakeCall( { participants: two } ), wrapper: createRef<HTMLDivElement>() as never } } layout="private" /> );
+        expect( stage.container.querySelector( '.bm-main-video video.video2' ) ).not.toBeNull();
+        expect( notice( stage.container ) ).toBeNull();
+    } );
+
+    it( 'works the same where React runs every effect twice (StrictMode)', () => {
+        const strict = ( extra: Partial<CallParticipant> ) => <React.StrictMode>{ tile( 'user_34', extra ) }</React.StrictMode>;
+        const { container, rerender } = render( strict( { videoOptimizing: true } ) );
+        expect( notice( container )?.textContent ).toBe( 'Optimizing video quality...' );
+        rerender( strict( { videoOptimizing: false, video: fakeTrack() } ) );
+        act( () => { fireEvent.loadedData( container.querySelector( 'video' )! ); } );
+        act( () => { vi.advanceTimersByTime( OPTIMIZING_FADE_MS ); } );
+        expect( notice( container ) ).toBeNull();
+    } );
+} );
+
+describe( 'second review B3: a moving camera\'s tile keeps its place in the grid', () => {
+    beforeEach( () => {
+        vi.useFakeTimers();
+        // a call 900 wide and 700 high, its dock 60
+        vi.spyOn( Element.prototype, 'getBoundingClientRect' ).mockImplementation( function( this: Element ){
+            const height = this.classList?.contains( 'bm-group-call-controls-v2' ) ? 60 : 700;
+            return { width: 900, height, top: 0, left: 0, right: 900, bottom: height, x: 0, y: 0, toJSON(){} } as DOMRect;
+        } );
+    } );
+    afterEach( () => {
+        vi.restoreAllMocks();
+        vi.useRealTimers();
+    } );
+
+    const people = ( mover: Partial<CallParticipant> ) => new Map<string, CallParticipant>( [
+        [ 'me', participant( 'me' ) ],
+        [ 'user_43', participant( 'user_43', { video: fakeTrack() } ) ],
+        [ 'user_34', participant( 'user_34', mover ) ],
+        [ 'user_44', participant( 'user_44' ) ],
+        [ 'user_45', participant( 'user_45', { video: fakeTrack() } ) ],
+    ] );
+    const screen = ( mover: Partial<CallParticipant> ) => <CallScreen call={ { ...fakeCall( { participants: people( mover ) } ), wrapper: createRef<HTMLDivElement>() as never } } layout="group-video" />;
+    const order = ( container: HTMLElement ) => [ ...container.querySelectorAll<HTMLElement>( '.bm-group-call-input-video[data-key]' ) ]
+        .sort( ( a, b ) => parseFloat( a.style.top ) - parseFloat( b.style.top ) || parseFloat( a.style.left ) - parseFloat( b.style.left ) )
+        .map( ( el ) => el.getAttribute( 'data-key' ) );
+
+    it( 'in the gap between its camera leaving the room and coming back, where a tile without a picture would move down', () => {
+        const { container, rerender } = render( screen( { video: fakeTrack() } ) );
+        act( () => { vi.advanceTimersByTime( 1000 ); } );
+        // settled: the tiles with a picture first
+        rerender( screen( { video: fakeTrack() } ) );
+        act( () => { vi.advanceTimersByTime( 1000 ); } );
+        const before = order( container );
+        expect( before.indexOf( 'user_34' ) ).toBeLessThan( before.indexOf( 'user_44' ) );
+
+        rerender( screen( { video: null, videoOptimizing: true } ) );
+        act( () => { vi.advanceTimersByTime( 1000 ); } );
+        expect( order( container ) ).toEqual( before );
+
+        // the same gap unmarked: the tile goes after the ones with a picture
+        rerender( screen( { video: null } ) );
+        act( () => { vi.advanceTimersByTime( 1000 ); } );
+        expect( order( container ).indexOf( 'user_34' ) ).toBeGreaterThan( order( container ).indexOf( 'user_45' ) );
+    } );
+} );
+
+describe( 'the camera checked before it goes out', () => {
+    for ( const layout of [ 'private', 'group-video' ] as const ) {
+        it( `spins the ${ layout } call's camera control meanwhile, as the room's controls do, and still takes a press`, () => {
+            const call = fakeCall( { cameraChecking: true, participants: new Map( [ [ 'me', participant( 'me' ) ] ] ) } );
+            const { container, rerender } = render( <CallScreen call={ { ...call, wrapper: createRef<HTMLDivElement>() as never } } layout={ layout } /> );
+
+            const camera = container.querySelector( '.bm-enable-video' )!;
+            expect( camera.getAttribute( 'data-busy' ) ).toBe( '1' );
+            expect( camera.querySelector( '.bm-svg-animate' ) ).not.toBeNull();
+
+            const done = { ...call, cameraChecking: false };
+            rerender( <CallScreen call={ { ...done, wrapper: createRef<HTMLDivElement>() as never } } layout={ layout } /> );
+            expect( container.querySelector( '.bm-enable-video' )?.getAttribute( 'data-busy' ) ).toBeNull();
+            expect( container.querySelector( '.bm-enable-video .bm-svg-animate' ) ).toBeNull();
+        } );
+
+        it( `lets the camera be turned off in the ${ layout } call while it is checked: the person wins at once`, () => {
+            const call = fakeCall( { cameraChecking: true, myCameraTrack: fakeTrack(), participants: new Map( [ [ 'me', participant( 'me' ) ] ] ) } );
+            const { container } = render( <CallScreen call={ { ...call, wrapper: createRef<HTMLDivElement>() as never } } layout={ layout } /> );
+            const camera = container.querySelector( '.bm-disable-video' )!;
+            expect( camera.getAttribute( 'data-busy' ) ).toBe( '1' );
+            fireEvent.click( camera );
+            expect( call.calls ).toEqual( [ 'disableCamera' ] );
+        } );
+    }
 } );
 
 describe( 'the private call\'s controls on a touch', () => {

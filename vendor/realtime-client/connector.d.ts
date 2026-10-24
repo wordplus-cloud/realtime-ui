@@ -50,7 +50,7 @@ export interface ConnectorOptions {
 }
 export declare class Connector implements ConnectorApi {
     private readonly options;
-    readonly version = "1.0.16";
+    readonly version = "1.0.46";
     private readonly hubs;
     /** Namespaces several attaches share (share.ts), by cluster, path, namespace and key. */
     private readonly shared;

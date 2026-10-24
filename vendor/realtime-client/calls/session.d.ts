@@ -58,6 +58,7 @@ export declare class P2PCallSession {
     private sentView;
     private viewPendingSince;
     private remoteWanted;
+    private screenDegradation;
     private handedOff;
     private readonly signalKey;
     private cipher;
@@ -139,6 +140,7 @@ export declare class P2PCallSession {
     private onPlaybackBlocked;
     resumePlayback(): Promise<void>;
     setLocalTrack(source: P2PSource, track: MediaStreamTrack | null): void;
+    setScreenDegradation(preference: RTCDegradationPreference): void;
     private localState;
     private sendState;
     participant(): P2PParticipantView | null;

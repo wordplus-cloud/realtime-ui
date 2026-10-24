@@ -129,6 +129,10 @@
 .bm-day-pill {
     font-size: 10.5px;
     font-weight: 700;
+    // A line of its own, the one the Chat sets on its root (_chat.scss):
+    // Better Messages lays its column out itself, so there the pill took the
+    // page's line, and FluentCommunity's 22.4px made it 32px tall, not 25px.
+    line-height: var(--bm-line-height-normal);
     letter-spacing: 0.04em;
     text-transform: uppercase;
     color: rgba(var(--bm-color-sticky-date-text), 1);
@@ -158,6 +162,8 @@
     &__label {
         font-size: 10.5px;
         font-weight: 700;
+        // As the day pill above: 19px tall, not 26px under a host's tall line.
+        line-height: var(--bm-line-height-normal);
         letter-spacing: 0.06em;
         text-transform: uppercase;
         color: rgba(var(--bm-color-accent), 1);

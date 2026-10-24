@@ -6,6 +6,7 @@ import { CallsController } from '../src/sdk/controller.ts';
 import CallsApp from '../src/sdk/calls-app.tsx';
 import { translator } from '../src/inc/translations.ts';
 import type { SdkCall, SdkCalls, SdkGroupCall, SdkIncoming, SdkPerson, SdkRemoteTrack } from '../src/sdk/types.ts';
+import { fakeRoom, fakeRooms } from './fake-rooms.ts';
 
 // The SDK's calls as the screens read them, by shape: events fired by hand.
 class Emitter {
@@ -61,10 +62,16 @@ function fakeCalls() {
 
 const devices = () => {
     const track = { stop: vi.fn(), getSettings: () => ( { deviceId: 'cam-1' } ), addEventListener: () => {} };
+    // A stream of what was asked for, as the browser gives it: the microphone, the camera, or both.
+    const stream = ( asked: MediaStreamConstraints ) => {
+        const audio = asked.audio ? [ track ] : [];
+        const video = asked.video ? [ track ] : [];
+        return { getTracks: () => [ ...audio, ...video ], getAudioTracks: () => audio, getVideoTracks: () => video };
+    };
     Object.defineProperty( navigator, 'mediaDevices', {
         configurable: true,
         value: {
-            getUserMedia: vi.fn( async () => ( { getTracks: () => [ track ] } ) ),
+            getUserMedia: vi.fn( async ( asked: MediaStreamConstraints ) => stream( asked ) ),
             getDisplayMedia: vi.fn(),
             enumerateDevices: vi.fn( async () => [] ),
         },
@@ -164,6 +171,10 @@ describe( 'the SDK\'s calls on Better Messages\' screens', () => {
         await act( async () => controller.place( 'support:34:42', 34, 'video', { name: 'Ann' } ) );
         expect( placed.sent.map( ( [ source ] ) => source ).sort() ).toEqual( [ 'camera', 'microphone' ] );
         expect( placed.sent.every( ( [ , track ] ) => track !== null ) ).toBe( true );
+        // Both in one request, so the browser asks once, the rehearsal's mount asking nothing more.
+        expect( navigator.mediaDevices.getUserMedia ).toHaveBeenCalledTimes( 1 );
+        expect( navigator.mediaDevices.getUserMedia ).toHaveBeenCalledWith( { audio: true,
+            video: { facingMode: 'user', width: { ideal: 1920 }, height: { ideal: 1080 }, frameRate: { ideal: 30 } } } );
     } );
 
     it( 'hangs up from the screen, ending the call and stopping what it sent', async () => {
@@ -245,6 +256,298 @@ describe( 'the SDK\'s calls on Better Messages\' screens', () => {
         await act( async () => ended.fire( 'ended', 'removed' ) );
         expect( container.querySelector( '.realtime-call-window' ) ).toBeNull();
         expect( container.querySelector( '.realtime-call-notice' )?.textContent ).toBe( 'You were removed from this call' );
+    } );
+} );
+
+describe( 'a call in the page, in a spot of its own', () => {
+    // A page could not hold a call inline: the call showed only in the window in the corner.
+    afterEach( () => document.body.replaceChildren() );
+
+    it( 'shows a call in the spot its name matches, and back in the window when the spot goes: the same screen, the camera and microphone not started again', async () => {
+        const calls = fakeCalls();
+        const placed = fakeCall( { name: 'match:34:42', state: 'connected' } );
+        calls.start.mockResolvedValue( placed );
+        const controller = new CallsController( calls );
+        const { container } = render( <CallsApp controller={ controller } /> );
+        const spot = document.body.appendChild( document.createElement( 'div' ) );
+        const other = document.body.appendChild( document.createElement( 'div' ) );
+        controller.spot( 'support:{a}:{b}', other );
+        const release = controller.spot( 'match:{a}:{b}', spot );
+
+        await act( async () => controller.place( 'match:34:42', 34, 'video', { name: 'Ann' } ) );
+        const window = spot.querySelector( '.realtime-call-window' );
+        expect( window?.querySelector( '.bm-private-call' ) ).not.toBeNull();
+        expect( spot.querySelector( '.realtime-call-holder' )?.getAttribute( 'data-place' ) ).toBe( 'spot' );
+        expect( other.childElementCount ).toBe( 0 );
+        expect( controller.snapshot().spot ).toBe( spot );
+        const sent = placed.sent.length;
+        expect( sent ).toBe( 2 );
+
+        // The page with the spot goes: the call goes on in the window, the same element, nothing started again.
+        act( () => release() );
+        expect( container.querySelector( '.realtime-call-window' ) ).toBe( window );
+        expect( container.querySelector( '.realtime-call-holder' )?.hasAttribute( 'data-place' ) ).toBe( false );
+        expect( spot.childElementCount ).toBe( 0 );
+        expect( placed.ended ).toBe( false );
+        expect( placed.sent.length ).toBe( sent );
+
+        // And back when a spot for it comes again.
+        act( () => void controller.spot( 'match:{a}:{b}', spot ) );
+        expect( spot.querySelector( '.realtime-call-window' ) ).toBe( window );
+        expect( placed.sent.length ).toBe( sent );
+    } );
+
+    it( 'takes a group call by its name, every call for a spot with no name, and the latest spot of a call', async () => {
+        const calls = fakeCalls();
+        const group = Object.assign( new Emitter(), { state: 'connected', people: () => [], setTrack: vi.fn( async () => {} ), leave: vi.fn(), decline: vi.fn() } );
+        calls.group.mockResolvedValue( group );
+        const controller = new CallsController( calls );
+        render( <CallsApp controller={ controller } /> );
+        const any = document.body.appendChild( document.createElement( 'div' ) );
+        const meeting = document.body.appendChild( document.createElement( 'div' ) );
+        controller.spot( null, any );
+        await act( async () => controller.join( 'meeting:daily', 'video', 'Daily' ) );
+        expect( any.querySelector( '.realtime-call-window' ) ).not.toBeNull();
+
+        act( () => void controller.spot( 'meeting:{id}', meeting ) );
+        expect( meeting.querySelector( '.realtime-call-window' ) ).not.toBeNull();
+        expect( any.childElementCount ).toBe( 0 );
+    } );
+
+    it( 'the spot that names a call most closely wins, whichever came first: its name, then a pattern, then every call', async () => {
+        // A layout's spot for every call registers after its page's own (React runs a child's layout effects first),
+        // and must not take the call from the page (an SDK review, 2026-10-20).
+        const calls = fakeCalls();
+        calls.start.mockResolvedValue( fakeCall( { name: 'chat:34:42', state: 'connected' } ) );
+        const controller = new CallsController( calls );
+        render( <CallsApp controller={ controller } /> );
+        const [ named, pattern, every, later ] = [ 0, 1, 2, 3 ].map( () => document.body.appendChild( document.createElement( 'div' ) ) );
+        const releaseNamed = controller.spot( 'chat:34:42', named );
+        const releasePattern = controller.spot( 'chat:{a}:{b}', pattern );
+        controller.spot( null, every );
+        await act( async () => controller.place( 'chat:34:42', 34, 'video', { name: 'Ann' } ) );
+        expect( controller.snapshot().spot ).toBe( named );
+
+        act( () => releaseNamed() );
+        expect( controller.snapshot().spot ).toBe( pattern );
+        act( () => releasePattern() );
+        expect( controller.snapshot().spot ).toBe( every );
+        // Among spots alike, the latest.
+        act( () => void controller.spot( null, later ) );
+        expect( later.querySelector( '.realtime-call-window' ) ).not.toBeNull();
+    } );
+
+    it( 'CallSpot: its children until a call comes, the call while it lasts with data-call, then its children again', async () => {
+        const { CallScreen, CallSpot } = await import( '../src/react.tsx' );
+        const { controllerFor } = await import( '../src/sdk/controller.ts' );
+        const calls = fakeCalls();
+        const placed = fakeCall( { name: 'match:34:42', state: 'connected' } );
+        calls.start.mockResolvedValue( placed );
+        const rt = { calls: async () => calls };
+        const { container } = render( <>
+            <CallScreen rt={ rt } />
+            <CallSpot rt={ rt } call="match:{a}:{b}" className="date"><p>The chat</p></CallSpot>
+            <CallSpot rt={ rt } call="office:{id}" />
+        </> );
+        await act( async () => {} );
+        const [ date, office ] = [ ...container.querySelectorAll( '.realtime-call-spot' ) ];
+        expect( date.className ).toBe( 'realtime-call-spot date' );
+        expect( date.textContent ).toBe( 'The chat' );
+        expect( office.hasAttribute( 'hidden' ) ).toBe( true );
+
+        await act( async () => controllerFor( calls ).place( 'match:34:42', 34, 'video', { name: 'Ann' } ) );
+        expect( date.getAttribute( 'data-call' ) ).toBe( 'match:34:42' );
+        expect( date.querySelector( '.realtime-call-window .bm-private-call' ) ).not.toBeNull();
+        expect( date.textContent ).not.toContain( 'The chat' );
+        expect( office.hasAttribute( 'hidden' ) ).toBe( true );
+
+        await act( async () => {
+            placed.state = 'ended';
+            placed.fire( 'ended', 'hangup' );
+        } );
+        expect( date.hasAttribute( 'data-call' ) ).toBe( false );
+        expect( date.textContent ).toBe( 'The chat' );
+        expect( container.querySelector( '.realtime-call-window' ) ).toBeNull();
+    } );
+
+    it( 'CallSpot: a call in it goes on in the window when the spot leaves the page', async () => {
+        const { CallScreen, CallSpot } = await import( '../src/react.tsx' );
+        const { controllerFor } = await import( '../src/sdk/controller.ts' );
+        const calls = fakeCalls();
+        const placed = fakeCall( { name: 'match:34:42', state: 'connected' } );
+        calls.start.mockResolvedValue( placed );
+        const rt = { calls: async () => calls };
+        const Page = ( { spot }: { spot: boolean } ) => <><CallScreen rt={ rt } />{ spot && <CallSpot rt={ rt } call="match:34:42" /> }</>;
+        const { container, rerender } = render( <Page spot={ true } /> );
+        await act( async () => {} );
+        await act( async () => controllerFor( calls ).place( 'match:34:42', 34, 'video', { name: 'Ann' } ) );
+        const window = container.querySelector( '.realtime-call-spot .realtime-call-window' );
+        expect( window ).not.toBeNull();
+
+        rerender( <Page spot={ false } /> );
+        expect( container.querySelector( '.realtime-call-spot' ) ).toBeNull();
+        expect( container.querySelector( '.realtime-call-home .realtime-call-window' ) ).toBe( window );
+        expect( placed.ended ).toBe( false );
+    } );
+} );
+
+describe( 'a chat that holds its call', () => {
+    // A chat could not hold its video call: the call showed above the chat, in a box of its own.
+    const page = ( room = 'chat:34:42' ) => {
+        const calls = fakeCalls();
+        const placed = fakeCall( { name: room, state: 'connected' } );
+        calls.start.mockResolvedValue( placed );
+        const held = fakeRoom( room );
+        const rt = Object.assign( fakeRooms( { [ room ]: held } ), { calls: async () => calls } );
+        return { calls, placed, rt, room: held };
+    };
+    const settle = async () => {
+        for ( let i = 0; i < 3; i++ ) await act( async () => {} );
+    };
+    // How wide the chat is: jsdom lays nothing out.
+    const wide = ( width: number ) => vi.spyOn( HTMLElement.prototype, 'clientWidth', 'get' ).mockImplementation( function ( this: HTMLElement ) {
+        return this.classList.contains( 'realtime-chat-body' ) ? width : 0;
+    } );
+    afterEach( () => vi.restoreAllMocks() );
+
+    it( 'shows the other person on top with their calls, and the call beside the messages, Hide Chat giving it the chat', async () => {
+        wide( 800 );
+        const { Chat, CallScreen } = await import( '../src/react.tsx' );
+        const { calls, placed, rt } = page();
+        const { container } = render( <><CallScreen rt={ rt } /><Chat rt={ rt } room="chat:34:42" to="42" call /></> );
+        await settle();
+
+        const chat = container.querySelector( '.realtime-chat' )!;
+        expect( chat.querySelector( '.realtime-chat-top__name' )?.textContent ).toBe( 'Ben' );
+        expect( chat.querySelector( '.realtime-chat-top__online' )?.textContent ).toBe( 'Online' );
+        expect( chat.hasAttribute( 'data-call' ) ).toBe( false );
+
+        await act( async () => fireEvent.click( chat.querySelector( '[aria-label="Video Call"]' )! ) );
+        await settle();
+        expect( calls.start ).toHaveBeenCalledWith( 'chat:34:42', { to: '42', type: 'video' } );
+        expect( chat.querySelector( '.realtime-chat-call .realtime-call-window .bm-private-call' ) ).not.toBeNull();
+        expect( chat.getAttribute( 'data-call' ) ).toBe( 'chat:34:42' );
+        expect( chat.getAttribute( 'data-call-layout' ) ).toBe( 'beside' );
+        expect( chat.getAttribute( 'data-call-chat' ) ).toBe( '1' );
+        // A second call can't start while this one is on.
+        expect( chat.querySelector( '[aria-label="Audio Call"]' )?.getAttribute( 'aria-disabled' ) ).toBe( 'true' );
+
+        // The call's controls hide the messages, and show them again.
+        await act( async () => fireEvent.click( chat.querySelector( '.bm-toggle-chat' )! ) );
+        expect( chat.getAttribute( 'data-call-chat' ) ).toBe( '0' );
+        await act( async () => fireEvent.click( chat.querySelector( '.bm-toggle-chat' )! ) );
+        expect( chat.getAttribute( 'data-call-chat' ) ).toBe( '1' );
+
+        await act( async () => {
+            placed.state = 'ended';
+            placed.fire( 'ended', 'hangup' );
+        } );
+        expect( chat.hasAttribute( 'data-call' ) ).toBe( false );
+        expect( chat.querySelector( '.realtime-call-window' ) ).toBeNull();
+    } );
+
+    it( 'in a narrow chat the call takes it all as it comes in, Show Chat putting the messages under it', async () => {
+        wide( 360 );
+        const { Chat, CallScreen } = await import( '../src/react.tsx' );
+        const { controllerFor } = await import( '../src/sdk/controller.ts' );
+        const { calls, rt } = page();
+        const { container } = render( <><CallScreen rt={ rt } /><Chat rt={ rt } room="chat:34:42" to="42" call="chat:{pair}" /></> );
+        await settle();
+        await act( async () => controllerFor( calls ).place( 'chat:34:42', 42, 'video', { name: 'Ben' } ) );
+        await settle();
+
+        const chat = container.querySelector( '.realtime-chat' )!;
+        expect( chat.getAttribute( 'data-call-layout' ) ).toBe( 'over' );
+        expect( chat.getAttribute( 'data-call-chat' ) ).toBe( '0' );
+        await act( async () => fireEvent.click( chat.querySelector( '.bm-toggle-chat' )! ) );
+        expect( chat.getAttribute( 'data-call-chat' ) ).toBe( '1' );
+    } );
+
+    it( 'takes its call from a layout spot for every call, and gives it back when the chat leaves the page', async () => {
+        wide( 800 );
+        const { Chat, CallScreen, CallSpot } = await import( '../src/react.tsx' );
+        const { controllerFor } = await import( '../src/sdk/controller.ts' );
+        const { calls, placed, rt } = page();
+        const Page = ( { chat }: { chat: boolean } ) => <>
+            <CallScreen rt={ rt } />
+            <CallSpot rt={ rt } className="top" />
+            { chat && <Chat rt={ rt } room="chat:34:42" call /> }
+        </>;
+        const { container, rerender } = render( <Page chat={ false } /> );
+        await settle();
+        await act( async () => controllerFor( calls ).place( 'chat:34:42', 42, 'video', { name: 'Ben' } ) );
+        const window = container.querySelector( '.top .realtime-call-window' );
+        expect( window ).not.toBeNull();
+
+        rerender( <Page chat={ true } /> );
+        await settle();
+        expect( container.querySelector( '.realtime-chat-call .realtime-call-window' ) ).toBe( window );
+        expect( container.querySelector( '.top' )?.hasAttribute( 'hidden' ) ).toBe( true );
+        // No `to`: no bar on top.
+        expect( container.querySelector( '.realtime-chat-top' ) ).toBeNull();
+
+        rerender( <Page chat={ false } /> );
+        expect( container.querySelector( '.top .realtime-call-window' ) ).toBe( window );
+        expect( placed.ended ).toBe( false );
+    } );
+
+    it( 'shows the name and picture the page gives for someone the directory does not know, on top and in their call', async () => {
+        // A person offline had no picture in a video call. The directory has a person for a day after they were last
+        // online, and the bar and the call window had nothing else.
+        wide( 800 );
+        const { Chat, CallScreen } = await import( '../src/react.tsx' );
+        const { rt, room } = page( 'chat:34:99' );
+        room.history.mockImplementation( async () => ( { events: [ { event: 'message', data: { text: 'Hi!' }, id: 'h1', at: Date.now(), from: '99' } ], more: false } ) );
+        const { container } = render( <><CallScreen rt={ rt } />
+            <Chat rt={ rt } room="chat:34:99" to="99" name="Lena" avatar="/photos/99" call /></> );
+        await settle();
+        const top = container.querySelector( '.realtime-chat-top' )!;
+        expect( top.querySelector( '.realtime-chat-top__name' )?.textContent ).toBe( 'Lena' );
+        expect( top.querySelector( 'img' )?.getAttribute( 'src' ) ).toBe( '/photos/99' );
+        // Her messages by the same name and picture.
+        const stack = container.querySelector( '.bm-msg-stack:not([data-is-me="1"])' )!;
+        expect( stack.querySelector( '.bm-name' )?.textContent ).toBe( 'Lena' );
+        expect( stack.querySelector( 'img' )?.getAttribute( 'src' ) ).toBe( '/photos/99' );
+
+        await act( async () => fireEvent.click( top.querySelector( '[aria-label="Video Call"]' )! ) );
+        await settle();
+        expect( container.querySelector( '.realtime-chat-call .realtime-call-window img[src="/photos/99"]' ) ).not.toBeNull();
+    } );
+
+    it( 'startCall calls the other person as the chat opens, once, the call in the chat', async () => {
+        // Video in a list of people must not start the call on the list's page. The list's Video links to the chat,
+        // which calls as it opens.
+        wide( 800 );
+        const { Chat, CallScreen } = await import( '../src/react.tsx' );
+        const { calls, rt } = page();
+        const Page = ( { start }: { start?: 'video' } ) => <><CallScreen rt={ rt } /><Chat rt={ rt } room="chat:34:42" to="42" call startCall={ start } /></>;
+        const { container, rerender } = render( <Page start="video" /> );
+        await settle();
+        expect( calls.start ).toHaveBeenCalledTimes( 1 );
+        expect( calls.start ).toHaveBeenCalledWith( 'chat:34:42', { to: '42', type: 'video' } );
+        expect( container.querySelector( '.realtime-chat-call .realtime-call-window' ) ).not.toBeNull();
+
+        // The page takes the word out of its address: the chat stays, and calls no more.
+        rerender( <Page /> );
+        rerender( <Page start="video" /> );
+        await settle();
+        expect( calls.start ).toHaveBeenCalledTimes( 1 );
+    } );
+
+    it( 'an app draws its own top bar with the ChatHeader piece, calling through it', async () => {
+        wide( 800 );
+        const { Chat, CallScreen } = await import( '../src/react.tsx' );
+        const { calls, rt } = page();
+        const { container } = render( <><CallScreen rt={ rt } />
+            <Chat rt={ rt } room="chat:34:42" to="42" call components={ {
+                ChatHeader: ( { person, online, call } ) => <header className="mine">{ person.name } { online ? 'here' : 'away' }
+                    <button onClick={ () => call?.( 'audio' ) }>Ring</button></header>,
+            } } /></> );
+        await settle();
+        expect( container.querySelector( '.mine' )?.textContent ).toBe( 'Ben hereRing' );
+        expect( container.querySelector( '.realtime-chat-top' ) ).toBeNull();
+        await act( async () => fireEvent.click( container.querySelector( '.mine button' )! ) );
+        expect( calls.start ).toHaveBeenCalledWith( 'chat:34:42', { to: '42', type: 'audio' } );
     } );
 } );
 

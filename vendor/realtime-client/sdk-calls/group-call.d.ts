@@ -162,6 +162,12 @@ export declare class GroupCall {
     private publishOptions;
     private caps;
     private choice;
+    private cameraWatch;
+    /**
+     * Watches the camera sent for a hardware encoder dropping its frames (encoder-watch.ts): once seen, this browser
+     * remembers it, and the next camera, in this call or another, goes out in software.
+     */
+    private watchCamera;
     private server;
     /** What this browser encodes, asked once a call. */
     private capabilities;

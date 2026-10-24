@@ -24,6 +24,7 @@ export const base : EasyStreamState = {
     tiles: [],
     audioBlocked: false,
     devices: { camera: false, microphone: false },
+    originalSound: false,
     screenSharing: false,
     canShareScreen: true,
     reactions: [],
@@ -68,6 +69,7 @@ export function fakeClient( state : Partial<EasyStreamState> = {} ){
         setCamera: vi.fn( async ( on : boolean ) => { patch( { devices: { ...current.devices, camera: on } } ); } ),
         setMicrophone: vi.fn( async ( on : boolean ) => { patch( { devices: { ...current.devices, microphone: on } } ); } ),
         setScreenShare: vi.fn( async ( on : boolean ) => { patch( { screenSharing: on } ); return on; } ),
+        setOriginalSound: vi.fn( async ( on : boolean ) => { patch( { originalSound: on } ); return on; } ),
         end: vi.fn( async () => ( { ok: true } ) ),
         unstage: vi.fn( async () => ( { ok: true } ) ),
         leaveStage: vi.fn( async () => {} ),
@@ -115,6 +117,7 @@ export function fakeClient( state : Partial<EasyStreamState> = {} ){
             return sent;
         } ),
         startAudio: vi.fn( async () => {} ),
+        retryPicture: vi.fn( () => patch( { tooSlow: false } ) ),
         // No layers known and nothing measured, unless a test says.
         pictureLayers: vi.fn( () => [] as any[] ),
         playbackStats: vi.fn( () => null as any ),

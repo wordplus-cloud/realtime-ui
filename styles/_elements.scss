@@ -61,6 +61,38 @@
     from { opacity: 0; transform: translateY(12px) scale(0.98); }
 }
 
+// The window's holder (calls-app.tsx), which moves between its home and the page's spots: no box of its own at home.
+// In a spot (CallSpot, <call-spot>), it fills the spot and the window fills it, where the page puts the spot and as
+// large as the page makes it.
+.realtime-call-holder {
+    display: contents;
+
+    &[data-place="spot"] {
+        display: block;
+        position: absolute;
+        inset: 0;
+
+        .realtime-call-window {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            z-index: auto;
+            box-shadow: none;
+            animation: none;
+        }
+    }
+}
+
+// A spot holding a call: 360px high unless the page makes it another size. In the components layer, as the buttons
+// below, so the page's own classes, Tailwind's utilities included, size it.
+@layer components {
+    .realtime-call-spot[data-call] {
+        position: relative;
+        min-height: 360px;
+    }
+}
+
 // The calls ringing here, one card each, in a column at the top corner.
 .realtime-call-rings {
     position: fixed;
@@ -125,21 +157,25 @@
 }
 
 // The in-tree call buttons (react.tsx: CallButton, GroupCallButton), as the elements' own buttons look: the page's text
-// and colour, a light border, a hover. Unlayered, so an app's CSS reset in a layer (Tailwind's preflight) leaves them;
-// an app's own class beside it, or none of this, is its own call.
-.realtime-call-button {
-    font: inherit;
-    color: inherit;
-    cursor: pointer;
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    padding: 6px 12px;
-    border-radius: 8px;
-    border: 1px solid rgba(127, 127, 127, 0.35);
-    background: transparent;
+// and colour, a light border, a hover. In the components layer: over an app's CSS reset in the base layer (Tailwind's
+// preflight), under its own classes beside it (Tailwind's utilities, or any rule outside layers), which were lost to
+// these while they were outside layers (an SDK review, 2026-10-20: `bg-rose-600 rounded-full` on a CallButton did
+// nothing).
+@layer components {
+    .realtime-call-button {
+        font: inherit;
+        color: inherit;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 6px 12px;
+        border-radius: 8px;
+        border: 1px solid rgba(127, 127, 127, 0.35);
+        background: transparent;
 
-    &:hover { background: rgba(127, 127, 127, 0.12); }
-    &:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }
-    &:disabled { cursor: default; opacity: 0.6; }
+        &:hover { background: rgba(127, 127, 127, 0.12); }
+        &:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }
+        &:disabled { cursor: default; opacity: 0.6; }
+    }
 }

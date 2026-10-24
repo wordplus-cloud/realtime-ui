@@ -199,4 +199,18 @@ describe( 'the chat', () => {
         expect( screen.getByText( 'Reconnecting to the chat…' ) ).toBeTruthy();
         expect( ( screen.getByLabelText( 'Send' ) as HTMLButtonElement ).disabled ).toBe( true );
     } );
+
+    it( 'marks a Better Messages room in its place as the stream\'s own, which it stays when Better Messages takes it over the whole page', () => {
+        const { asClient } = fakeClient( live );
+        const { container } = render( <EasyStreamApp client={ asClient } room={ '<div class="bm-chat-wrap" data-thread-id="7"></div>' } /> );
+
+        const room = container.querySelector( '.estream-bm-room > .bm-chat-wrap' )!;
+        expect( room.getAttribute( 'data-thread-id' ) ).toBe( '7' );
+        expect( room.hasAttribute( 'data-estream-room' ) ).toBe( true );
+
+        // A phone's room opened over the page, outside the stream's parts.
+        document.body.appendChild( room );
+        expect( room.closest( '.estream-theme' ) ).toBeNull();
+        expect( room.closest( '[data-estream-room]' ) ).toBe( room );
+    } );
 } );

@@ -58,6 +58,16 @@ it( 'draws a stream in one piece, joined once with its picture', async () => {
     expect( calls.stream ).toHaveBeenCalledWith( 'show:mugs', { video: true } );
 } );
 
+it( 'offers its signed-in viewer the hand while live, which the app\'s rule allows', async () => {
+    await place( '<live-stream name="lesson:1"></live-stream>' );
+
+    // The page is German here: "Ask to join on stage".
+    const hand = () => [ ...document.querySelectorAll<HTMLButtonElement>( 'live-stream button' ) ].find( ( button ) => button.textContent === 'Anfragen, auf die Bühne zu kommen' );
+    await waitFor( () => expect( hand() ).toBeTruthy() );
+    await act( async () => hand()!.click() );
+    expect( shows.get( 'lesson:1' )!.client.raiseHand ).toHaveBeenCalledWith( true );
+} );
+
 it( 'gives every element of a stream one join, each part in its own element', async () => {
     await place( '<live-stream name="show:mugs" view="player"></live-stream><div><live-stream name="show:mugs" view="chat" height="480"></live-stream></div>' );
 

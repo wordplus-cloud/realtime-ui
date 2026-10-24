@@ -73,6 +73,8 @@ export declare class P2PPeer {
     private bwe;
     private readonly wanted;
     private readonly shapedFrom;
+    private screenDegradation;
+    private screenDegradationWritten;
     private readonly paramChains;
     private readonly localTracks;
     private readonly codecWatch;
@@ -99,6 +101,7 @@ export declare class P2PPeer {
     private nextFreeSource;
     private adoptOfferedSections;
     setWanted(view: ViewHint): void;
+    setScreenDegradation(preference: RTCDegradationPreference): void;
     setPeerCaps(caps: CodecCaps): void;
     setOwnCaps(caps: CodecCaps): void;
     private get negotiated();

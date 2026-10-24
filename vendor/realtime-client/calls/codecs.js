@@ -1,5 +1,5 @@
 import { isFirefox, isSafari } from "./platform.js";
-import { CHROMIUM_H264_ENCODE } from "./room-publish.js";
+import { CHROMIUM_H264_ENCODE, droppedHardwareCodecs } from "./room-publish.js";
 // Which video codec each direction of a direct call uses.
 //
 // The browsers' own order is a legacy one (Chrome and Firefox offer VP8
@@ -115,14 +115,18 @@ export function markBroken(family, direction) {
 }
 function withoutBroken(caps) {
     const current = brokenCodecs();
-    if (Object.keys(current).length === 0)
+    // a codec whose hardware this browser saw taking a camera's frames off (encoder-watch.ts), not sent: a room's
+    // camera goes out in VP8 then (room-publish.ts), and a direct call's sent H.264 from hardware at 3-6 frames as
+    // before (the review after the move to the mesh, 2026-10-21)
+    const dropped = droppedHardwareCodecs().map((codec) => 'video/' + codec.toUpperCase());
+    if (Object.keys(current).length === 0 && dropped.length === 0)
         return caps;
     const families = {};
     for (const family of Object.keys(caps.families)) {
         const pair = caps.families[family];
         const directions = current[family] ?? [];
         families[family] = {
-            enc: directions.includes('enc') ? NONE : pair.enc,
+            enc: directions.includes('enc') || dropped.includes(family) ? NONE : pair.enc,
             dec: directions.includes('dec') ? NONE : pair.dec
         };
     }

@@ -1,5 +1,5 @@
 import {afterEach, beforeEach, describe, expect, it, vi} from "vitest";
-import {act, cleanup, fireEvent, render, screen} from "@testing-library/react";
+import {act, cleanup, fireEvent, render, screen, within} from "@testing-library/react";
 import type {EasyStreamState, Tile} from "@wordplus/realtime-client/streams";
 import {EasyStreamApp} from "../../src/components/streams/index.ts";
 import {googleCalendarUrl, icsFile} from "../../src/components/streams/calendar.ts";
@@ -239,6 +239,30 @@ describe( 'the player', () => {
         expect( screen.queryByText( 'You are offline' ) ).toBeNull();
     } );
 
+    it( 'says when the connection is too slow for the picture, the sound going on, with Try again and the sound held back', () => {
+        const { client, update, asClient } = fakeClient( live() );
+        render( <EasyStreamApp client={ asClient } /> );
+        const said = 'Your connection is too slow for the picture right now. The sound goes on.';
+        expect( screen.queryByText( said ) ).toBeNull();
+
+        update( { tooSlow: true } );
+        expect( screen.getByText( said ).closest( '[role="status"]' ) ).toBeTruthy();
+        fireEvent.click( screen.getByRole( 'button', { name: 'Try again' } ) );
+        expect( client.retryPicture ).toHaveBeenCalledTimes( 1 );
+        expect( screen.queryByText( said ) ).toBeNull();
+
+        // With the sound held back by the browser, turning it on is beside Try again, not over it.
+        update( { tooSlow: true, audioBlocked: true } );
+        const box = screen.getByText( said ).closest( '.estream-slow' ) as HTMLElement;
+        fireEvent.click( within( box ).getByRole( 'button', { name: 'Turn sound on' } ) );
+        expect( client.startAudio ).toHaveBeenCalled();
+        expect( document.querySelector( '.estream-unmute' ) ).toBeNull();
+
+        // Offline says that instead.
+        update( { offline: true } );
+        expect( screen.queryByText( said ) ).toBeNull();
+    } );
+
     it( 'closes its menu on Escape, giving focus back to its button', () => {
         const { asClient } = fakeClient( live() );
         render( <EasyStreamApp client={ asClient } /> );
@@ -277,6 +301,133 @@ describe( 'the player', () => {
             delete ( document as any ).fullscreenEnabled;
             delete ( document as any ).fullscreenElement;
             delete ( Element.prototype as any ).requestFullscreen;
+        }
+    } );
+
+    it( 'fills the window on a desktop, not the screen: lifted over the whole page, which stays still under it, until Escape after a menu in it', async () => {
+        vi.stubGlobal( 'matchMedia', ( query : string ) => ( { matches: query === '(hover: hover) and (pointer: fine)', media: query, addEventListener(){}, removeEventListener(){} } ) );
+        const request = vi.fn();
+        Object.defineProperty( document, 'fullscreenEnabled', { configurable: true, value: true } );
+        Element.prototype.requestFullscreen = request as any;
+        const proto = HTMLElement.prototype as any;
+        const saved = { show: proto.showPopover, hide: proto.hidePopover };
+        const lifted : Element[] = [];
+        proto.showPopover = function( this : Element ){ lifted.push( this ); };
+        proto.hidePopover = function( this : Element ){ if( lifted.includes( this ) ) lifted.splice( lifted.indexOf( this ), 1 ); };
+
+        try {
+            const { asClient } = fakeClient( live() );
+            const { container } = render( <EasyStreamApp client={ asClient } title="Launch" /> );
+            const root = container.querySelector( '.estream-theme' )!;
+
+            await act( async () => { fireEvent.click( screen.getByLabelText( 'Full screen' ) ); } );
+
+            expect( request, 'not the screen' ).not.toHaveBeenCalled();
+            expect( lifted ).toEqual( [ root ] );
+            expect( [ root.getAttribute( 'popover' ), root.hasAttribute( 'data-estream-window' ) ] ).toEqual( [ 'manual', true ] );
+            expect( root.className ).toContain( 'estream-theme--full' );
+            expect( document.documentElement.style.overflow ).toBe( 'hidden' );
+            expect( container.querySelector( '.estream-top__title' )?.textContent ).toBe( 'Launch' );
+            expect( container.querySelector( '.estream-app__side' ), 'the chat goes with it' ).toBeTruthy();
+
+            // Escape closes a menu open in it first, and only then leaves it.
+            fireEvent.click( screen.getByLabelText( 'Settings' ) );
+            fireEvent.keyDown( screen.getByRole( 'menu' ), { key: 'Escape' } );
+            expect( screen.queryByRole( 'menu' ) ).toBeNull();
+            expect( root.className ).toContain( 'estream-theme--full' );
+
+            await act( async () => { fireEvent.keyDown( document.activeElement ?? document.body, { key: 'Escape' } ); } );
+            expect( root.className ).not.toContain( 'estream-theme--full' );
+            expect( lifted ).toEqual( [] );
+            expect( [ root.hasAttribute( 'popover' ), root.hasAttribute( 'data-estream-window' ) ] ).toEqual( [ false, false ] );
+            expect( document.documentElement.style.overflow ).toBe( '' );
+
+            // Its button, and f, both ways.
+            await act( async () => { fireEvent.click( screen.getByLabelText( 'Full screen' ) ); } );
+            expect( lifted ).toEqual( [ root ] );
+            await act( async () => { fireEvent.click( screen.getByLabelText( 'Exit full screen' ) ); } );
+            expect( lifted ).toEqual( [] );
+            await act( async () => { fireEvent.keyDown( stage(), { key: 'f' } ); } );
+            expect( lifted ).toEqual( [ root ] );
+            await act( async () => { fireEvent.keyDown( stage(), { key: 'f' } ); } );
+            expect( lifted ).toEqual( [] );
+            expect( request ).not.toHaveBeenCalled();
+        } finally {
+            proto.showPopover = saved.show;
+            proto.hidePopover = saved.hide;
+            delete ( document as any ).fullscreenEnabled;
+            delete ( Element.prototype as any ).requestFullscreen;
+        }
+    } );
+
+    it( 'keeps the way out of full screen over the screen after the end, and the chat\'s button over any screen while the chat is hidden', async () => {
+        vi.stubGlobal( 'matchMedia', ( query : string ) => ( { matches: query === '(pointer: coarse)', media: query, addEventListener(){}, removeEventListener(){} } ) );
+        const proto = HTMLElement.prototype as any;
+        const saved = { show: proto.showPopover, hide: proto.hidePopover };
+        proto.showPopover = vi.fn();
+        proto.hidePopover = vi.fn();
+        const ended = { stream: { id: 's', state: 'ended' as const, started_at: Date.now() - 600_000, ended_at: Date.now() }, media: 'idle' as const, tiles: [] };
+
+        try {
+            const { asClient, update } = fakeClient( live() );
+            const { container } = render( <EasyStreamApp client={ asClient } title="Launch" /> );
+            const root = container.querySelector( '.estream-theme' )!;
+
+            await act( async () => { fireEvent.click( screen.getByLabelText( 'Full screen' ) ); } );
+            update( ended );
+            expect( screen.getByText( 'This stream has ended' ) ).toBeTruthy();
+            await act( async () => { fireEvent.click( screen.getByLabelText( 'Exit full screen' ) ); } );
+            expect( root.className ).not.toContain( 'estream-theme--full' );
+            // On the page, the screen alone.
+            expect( screen.queryByLabelText( 'Full screen' ) ).toBeNull();
+            cleanup();
+
+            // The chat hidden before: its button over the screen brings it back.
+            window.localStorage.setItem( 'wordplus-stream:chat-hidden', 'true' );
+            const again = fakeClient( ended );
+            const { container : page } = render( <EasyStreamApp client={ again.asClient } title="Launch" /> );
+            expect( page.querySelector( '.estream-app__side' ) ).toBeNull();
+            fireEvent.click( screen.getByLabelText( 'Show chat' ) );
+            expect( page.querySelector( '.estream-app__side' ) ).toBeTruthy();
+        } finally {
+            proto.showPopover = saved.show;
+            proto.hidePopover = saved.hide;
+        }
+    } );
+
+    it( 'fills the window on an iPhone too, with its controls and chat, not iOS\'s video player with the picture alone; before popovers, that player', async () => {
+        vi.stubGlobal( 'matchMedia', ( query : string ) => ( { matches: query === '(pointer: coarse)', media: query, addEventListener(){}, removeEventListener(){} } ) );
+        const proto = HTMLElement.prototype as any;
+        const saved = { show: proto.showPopover, hide: proto.hidePopover };
+        const lifted : Element[] = [];
+        proto.showPopover = function( this : Element ){ lifted.push( this ); };
+        proto.hidePopover = function( this : Element ){ if( lifted.includes( this ) ) lifted.splice( lifted.indexOf( this ), 1 ); };
+        const native = vi.fn();
+        ( HTMLVideoElement.prototype as any ).webkitEnterFullscreen = native;
+
+        try {
+            const { asClient } = fakeClient( live() );
+            const { container } = render( <EasyStreamApp client={ asClient } title="Launch" /> );
+            const root = container.querySelector( '.estream-theme' )!;
+
+            await act( async () => { fireEvent.click( screen.getByLabelText( 'Full screen' ) ); } );
+            expect( lifted ).toEqual( [ root ] );
+            expect( native ).not.toHaveBeenCalled();
+            expect( root.className ).toContain( 'estream-theme--full' );
+            expect( container.querySelector( '.estream-app__side' ), 'the chat goes with it' ).toBeTruthy();
+            await act( async () => { fireEvent.click( screen.getByLabelText( 'Exit full screen' ) ); } );
+            expect( lifted ).toEqual( [] );
+
+            // iOS before 17, without popovers.
+            delete proto.showPopover;
+            delete proto.hidePopover;
+            await act( async () => { fireEvent.click( screen.getByLabelText( 'Full screen' ) ); } );
+            expect( native ).toHaveBeenCalledTimes( 1 );
+            expect( root.className ).not.toContain( 'estream-theme--full' );
+        } finally {
+            proto.showPopover = saved.show;
+            proto.hidePopover = saved.hide;
+            delete ( HTMLVideoElement.prototype as any ).webkitEnterFullscreen;
         }
     } );
 
@@ -340,6 +491,45 @@ describe( 'the player', () => {
 
         fireEvent.pointerMove( stage(), { pointerType: 'mouse' } );
         expect( bar().className ).not.toContain( 'estream-bar--hidden' );
+    } );
+
+    it( 'keeps its controls while the mouse rests on them, and hides them once it leaves or a touch takes over', () => {
+        vi.useFakeTimers();
+        const { asClient } = fakeClient( live() );
+        render( <EasyStreamApp client={ asClient } /> );
+        const bar = () => document.querySelector( '.estream-bar' )!;
+        const hidden = () => bar().className.includes( 'estream-bar--hidden' );
+        // The bar along the bottom of a 640 by 360 picture.
+        vi.spyOn( bar(), 'getBoundingClientRect' ).mockReturnValue( { left: 0, right: 640, top: 316, bottom: 360, x: 0, y: 316, width: 640, height: 44 } as DOMRect );
+        const onBar = { pointerType: 'mouse', clientX: 600, clientY: 338 };
+        const onPicture = { pointerType: 'mouse', clientX: 320, clientY: 180 };
+
+        // Resting on the settings, it stays however long.
+        fireEvent.pointerMove( screen.getByLabelText( 'Settings' ), onBar );
+        act( () => { vi.advanceTimersByTime( 10_000 ); } );
+        expect( hidden() ).toBe( false );
+
+        // Back on the picture, it goes as it rests there.
+        fireEvent.pointerMove( stage(), onPicture );
+        act( () => { vi.advanceTimersByTime( 3100 ); } );
+        expect( hidden() ).toBe( true );
+
+        // Out of the player from the bar, at once.
+        fireEvent.pointerMove( stage(), onBar );
+        expect( hidden() ).toBe( false );
+        fireEvent.pointerLeave( stage(), onBar );
+        expect( hidden() ).toBe( true );
+
+        // A touch: the mouse left resting on the bar keeps it no longer.
+        fireEvent.pointerMove( stage(), onBar );
+        fireEvent.pointerDown( stage(), { pointerType: 'touch' } );
+        fireEvent.pointerUp( stage(), { pointerType: 'touch' } );
+        expect( hidden() ).toBe( true );
+        fireEvent.pointerDown( stage(), { pointerType: 'touch' } );
+        fireEvent.pointerUp( stage(), { pointerType: 'touch' } );
+        expect( hidden() ).toBe( false );
+        act( () => { vi.advanceTimersByTime( 3100 ); } );
+        expect( hidden() ).toBe( true );
     } );
 
     it( 'warns of a weak connection, says when it reconnects, and offers sound the browser held back', () => {
@@ -431,6 +621,30 @@ describe( 'the screen for each moment', () => {
         render( <EasyStreamApp client={ asClient } /> );
 
         expect( screen.getAllByText( 'Waiting for OBS…' ).length ).toBeGreaterThan( 0 );
+    } );
+
+    it( 'tells a host to send OBS\'s picture in layers, and the size to send for what the stream takes', () => {
+        const { asClient, update } = fakeClient( {
+            ...live( { tiles: [] } ),
+            you: { ...base.you!, role: 'host', mod: true },
+            encoder: { url: 'https://cloud.example/easy-stream/v1/whip', key: 'esk_x' },
+            topQuality: '1080p'
+        } );
+        render( <EasyStreamApp client={ asClient } /> );
+        const steps = () => [ ...document.querySelectorAll( '.estream-encoder__steps > li' ) ].map( ( li ) => li.textContent ?? '' );
+
+        expect( steps()[3] ).toBe( 'In the same window, set Total Layers to 3 if your OBS has it (version 32.1 or newer). OBS then also sends smaller copies of the picture, so viewers on slow connections keep watching smoothly.' );
+        // Full HD with the layers under it, and the single picture everyone can take without them. Then the Advanced
+        // output mode, which alone has Keyframe Interval, and Max B-frames of its own.
+        expect( steps()[4] ).toMatch( /^In Settings → Video, set Output \(Scaled\) Resolution to 1920×1080 and 30 FPS.+Without layers, 1280×720/ );
+        expect( steps()[5] ).toMatch( /^In Settings → Output, choose the Advanced output mode.+4,500 kbps \(2,500 kbps without layers\), Keyframe Interval to 1 s and Max B-frames to 0/ );
+
+        update( { topQuality: '720p' } );
+        expect( steps()[4] ).toMatch( /^For everyone to watch smoothly, set Output \(Scaled\) Resolution to 1280×720 and 30 FPS/ );
+        expect( steps()[5] ).toMatch( /about 2,500 kbps, Keyframe Interval to 1 s and Max B-frames to 0/ );
+        // The numbers a starting point, for each to try on their own stream.
+        expect( steps()[6] ).toBe( 'These settings are a starting point. Try them on your own stream and connection: watch it from another device, and change the bitrate, Total Layers or the preset until it plays smoothly.' );
+        expect( steps() ).toHaveLength( 7 );
     } );
 } );
 

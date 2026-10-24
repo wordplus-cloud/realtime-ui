@@ -1,13 +1,13 @@
-export declare const GRANT_AUDIENCE = "easy-stream";
-export declare const GRANT_KEY_LABEL = "easy-stream grant v1";
+export declare const GRANT_AUDIENCE = "live-stream";
+export declare const GRANT_KEY_LABEL = "live-stream grant v1";
 export declare const GRANT_MAX_LIFETIME_S: number;
 export declare const STREAM_ID: RegExp;
 export declare const USER_ID: RegExp;
-export declare const JOIN_PATH = "/easy-stream/v1/join";
-export declare const WHIP_PATH = "/easy-stream/v1/whip";
+export declare const JOIN_PATH = "/live-stream/v1/join";
+export declare const WHIP_PATH = "/live-stream/v1/whip";
 export declare const INGEST_IDENTITY = "ingest";
-export declare const LIVE_PATH = "/easy-stream/v1/live";
-export declare const REACTIONS_PATH = "/easy-stream/v1/reactions";
+export declare const LIVE_PATH = "/live-stream/v1/live";
+export declare const REACTIONS_PATH = "/live-stream/v1/reactions";
 export declare const CHAT_MAX = 500;
 export declare const SLOW_MAX_S = 300;
 export declare const REACTIONS: readonly ["❤️", "👏", "😂", "😮", "🔥"];
@@ -35,19 +35,22 @@ export interface GrantClaims {
     links?: boolean;
     fresh?: boolean;
     people?: 'all' | 'mods';
+    viewers?: 'all' | 'mods';
     reactions?: boolean;
     track?: boolean;
+    autostart?: boolean;
     org?: string[];
     iat?: number;
     exp: number;
 }
-export declare const CLAIM_ORDER: readonly ["iss", "aud", "str", "role", "sub", "name", "avatar", "chat", "mod", "src", "q", "stage", "offline", "links", "fresh", "people", "reactions", "track", "org", "iat", "exp"];
+export declare const CLAIM_ORDER: readonly ["iss", "aud", "str", "role", "sub", "name", "avatar", "chat", "mod", "src", "q", "stage", "offline", "links", "fresh", "people", "viewers", "reactions", "track", "autostart", "org", "iat", "exp"];
 export type StreamPhase = 'idle' | 'live' | 'ended';
 export interface StreamState {
     id: string;
     state: StreamPhase;
     started_at: number | null;
     ended_at: number | null;
+    encoder_lost_at?: number;
 }
 export interface LiveStream {
     id: string;
@@ -109,7 +112,7 @@ export interface Usage {
     buy_url: string | null;
     at: number;
 }
-export declare const CHECK_PATH = "/easy-stream/v1/check";
+export declare const CHECK_PATH = "/live-stream/v1/check";
 export type JoinError = 'bad_request' | 'bad_grant' | 'expired' | 'not_licensed' | 'not_included' | 'wrong_origin' | 'banned' | 'rate' | 'no_hours' | 'server';
 export interface JoinFailure {
     ok: false;
@@ -156,7 +159,9 @@ export interface Hello {
     layout?: Layout;
     timeout?: number | null;
     reactions?: boolean;
+    hidden?: HiddenPictures;
 }
+export type HiddenPictures = 'low' | 'pause';
 export type Ack<T extends object = {}> = ({
     ok: true;
 } & T) | {
@@ -183,6 +188,9 @@ export interface ServerEvents {
     viewers: (p: {
         n: number;
         peak?: number;
+    }) => void;
+    hidden: (p: {
+        pictures: HiddenPictures;
     }) => void;
     slow: (p: {
         seconds: number;

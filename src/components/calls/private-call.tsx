@@ -17,12 +17,13 @@ import {
 import {formatSize, msToTime} from "../../inc/functions.ts";
 import useStateRef from "../../inc/hooks/state-ref.ts";
 import Resizable from "../helpers/resizable.tsx";
-import Icon from "../../primitives/icon.tsx";
+import Icon, { IconName } from "../../primitives/icon.tsx";
 import CallDock from "./call-dock.tsx";
 import { AddPersonButton, AddPersonPanel } from "./add-person.tsx";
 import { cssRatio, useMediaRatio, usePictureDrawn } from "../../inc/calls/ratio.ts";
 import useHeld, { PAUSED_NOTICE_MS } from "../../inc/hooks/held.ts";
 import { Piece } from "../../pieces.tsx";
+import { CameraOptimizingNotice, useCameraOptimizing } from "./optimizing.tsx";
 
 /**
  * A call between two people, from the CallContext: ringing out (the other side's picture, Calling..., cancel) or in
@@ -58,6 +59,8 @@ export default function PrivateCallLayout() {
         switchCamera,
         enableCamera,
         disableCamera,
+        cameraChecking,
+        optimizingMaxMs,
         enableMic,
         disableMic,
         enableShareScreen,
@@ -89,6 +92,12 @@ export default function PrivateCallLayout() {
 
     const [ configOpen, setConfigOpen ] = useState( false );
     const [ addOpen, setAddOpen ] = useState( false );
+
+    // The camera spins while it is checked before it goes out (context.ts), as a group call's controls do while their
+    // request is out. It still takes a press: turning the camera off wins over its check at once.
+    const cameraGlyph = ( name: IconName ) => cameraChecking
+        ? <Icon name="spinner" size={ 20 } className="bm-svg-animate" />
+        : <Icon name={ name } size={ 20 } />;
 
     const [ myCameraVideo, setMyCameraVideo ] = useStateRef<HTMLVideoElement | null>(null);
 
@@ -305,7 +314,11 @@ export default function PrivateCallLayout() {
     const peerHasPicture = !! otherParticipant && ( !! otherParticipant.video || !! otherParticipant.screen );
     // Their picture paused by the media server for this page's download (a call on the room; a direct call has no
     // server between them): frozen on its last frame, so the call says why once it has stayed so for a moment.
-    const peerPaused = useHeld( action === 'call_in_progress' && peerPresent
+    // Their camera moving to another codec on the room shows "Optimizing video quality..." instead (optimizing.tsx),
+    // only while the stage shows their camera: never over a screen they share.
+    const peerOptimizing = useCameraOptimizing( otherParticipant, videoElement, optimizingMaxMs );
+    const peerOptimizingShown = peerOptimizing.shown && peerPresent && ( ! otherParticipant.screen || primaryVideo === 'camera' );
+    const peerPaused = useHeld( action === 'call_in_progress' && peerPresent && ! peerOptimizingShown
         && ( ( !! otherParticipant.video && !! otherParticipant.videoPaused ) || ( !! otherParticipant.screen && !! otherParticipant.screenPaused ) ), PAUSED_NOTICE_MS );
 
     // A keyboard reaches the call (an SDK review, 2026-10-14): the window is a stop in the Tab order and takes the focus
@@ -440,6 +453,8 @@ export default function PrivateCallLayout() {
                         { ( primaryVideo === 'camera' ) && <video ref={setVideoElement} datatype="camera" autoPlay playsInline className="video1" muted={false}/> }
                     </> }
 
+                    { peerOptimizingShown && <CameraOptimizingNotice state={ peerOptimizing } avatar={ otherParticipant.avatar } main /> }
+
                     { peerPaused &&
                         <div className="bm-call-paused bm-call-paused-main" part="video-paused">
                             <div className="bm-call-paused-notice">
@@ -556,18 +571,16 @@ export default function PrivateCallLayout() {
 
                 { myCameraTrack &&
                     <Tooltip content={_x('Disable Camera', 'Private Call Screen', 'bp-better-messages')}>
-                        <span onClick={disableCamera} className="bm-disable-video">
-                            { ! iconsReverted && <Icon name="videoOff" size={ 20 } /> }
-                            { iconsReverted && <Icon name="video" size={ 20 } /> }
+                        <span onClick={ disableCamera } data-busy={ cameraChecking ? 1 : undefined } className="bm-disable-video">
+                            { cameraGlyph( iconsReverted ? 'video' : 'videoOff' ) }
                         </span>
                     </Tooltip>
                 }
 
                 {!myCameraTrack &&
                     <Tooltip content={_x('Enable Camera', 'Private Call Screen', 'bp-better-messages')}>
-                            <span onClick={enableCamera} className="bm-enable-video">
-                                {!iconsReverted && <Icon name="video" size={ 20 } />}
-                                {iconsReverted && <Icon name="videoOff" size={ 20 } />}
+                            <span onClick={ enableCamera } data-busy={ cameraChecking ? 1 : undefined } className="bm-enable-video">
+                                { cameraGlyph( iconsReverted ? 'videoOff' : 'video' ) }
                             </span>
                     </Tooltip>}
 

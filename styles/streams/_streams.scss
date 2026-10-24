@@ -62,9 +62,9 @@
 }
 
 // The shell is what the layout measures: a sidebar's width of chat beside the player when there is
-// room, below it when there isn't, whatever the page's own width.
+// room, below it when there isn't, whatever the page's own width. Named, for what inside it goes by its width alone.
 .estream-shell {
-    container-type: inline-size;
+    container: estream-shell / inline-size;
     width: 100%;
 }
 
@@ -993,6 +993,65 @@
     }
 }
 
+// A connection too slow for the picture (the engine's tooSlow): its last frame dimmed, what happens said in its middle,
+// and its buttons. Under the controls, which stay usable.
+.estream-slow {
+    position: absolute;
+    inset: 0;
+    z-index: 4;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    padding: 16px 24px;
+    background: rgba(0, 0, 0, 0.6);
+    color: #fff;
+    text-align: center;
+
+    > .estream-icon {
+        width: 28px;
+        height: 28px;
+    }
+
+    &__text {
+        max-width: 340px;
+        margin: 0;
+        font-size: 0.95em;
+        line-height: 1.4;
+    }
+
+    &__actions {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 8px;
+    }
+
+    &__button {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 16px;
+        border: 0;
+        border-radius: 999px;
+        font: inherit;
+        font-weight: 600;
+        cursor: pointer;
+        @include button-colours( #111, #fff );
+
+        &:focus-visible {
+            outline: 3px solid var(--estream-accent);
+            outline-offset: 2px;
+        }
+
+        .estream-icon {
+            width: 18px;
+            height: 18px;
+        }
+    }
+}
+
 // The statistics over the picture (stats.tsx), read while the stream plays behind them, scrolling within the picture:
 // under the badges along the top, the Live badge among them, and over the controls along the bottom. Headings are the
 // panel's own: a theme's h2 and h3 never reach them.
@@ -1245,11 +1304,24 @@
     }
 }
 
-// A phone in full screen has room for the picture alone.
-@container (max-width: 760px) {
-    .estream-theme--full .estream-app__side {
-        display: none;
-    }
+// Full screen in the browser's window, a desktop's: the player lifted over the page as a popover fills the window edge
+// to edge, as the screen's full screen fills the screen, with none of a popover's own box, frame or colours.
+.estream-theme--full[data-estream-window],
+.estream-studio-page__picture--full[data-estream-window] {
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    max-width: none;
+    max-height: none;
+    min-height: 0;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    box-sizing: border-box;
+    overflow: hidden;
+    color: inherit;
+    transform: none;
 }
 
 // The Appearance tab's choices.
@@ -1317,10 +1389,11 @@
     }
 }
 
-// Full screen keeps the chat beside the picture, wherever the site puts it on the page.
+// Full screen keeps the chat beside the picture, wherever the site puts it on the page: a sidebar's width, and at most
+// two fifths of a narrow screen's, a phone's held sideways.
 .estream-theme.estream-theme--full {
     .estream-app:not(.estream-app--no-chat) {
-        grid-template-columns: minmax(0, 1fr) 340px;
+        grid-template-columns: minmax(0, 1fr) min(340px, 40%);
     }
 
     .estream-app__side {
@@ -1334,8 +1407,71 @@
     }
 }
 
+// Where there is no room for the chat beside the picture, a full screen narrow and upright (a phone held upright, or a
+// narrow window), the chat goes under it: the picture the whole width at its shape, at most half the height, the chat
+// the rest, its button showing and hiding it as beside. Hidden, the picture has it all. A column kept beside it there
+// squeezed the picture into a strip with its controls cut off. Held sideways, the chat stays beside it, narrower.
+@mixin chat-below {
+    .estream-theme.estream-theme--full {
+        .estream-app:not(.estream-app--no-chat) {
+            grid-template-columns: minmax(0, 1fr);
+            grid-template-rows: auto minmax(0, 1fr);
+
+            .estream-app__main {
+                height: auto;
+            }
+
+            .estream-stage {
+                flex: none;
+                height: min(calc(100vw * 9 / 16), 50vh);
+            }
+
+            .estream-app__side {
+                border-left: 0;
+                border-top: 1px solid var(--estream-border);
+            }
+        }
+
+        &.estream-theme--standard .estream-app:not(.estream-app--no-chat) .estream-stage {
+            height: min(calc(100vw * 3 / 4), 50vh);
+        }
+
+        &.estream-theme--upright .estream-app:not(.estream-app--no-chat) .estream-stage {
+            height: 50vh;
+        }
+    }
+}
+
+@media (orientation: portrait) {
+    @container estream-shell (max-width: 760px) {
+        @include chat-below;
+    }
+}
+
+@supports not (container-type: inline-size) {
+    @media (max-width: 760px) and (orientation: portrait) {
+        @include chat-below;
+    }
+}
+
+// A Better Messages room in the player's full screen is used where it is: Better Messages' Tap to open messages, which
+// it lays over a room on a phone, would take the room out of the full screen to the page's body, where nobody sees it.
+.estream-theme--full .estream-bm-room .bm-tap-to-open:not(#\9) {
+    display: none;
+}
+
 .estream-theme--no-avatars .estream-message__avatar {
     display: none;
+}
+
+// Where the logo keeps to: the picture's own box in the stage (usePictureBox), without the bars a picture of another
+// shape leaves, so that its place and width, shares of it, cover the same part of the picture in every player. The
+// whole stage where it shows no one picture.
+.estream-logo-frame {
+    position: absolute;
+    inset: 0;
+    z-index: 4;
+    pointer-events: none;
 }
 
 // The site's logo over the picture, out of the badges' and the controls' way.
@@ -1352,12 +1488,84 @@
     &--top-right { top: 14px; right: 14px; }
     &--bottom-left { bottom: 14px; left: 14px; }
     &--bottom-right { bottom: 14px; right: 14px; }
+
+    // The distance the site set from the corner's side, and from its top or bottom.
+    &--x {
+        &.estream-logo--top-left, &.estream-logo--bottom-left { left: var(--estream-logo-x); }
+        &.estream-logo--top-right, &.estream-logo--bottom-right { right: var(--estream-logo-x); }
+    }
+
+    &--y {
+        &.estream-logo--top-left, &.estream-logo--top-right { top: var(--estream-logo-y); }
+        &.estream-logo--bottom-left, &.estream-logo--bottom-right { bottom: var(--estream-logo-y); }
+    }
+
+    // In a settings page's preview, dragged into place, and sized with the handle at its outer corner.
+    &--movable {
+        pointer-events: auto;
+        cursor: grab;
+        touch-action: none;
+
+        &:active { cursor: grabbing; }
+
+        &:hover,
+        &.estream-logo--sizing {
+            outline: 1px dashed rgba(255, 255, 255, 0.85);
+            outline-offset: 3px;
+        }
+    }
+
+    &__image {
+        display: block;
+        width: 100%;
+        height: auto;
+        pointer-events: none;
+    }
+
+    &__size {
+        position: absolute;
+        width: 14px;
+        height: 14px;
+        box-sizing: border-box;
+        border: 2px solid var(--estream-accent);
+        border-radius: 50%;
+        background: #fff;
+        box-shadow: 0 1px 4px rgba(0, 0, 0, 0.45);
+        touch-action: none;
+        // Shown with the logo's hover and while it is pulled, out of the picture's way otherwise.
+        opacity: 0;
+        transition: opacity 0.15s;
+
+        &--top-left { top: -9px; left: -9px; cursor: nwse-resize; }
+        &--top-right { top: -9px; right: -9px; cursor: nesw-resize; }
+        &--bottom-left { bottom: -9px; left: -9px; cursor: nesw-resize; }
+        &--bottom-right { bottom: -9px; right: -9px; cursor: nwse-resize; }
+    }
+
+    &--movable:hover &__size,
+    &--sizing &__size {
+        opacity: 1;
+    }
 }
 
+// A screen without hover, a tablet's, shows it always: there is no other way to find it there.
+@media (hover: none) {
+    .estream-logo__size {
+        opacity: 1;
+    }
+}
+
+// Out of the bar's way while it shows, however close to the bottom it was set: less where the picture's foot is above
+// the stage's.
 .estream-stage--picture:not(.estream-stage--idle) {
     .estream-logo--bottom-left,
     .estream-logo--bottom-right {
-        bottom: 58px;
+        bottom: max(14px, calc(58px - var(--estream-picture-below, 0px)));
+    }
+
+    .estream-logo--y.estream-logo--bottom-left,
+    .estream-logo--y.estream-logo--bottom-right {
+        bottom: max(var(--estream-logo-y), calc(58px - var(--estream-picture-below, 0px)));
     }
 }
 
@@ -1530,6 +1738,17 @@
     &--small {
         padding: 3px 10px;
         font-size: 0.85em;
+    }
+}
+
+// A link drawn as a button (Connect to go live) keeps the button's look over a page's own rules for links, a
+// WordPress admin page's among them: no underline, and a primary one its text's colour.
+.estream-theme a.estream-button {
+    text-decoration: none;
+
+    &.estream-button--primary,
+    &.estream-button--primary:where(:hover, :focus, :active, :visited) {
+        color: var(--estream-accent-text);
     }
 }
 
@@ -1809,6 +2028,19 @@
             min-width: 0;
             max-width: 360px;
         }
+
+        // A switch with a line saying more under it (the original sound's).
+        &--stack {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 4px;
+        }
+    }
+
+    &__note {
+        margin: 0;
+        color: var(--estream-muted);
+        font-size: 0.85em;
     }
 
 }
@@ -3177,7 +3409,22 @@ select.estream-input {
 
     // Turning the sound on where the browser kept it off: one of Better Messages' own buttons, in its accent, over the
     // picture. Better Messages strips every button in its wraps with !important (no background, no padding, square
-    // corners, no shadow, the text's colour), so this takes an id's weight and !important back.
+    // corners, no shadow, the text's colour), so this takes an id's weight and !important back. So do the buttons said
+    // over a picture too much for the connection.
+    button.estream-slow__button:not(#\9) {
+        padding: 8px 16px !important;
+        border-radius: var(--bm-radius-button, 8px) !important;
+        background: rgba(var(--bm-color-accent, 37, 99, 235), 1) !important;
+        color: #fff !important;
+        font-size: 14px !important;
+        line-height: 20px;
+        white-space: nowrap;
+
+        &:hover {
+            background: rgba(var(--bm-color-accent, 37, 99, 235), 0.9) !important;
+        }
+    }
+
     button.estream-unmute:not(#\9) {
         padding: 10px 18px !important;
         border-radius: var(--bm-radius-button, 8px) !important;
@@ -3430,6 +3677,31 @@ select.estream-input {
     }
 }
 
+// The room keeps to the stream: none of its header's ways out of it, the dash that docks it among the page's mini chats
+// or opens the messenger, and the arrows that take the room over the whole page; and in full screen not its More menu
+// either, which it opens on the page's body, outside the full screen, where nobody sees it.
+.estream-bm-room [data-action-key="minimize"],
+.estream-bm-room [data-action-key="maximize"],
+.estream-bm-room [data-action-key="unmaximize"],
+.estream-theme--full .estream-bm-room [data-action-key="more"] {
+    display: none !important;
+}
+
+// In full screen the room meets the screen's edges square, as the light chat does there: none of Better Messages'
+// card frame, which it raises with an id's weight (`:not(#\9)`), the column's own line parting it from the picture.
+.estream-theme--full .estream-bm-room .bm-card--thread-embed:not(#\9) {
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+}
+
+// That line in the dark the room takes in full screen, not the page's theme's, which shows as a white stripe between
+// the black of the picture and the room; over black, since the player's surface under it is the page's theme's too.
+.estream-theme--full .estream-app__side:has(> .estream-bm-room) {
+    border-left-color: rgba(255, 255, 255, 0.08);
+    background: #000;
+}
+
 .estream-app__side > .estream-bm-room {
     position: absolute;
     inset: 0;
@@ -3437,7 +3709,8 @@ select.estream-input {
     min-height: 0;
 }
 
-.estream-theme--chat-below .estream-app__side > .estream-bm-room {
+// Below the stream, the height the site chose; not in full screen, where the room is beside the picture as tall as it.
+.estream-theme--chat-below:not(.estream-theme--full) .estream-app__side > .estream-bm-room {
     position: static;
     height: var(--estream-chat-height, 480px);
 }
@@ -3872,6 +4145,31 @@ $studio-controls: 150px;
     }
 }
 
+// The chat hidden from the player (parts.tsx): the player takes the layout's width, the chat kept on the page unseen.
+.estream-layout--no-chat {
+    .estream-layout__side,
+    .estream-part--chat {
+        display: none;
+    }
+}
+
+// So is a chat that is a block of its own, wherever it is on the page, its block with it: a player beside it in a Row
+// takes the row's width.
+[data-estream-chat-hidden],
+.wp-block-wordplus-stream-chat:has(> [data-estream-chat-hidden]) {
+    display: none;
+}
+
+@container (min-width: 600px) {
+    .estream-layout--side.estream-layout--no-chat .estream-layout__grid {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .estream-layout--vertical.estream-layout--no-chat .estream-layout__grid {
+        grid-template-columns: minmax(0, calc(min(80vh, 780px) * 9 / 16));
+    }
+}
+
 // The WordPress plugin's blocks in a row (the Row block, or any flex box a theme or page builder lays them out in),
 // which sizes each to what it holds: a player has no width of its own (its height follows its width), so it would
 // shrink away. The player, the details and the studio take the room there is, from a size each reads at; the chat
@@ -3890,4 +4188,16 @@ $studio-controls: 150px;
 :where(.wp-block-wordplus-stream-details, .wp-block-wordplus-stream-studio, .wp-block-wordplus-stream-live-stream) {
     flex: 1 1 100%;
     min-width: 0;
+}
+
+// A Row keeps its blocks on one line (WordPress's flex-wrap: nowrap, unless "Allow to wrap" is on), and a phone has no
+// room for the player and the chat side by side: the chat ran off the screen. There they wrap, each as wide as the row.
+@media (max-width: 600px) {
+    .is-layout-flex:has(> .wp-block-wordplus-stream-player, > .wp-block-wordplus-stream-chat, > .wp-block-wordplus-stream-details, > .wp-block-wordplus-stream-studio) {
+        flex-wrap: wrap;
+    }
+
+    :where(.wp-block-wordplus-stream-player, .wp-block-wordplus-stream-chat) {
+        flex: 1 1 100%;
+    }
 }

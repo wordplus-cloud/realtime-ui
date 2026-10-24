@@ -30,6 +30,7 @@ export interface MediaStats {
     limited: 'bandwidth' | 'cpu' | null;
     paused?: boolean;
     held?: boolean;
+    keyframeSeconds?: number;
 }
 export interface Tile {
     identity: string;
@@ -54,7 +55,7 @@ export interface FloatingReaction {
     at: number;
 }
 export interface EasyStreamState {
-    status: 'joining' | 'ready' | 'error';
+    status: 'joining' | 'ready' | 'error' | 'unconnected';
     error: string | null;
     stream: StreamState | null;
     you: You | null;
@@ -76,6 +77,7 @@ export interface EasyStreamState {
         camera: boolean;
         microphone: boolean;
     };
+    originalSound: boolean;
     screenSharing: boolean;
     canShareScreen: boolean;
     reactions: FloatingReaction[];
@@ -94,6 +96,7 @@ export interface EasyStreamState {
     elsewhere: boolean;
     sentHere: boolean;
     stalled: boolean;
+    tooSlow: boolean;
     offline: boolean;
 }
 export type GrantSource = string | (() => Promise<string>);
@@ -103,6 +106,13 @@ export interface EasyStreamOptions {
     media?: () => Promise<Media>;
     worker?: string | null;
     video?: boolean;
+    app?: {
+        name: string;
+        version?: string;
+    };
+    offlineHost?: {
+        name: string;
+    };
     fetch?: typeof fetch;
     realtime?: (options: RealtimeOptions) => RealtimeClient;
     Room?: new (options?: RoomOptions) => Room;
@@ -132,10 +142,20 @@ type Ack = {
     ok: false;
     error: string;
 };
+export declare function screenLayers(width: number, height: number, quality: Quality): Array<{
+    width: number;
+    height: number;
+    bitrate: number;
+    fps: number;
+}>;
 export declare function canShareScreen(nav?: {
     mediaDevices?: {
         getDisplayMedia?: unknown;
     };
+} | undefined): boolean;
+export declare function handheld(nav?: {
+    userAgent?: string;
+    maxTouchPoints?: number;
 } | undefined): boolean;
 export declare function personOf(identity: string): string;
 export declare class EasyStreamClient {
@@ -160,6 +180,7 @@ export declare class EasyStreamClient {
     private joining;
     private connectingMedia;
     private localTracks;
+    private findingEncoder;
     private screenTracks;
     private deviceIds;
     private wantedQuality;
@@ -177,6 +198,13 @@ export declare class EasyStreamClient {
     private avatar;
     private stallTimer;
     private onSight;
+    private hidden;
+    private hiddenTimer;
+    private hiddenKept;
+    private readonly handheld;
+    private slowTimer;
+    private slowTries;
+    private slowKept;
     private syncTimer;
     private joinTimer;
     private usageTimer;
@@ -185,6 +213,7 @@ export declare class EasyStreamClient {
     private readonly playback;
     private readonly sending;
     private pixelDensity;
+    private screenDensity;
     private onNetwork;
     constructor(options: EasyStreamOptions);
     wantVideo(): void;
@@ -229,6 +258,7 @@ export declare class EasyStreamClient {
     private sendingKey;
     private rememberSending;
     private forgetSending;
+    private sentBefore;
     private resume;
     private watch;
     private connectMedia;
@@ -239,15 +269,27 @@ export declare class EasyStreamClient {
     private mediaFailed;
     private wireRoom;
     private disconnectMedia;
+    private pictureTooSlow;
+    retryPicture(): void;
+    private forgetSlow;
+    private pictureOff;
+    private pictureOn;
     private followSight;
+    private hideLater;
+    private hide;
+    private unhide;
+    private keepHidden;
     private followNetwork;
     private lookAgain;
     private rejoinStalled;
     private arriving;
     private bytesIn;
     private capQuality;
+    private hiddenLow;
     private holdArrivals;
     private keepEncoderOn;
+    private findEncoder;
+    private encoderOf;
     private ownHold;
     private followPictures;
     private stopFollowing;
@@ -262,16 +304,22 @@ export declare class EasyStreamClient {
     private resolution;
     private cameraOptions;
     private microphoneOptions;
+    private microphonePublishing;
     private localTrack;
     listDevices(): Promise<Devices>;
     useDevice(kind: 'camera' | 'microphone', deviceId: string): Promise<boolean>;
+    setOriginalSound(on: boolean): Promise<boolean>;
     flipCamera(): Promise<void>;
     localMedia(kind: 'audio' | 'video'): MediaStreamTrack | null;
     sendingStats(): Promise<MediaStats | null>;
     private lastDecoded;
+    private keyframes;
     encoderStats(): Promise<MediaStats | null>;
+    private keyframeSeconds;
     private cameraPublishing;
     private codecChoice;
+    private cameraWatch;
+    private watchCamera;
     private chosenCodecs;
     private pickCodecs;
     private publishUnpublished;
@@ -296,6 +344,7 @@ export declare class EasyStreamClient {
     acceptStage(): Promise<Ack>;
     declineStage(): void;
     leaveStage(): Promise<void>;
+    private backToWatching;
     sendChat(text: string): Promise<Ack>;
     deleteMessage(id: string): Promise<Ack>;
     ban(identity: string, who?: {
@@ -322,6 +371,7 @@ export declare class EasyStreamClient {
     muteGuest(identity: string): Promise<Ack>;
     react(kind: Reaction): void;
     setQuality(quality: VideoChoice): void;
+    private capAll;
     startAudio(): Promise<void>;
     private live;
     private startTally;

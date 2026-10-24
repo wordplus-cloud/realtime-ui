@@ -88,9 +88,20 @@ describe( 'the appearance', () => {
             expect( safeImage( bad ) ).toBeNull();
         }
 
-        expect( logoOf( { logo: 'https://site.example/logo.png', logoPosition: 'bottom-left', logoSize: 9999, logoOpacity: 5 } ) )
-            .toEqual( { src: 'https://site.example/logo.png', position: 'bottom-left', width: 320, opacity: 0.2 } );
-        expect( logoOf( { logo: 'https://site.example/logo.png', logoPosition: 'middle' as any } )?.position ).toBe( 'top-right' );
+        const logo = 'https://site.example/logo.png';
+        expect( logoOf( { logo, logoPosition: 'bottom-left', logoWidth: 99, logoOpacity: 5 } ) )
+            .toEqual( { src: logo, position: 'bottom-left', width: 40, opacity: 0.05, x: null, y: null } );
+        // Its opacity from 1 per cent, and never under it; its width from 2 per cent of the picture's, 12 unless set.
+        expect( logoOf( { logo, logoWidth: 0.5, logoOpacity: 0 } ) ).toMatchObject( { width: 2, opacity: 0.01 } );
+        expect( logoOf( { logo } ) ).toMatchObject( { width: 12, x: null, y: null } );
+        expect( logoOf( { logo, logoPosition: 'middle' as any } )?.position ).toBe( 'top-right' );
+        // Its distance from the corner's sides in per cent of the picture, to a tenth, from 0 to 50, or the player's own.
+        expect( logoOf( { logo, logoInsetX: 24.66, logoInsetY: 90 } ) ).toMatchObject( { x: 24.7, y: 50 } );
+        expect( logoOf( { logo, logoInsetX: -5, logoInsetY: null } ) ).toMatchObject( { x: 0, y: null } );
+        expect( logoOf( { logo, logoInsetX: '12' as any, logoInsetY: Number.NaN } ) ).toMatchObject( { x: null, y: null } );
+        // The pixels of before, as their share of a picture 800 by 450, and the shares where both are there.
+        expect( logoOf( { logo, logoSize: 120, logoX: 40, logoY: 45 } ) ).toMatchObject( { width: 15, x: 5, y: 10 } );
+        expect( logoOf( { logo, logoWidth: 20, logoSize: 120, logoInsetX: 3, logoX: 40 } ) ).toMatchObject( { width: 20, x: 3 } );
     } );
 
     it( 'leaves out the title, the time on air and names on the video where the site says so', () => {
@@ -127,11 +138,184 @@ describe( 'the appearance', () => {
 
     it( 'puts the logo over the picture, in its corner, at its size and opacity', () => {
         const { asClient } = fakeClient( live() );
-        const { container } = render( <EasyStreamApp client={ asClient } appearance={ { logo: 'https://site.example/logo.png', logoPosition: 'bottom-right', logoSize: 120, logoOpacity: 60 } } /> );
+        const { container } = render( <EasyStreamApp client={ asClient } appearance={ { logo: 'https://site.example/logo.png', logoPosition: 'bottom-right', logoWidth: 15, logoOpacity: 60 } } /> );
+
+        const logo = container.querySelector( '.estream-stage .estream-logo-frame > .estream-logo' ) as HTMLImageElement;
+        expect( logo.className ).toBe( 'estream-logo estream-logo--bottom-right' );
+        expect( [ logo.getAttribute( 'src' ), logo.style.width, logo.style.opacity, logo.alt ] ).toEqual( [ 'https://site.example/logo.png', '15%', '0.6', '' ] );
+        expect( logo.style.getPropertyValue( '--estream-logo-x' ) ).toBe( '' );
+        // Viewers have the image alone, which never moves.
+        expect( logo.getAttribute( 'data-estream-tip' ) ).toBeNull();
+    } );
+
+    it( 'puts the logo at the distance the site set from its corner\'s side and from its top or bottom, in shares of the picture', () => {
+        const { asClient } = fakeClient( live() );
+        const { container } = render( <EasyStreamApp client={ asClient } appearance={ { logo: 'https://site.example/logo.png', logoPosition: 'top-left', logoInsetX: 3.5, logoInsetY: 2 } } /> );
 
         const logo = container.querySelector( '.estream-stage .estream-logo' ) as HTMLImageElement;
-        expect( logo.className ).toBe( 'estream-logo estream-logo--bottom-right' );
-        expect( [ logo.getAttribute( 'src' ), logo.style.width, logo.style.opacity, logo.alt ] ).toEqual( [ 'https://site.example/logo.png', '120px', '0.6', '' ] );
+        expect( logo.className ).toBe( 'estream-logo estream-logo--top-left estream-logo--x estream-logo--y' );
+        expect( [ logo.style.getPropertyValue( '--estream-logo-x' ), logo.style.getPropertyValue( '--estream-logo-y' ) ] ).toEqual( [ '3.5%', '2%' ] );
+    } );
+
+    it( 'keeps the logo to the picture, without the bars a picture of another shape leaves in the stage', () => {
+        const { asClient, update } = fakeClient( live( { tiles: [ person( 'u:1', 'Maya Lee' ) ] } ) );
+        const { container } = render( <EasyStreamApp client={ asClient } appearance={ { logo: 'https://site.example/logo.png' } } /> );
+        const stage = container.querySelector( '.estream-stage' ) as HTMLElement;
+        const frame = () => container.querySelector( '.estream-logo-frame' ) as HTMLElement;
+        const box = ( width : number, height : number ) => () => ( { left: 0, top: 0, width, height, right: width, bottom: height, x: 0, y: 0, toJSON(){} } ) as DOMRect;
+        const arrives = ( stageWidth : number, stageHeight : number, width : number, height : number ) => {
+            const video = container.querySelector( 'video' )!;
+            stage.getBoundingClientRect = box( stageWidth, stageHeight );
+            video.getBoundingClientRect = box( stageWidth, stageHeight );
+            Object.defineProperty( video, 'videoWidth', { value: width, configurable: true } );
+            Object.defineProperty( video, 'videoHeight', { value: height, configurable: true } );
+            fireEvent( video, new Event( 'resize' ) );
+        };
+        const at = () => [ frame().style.left, frame().style.top, frame().style.width, frame().style.height, frame().style.getPropertyValue( '--estream-picture-below' ) ];
+
+        // A camera alone, shown whole: a standard picture in a wide stage, with bars at its sides.
+        arrives( 800, 450, 1440, 1080 );
+        expect( at() ).toEqual( [ '100px', '0px', '600px', '450px', '0px' ] );
+        // A wide one in a stage as tall as a standard screen in full screen, with bars above and below it.
+        arrives( 800, 600, 1920, 1080 );
+        expect( at() ).toEqual( [ '0px', '75px', '800px', '450px', '75px' ] );
+
+        // Two side by side: the whole stage.
+        update( { tiles: [ person( 'u:1', 'Maya Lee' ), person( 'u:5', 'Olena' ) ] } );
+        expect( frame().getAttribute( 'style' ) ).toBeNull();
+        // Before the start, a screen and no picture: the whole stage.
+        update( { stream: { id: 's', state: 'idle', started_at: null, ended_at: null }, tiles: [] } );
+        expect( frame().getAttribute( 'style' ) ).toBeNull();
+    } );
+
+    it( 'lets a settings page\'s preview drag the logo, saying where it was let go: the corner nearest it and its distance in shares of the picture', () => {
+        const { asClient } = fakeClient( live() );
+        const { container, rerender } = render( <EasyStreamApp client={ asClient } preview appearance={ { logo: 'https://site.example/logo.png', logoPosition: 'top-right', logoWidth: 12.5 } } /> );
+        const logo = container.querySelector( '.estream-stage .estream-logo' ) as HTMLImageElement;
+        expect( logo.className ).toContain( 'estream-logo--movable' );
+        expect( logo.getAttribute( 'data-estream-tip' ) ).toBe( 'Drag the logo to place it. Pull its round handle to size it.' );
+
+        const heard : any[] = [];
+        container.addEventListener( 'estream-logo-move', ( e ) => heard.push( ( e as CustomEvent ).detail ) );
+        // A picture of 800 by 450, a logo of 100 by 40 in its top right corner, held 10 pixels into it.
+        const box = ( left : number, top : number, width : number, height : number ) => () => ( { left, top, width, height, right: left + width, bottom: top + height, x: left, y: top, toJSON(){} } ) as DOMRect;
+        logo.parentElement!.getBoundingClientRect = box( 0, 0, 800, 450 );
+        logo.getBoundingClientRect = box( 686, 14, 100, 40 );
+
+        // A press without a move leaves it where it is.
+        fireEvent.pointerDown( logo, { pointerId: 1, clientX: 696, clientY: 24 } );
+        fireEvent.pointerUp( logo, { pointerId: 1, clientX: 697, clientY: 25 } );
+        expect( heard ).toEqual( [] );
+
+        fireEvent.pointerDown( logo, { pointerId: 1, clientX: 696, clientY: 24 } );
+        // Moved where it is held, and let go near the bottom left: 40 pixels from the side, 30 from the bottom, 5 and
+        // 6.7 per cent of the picture.
+        fireEvent.pointerMove( logo, { pointerId: 1, clientX: 50, clientY: 390 } );
+        expect( [ logo.style.left, logo.style.top ] ).toEqual( [ '40px', '380px' ] );
+        fireEvent.pointerUp( logo, { pointerId: 1, clientX: 50, clientY: 390 } );
+        expect( heard ).toEqual( [ { position: 'bottom-left', x: 5, y: 6.7 } ] );
+        // It stays where it was let go, until the site's settings say again.
+        expect( logo.style.left ).toBe( '' );
+        expect( logo.className ).toContain( 'estream-logo--bottom-left' );
+        expect( [ logo.style.getPropertyValue( '--estream-logo-x' ), logo.style.getPropertyValue( '--estream-logo-y' ) ] ).toEqual( [ '5%', '6.7%' ] );
+
+        // Dragged past the edge, it is held at it.
+        fireEvent.pointerDown( logo, { pointerId: 1, clientX: 696, clientY: 24 } );
+        fireEvent.pointerUp( logo, { pointerId: 1, clientX: 2000, clientY: -300 } );
+        expect( heard[1] ).toEqual( { position: 'top-right', x: 0, y: 0 } );
+
+        // A preview drawn at half its size: the same shares of the picture, whatever the screen measures.
+        Object.defineProperty( logo.parentElement!, 'offsetWidth', { configurable: true, value: 1600 } );
+        fireEvent.pointerDown( logo, { pointerId: 1, clientX: 696, clientY: 24 } );
+        fireEvent.pointerUp( logo, { pointerId: 1, clientX: 50, clientY: 390 } );
+        expect( heard[2] ).toEqual( { position: 'bottom-left', x: 5, y: 6.7 } );
+
+        // The site's settings again: where they say.
+        rerender( <EasyStreamApp client={ asClient } preview appearance={ { logo: 'https://site.example/logo.png', logoPosition: 'top-left', logoInsetX: 1, logoInsetY: 2, logoWidth: 12.5 } } /> );
+        expect( logo.className ).toContain( 'estream-logo--top-left' );
+        expect( logo.style.getPropertyValue( '--estream-logo-x' ) ).toBe( '1%' );
+    } );
+
+    it( 'lets a studio that places the logo move it over the host\'s own picture before going live, and never while live', () => {
+        const local : Tile = { ...person( 'u:1', 'Maya Lee' ), local: true };
+        const { asClient, update } = fakeClient( { stream: { id: 's', state: 'idle', started_at: null, ended_at: null }, media: 'live', you: { identity: 'u:1', role: 'host', name: 'Maya Lee', chat: 'write', mod: true }, tiles: [ local ] } as Partial<EasyStreamState> );
+        const { container, rerender } = render( <EasyStreamApp client={ asClient } placeLogo appearance={ { logo: 'https://site.example/logo.png' } } /> );
+        const movable = () => container.querySelector( '.estream-logo' )?.className.includes( 'estream-logo--movable' );
+        expect( movable() ).toBe( true );
+
+        update( { stream: { id: 's', state: 'live', started_at: Date.now(), ended_at: null } } );
+        expect( movable() ).toBe( false );
+
+        // Only where the page places it.
+        update( { stream: { id: 's', state: 'idle', started_at: null, ended_at: null } } );
+        rerender( <EasyStreamApp client={ asClient } appearance={ { logo: 'https://site.example/logo.png' } } /> );
+        expect( movable() ).toBe( false );
+    } );
+
+    it( 'lets a settings page\'s preview size the logo with the handle at the corner away from its own, saying how wide in a share of the picture', () => {
+        const { asClient } = fakeClient( live() );
+        const { container } = render( <EasyStreamApp client={ asClient } preview appearance={ { logo: 'https://site.example/logo.png', logoPosition: 'top-right', logoWidth: 12.5, logoOpacity: 1 } } /> );
+        const logo = container.querySelector( '.estream-stage .estream-logo' ) as HTMLElement;
+        // The image faint as the site has it, the handle not: it is the frame's, beside the image.
+        expect( ( logo.querySelector( '.estream-logo__image' ) as HTMLImageElement ).style.opacity ).toBe( '0.01' );
+        expect( logo.style.opacity ).toBe( '' );
+        // In the top right corner, so its handle is at the bottom left, pulled out leftwards and down.
+        const handle = logo.querySelector( '.estream-logo__size' ) as HTMLElement;
+        expect( handle.className ).toBe( 'estream-logo__size estream-logo__size--bottom-left' );
+
+        const heard : any[] = [];
+        const moved : any[] = [];
+        container.addEventListener( 'estream-logo-size', ( e ) => heard.push( ( e as CustomEvent ).detail ) );
+        container.addEventListener( 'estream-logo-move', ( e ) => moved.push( ( e as CustomEvent ).detail ) );
+        const box = ( left : number, top : number, width : number, height : number ) => () => ( { left, top, width, height, right: left + width, bottom: top + height, x: left, y: top, toJSON(){} } ) as DOMRect;
+        logo.parentElement!.getBoundingClientRect = box( 0, 0, 800, 450 );
+        logo.getBoundingClientRect = box( 686, 14, 100, 40 );
+
+        // 60 pixels to the left: 60 wider, 160 of the picture's 800, as it shows while pulled.
+        fireEvent.pointerDown( handle, { pointerId: 1, clientX: 686, clientY: 54 } );
+        fireEvent.pointerMove( handle, { pointerId: 1, clientX: 626, clientY: 54 } );
+        expect( logo.style.width ).toBe( '20%' );
+        expect( logo.className ).toContain( 'estream-logo--sizing' );
+        fireEvent.pointerUp( handle, { pointerId: 1, clientX: 626, clientY: 54 } );
+        expect( heard ).toEqual( [ { width: 20 } ] );
+        // Not a move of the logo, and as wide as it was made until the site's settings say again.
+        expect( moved ).toEqual( [] );
+        expect( logo.style.width ).toBe( '20%' );
+        expect( logo.className ).not.toContain( 'estream-logo--sizing' );
+
+        // Pulled up, in towards its corner, by more than across: smaller as much as its shape says, 10 down is 25 wide.
+        fireEvent.pointerDown( handle, { pointerId: 1, clientX: 686, clientY: 54 } );
+        fireEvent.pointerUp( handle, { pointerId: 1, clientX: 690, clientY: 44 } );
+        expect( heard[1] ).toEqual( { width: 9.4 } );
+
+        // Never past the bounds of a logo's width.
+        fireEvent.pointerDown( handle, { pointerId: 1, clientX: 686, clientY: 54 } );
+        fireEvent.pointerUp( handle, { pointerId: 1, clientX: 2000, clientY: 54 } );
+        expect( heard[2] ).toEqual( { width: 2 } );
+        fireEvent.pointerDown( handle, { pointerId: 1, clientX: 686, clientY: 54 } );
+        fireEvent.pointerUp( handle, { pointerId: 1, clientX: -2000, clientY: 54 } );
+        expect( heard[3] ).toEqual( { width: 40 } );
+
+        // A preview drawn at half its size: the same share of the picture, whatever the screen measures.
+        Object.defineProperty( logo.parentElement!, 'offsetWidth', { configurable: true, value: 1600 } );
+        fireEvent.pointerDown( handle, { pointerId: 1, clientX: 686, clientY: 54 } );
+        fireEvent.pointerUp( handle, { pointerId: 1, clientX: 626, clientY: 54 } );
+        expect( heard[4] ).toEqual( { width: 20 } );
+    } );
+
+    it( 'puts the handle at the corner away from the logo\'s own in each corner', () => {
+        const { asClient } = fakeClient( live() );
+        const { container, rerender } = render( <EasyStreamApp client={ asClient } preview appearance={ { logo: 'https://site.example/logo.png', logoPosition: 'bottom-left' } } /> );
+        const handle = () => container.querySelector( '.estream-logo__size' )?.className;
+        expect( handle() ).toBe( 'estream-logo__size estream-logo__size--top-right' );
+        rerender( <EasyStreamApp client={ asClient } preview appearance={ { logo: 'https://site.example/logo.png', logoPosition: 'top-left' } } /> );
+        expect( handle() ).toBe( 'estream-logo__size estream-logo__size--bottom-right' );
+        rerender( <EasyStreamApp client={ asClient } preview appearance={ { logo: 'https://site.example/logo.png', logoPosition: 'bottom-right' } } /> );
+        expect( handle() ).toBe( 'estream-logo__size estream-logo__size--top-left' );
+        // Only in a preview: viewers have the image alone.
+        rerender( <EasyStreamApp client={ asClient } appearance={ { logo: 'https://site.example/logo.png', logoPosition: 'bottom-right' } } /> );
+        expect( handle() ).toBeUndefined();
+        expect( container.querySelector( '.estream-logo' )?.tagName ).toBe( 'IMG' );
     } );
 
     it( 'shows the cover before the stream starts and after it ends, never over the picture', () => {

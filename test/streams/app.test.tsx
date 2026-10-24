@@ -164,7 +164,7 @@ describe( 'EasyStreamApp', () => {
         expect( screen.getByText( 'This stream does not take guests on stage' ) ).toBeTruthy();
     } );
 
-    it( 'speaks the language its host gives it, plurals included, asking in the wordplus-stream text domain', () => {
+    it( 'speaks the language its host gives it, plurals included, asking in the wordplus-live-stream text domain', () => {
         // An app's host: the package's translator, with words of its own, in Polish (three forms a number).
         const polish = translator( 'pl', {
             'The stream starts soon': 'Transmisja wkrótce się zacznie',
@@ -187,7 +187,7 @@ describe( 'EasyStreamApp', () => {
             update( { viewers: 3, stream: { id: 's', state: 'live', started_at: 1, ended_at: null } } );
             expect( screen.getByText( '3 oglądają' ) ).toBeTruthy();
             expect( screen.getByLabelText( 'Serce' ) ).toBeTruthy();
-            expect( [ ...domains ] ).toEqual( [ 'wordplus-stream' ] );
+            expect( [ ...domains ] ).toEqual( [ 'wordplus-live-stream' ] );
         } finally {
             configureUi( { translate: ( text ) => text, translatePlural: ( single, plural, count ) => count === 1 ? single : plural } );
         }

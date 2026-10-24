@@ -41,7 +41,7 @@ export interface StreamTile {
 }
 /** The stream as a screen of one's own draws it: Easy Stream's state, the parts an app reads. */
 export interface StreamSnapshot {
-    status: 'joining' | 'ready' | 'error';
+    status: 'joining' | 'ready' | 'error' | 'unconnected';
     error: string | null;
     stream: StreamInfo | null;
     you: You | null;

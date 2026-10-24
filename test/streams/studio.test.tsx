@@ -87,6 +87,47 @@ describe( 'the studio', () => {
         expect( next.client.useDevice ).toHaveBeenCalledWith( 'microphone', 'mic-2' );
     } );
 
+    it( 'sends original sound for music, from the preview and from the microphone\'s menu, and keeps it for next time', async () => {
+        const { client, asClient } = fakeClient( { you: host, devices: { camera: true, microphone: true } } );
+        const { unmount } = render( <EasyStreamApp client={ asClient } /> );
+        await flush();
+        // Speech until chosen: the RTC client's own.
+        expect( client.setOriginalSound ).not.toHaveBeenCalled();
+
+        // In the preview, with what it means.
+        const original = screen.getByRole( 'switch', { name: 'Original sound, for music' } ) as HTMLInputElement;
+        expect( original.checked ).toBe( false );
+        expect( screen.getByText( 'The microphone as it hears, in stereo, with no echo or noise removal. Use headphones, so the speakers do not echo into it.' ) ).toBeTruthy();
+        await act( async () => { fireEvent.click( original ); } );
+        expect( client.setOriginalSound ).toHaveBeenLastCalledWith( true );
+        expect( original.checked ).toBe( true );
+        expect( window.localStorage.getItem( 'wordplus-stream:original-sound' ) ).toBe( 'true' );
+
+        // In the microphone's menu of the bar, with one microphone too: back to speech.
+        fireEvent.click( screen.getByLabelText( 'Choose a microphone' ) );
+        expect( screen.getByRole( 'menuitemradio', { name: /Original sound/ } ).getAttribute( 'aria-checked' ) ).toBe( 'true' );
+        await act( async () => { fireEvent.click( screen.getByRole( 'menuitemradio', { name: /Speech/ } ) ); } );
+        expect( client.setOriginalSound ).toHaveBeenLastCalledWith( false );
+        expect( window.localStorage.getItem( 'wordplus-stream:original-sound' ) ).toBe( 'false' );
+        await act( async () => { fireEvent.click( original ); } );
+        unmount();
+
+        // The next studio opens it so.
+        const next = fakeClient( { you: host } );
+        render( <EasyStreamApp client={ next.asClient } /> );
+        expect( next.client.setOriginalSound ).toHaveBeenCalledWith( true );
+    } );
+
+    it( 'says so when the microphone cannot be opened for original sound, and leaves it as it was', async () => {
+        const { client, asClient } = fakeClient( { you: host, devices: { camera: true, microphone: true } } );
+        client.setOriginalSound.mockImplementation( async () => false );
+        render( <EasyStreamApp client={ asClient } /> );
+        await flush();
+        await act( async () => { fireEvent.click( screen.getByRole( 'switch', { name: 'Original sound, for music' } ) ); } );
+        expect( ( screen.getByRole( 'switch', { name: 'Original sound, for music' } ) as HTMLInputElement ).checked ).toBe( false );
+        expect( screen.getByRole( 'alert' ) ).toBeTruthy();
+    } );
+
     it( 'while live: the bar, the time, the viewers and their peak, how the picture goes out, and the keys', async () => {
         const { client, update, asClient } = fakeClient( {
             you: host, stream: { ...liveStream, started_at: Date.now() - 125_000 }, devices: { camera: true, microphone: true }, viewers: 12, tally: { peak: 30, messages: 4, reactions: 9 }
@@ -439,6 +480,88 @@ describe( 'the studio', () => {
             expect( screen.queryByRole( 'alert' ) ).toBeNull();
             expect( ( screen.getByText( 'Go live' ).closest( 'button' ) as HTMLButtonElement ).disabled ).toBe( false );
             view.unmount();
+        }
+    } );
+
+    it( 'says when OBS sends its key frames far apart, which each viewer coming in waits for, and what to set', async () => {
+        const encoder = { url: 'https://cloud.example/live-stream/v1/whip', key: 'esk_secret' };
+        const picture = { attach: vi.fn(), detach: vi.fn() } as unknown as Tile['camera'];
+        const tiles : Tile[] = [ { identity: 'ingest', name: 'Host', role: 'host', local: false, camera: picture, screen: null, audio: [], micMuted: false, speaking: false, encoder: true } ];
+        const said = () => screen.queryAllByRole( 'status' ).map( ( s ) => s.textContent ?? '' ).find( ( t ) => t.startsWith( 'OBS sends a keyframe' ) );
+
+        for( const [ keyframeSeconds, words ] of [
+            [ 8.2, 'OBS sends a keyframe every 8 seconds, so viewers wait up to that long for the picture as they come in and when they come back to the page. In OBS, choose the Advanced output mode in Settings → Output and set Keyframe Interval to 1 s under Streaming.' ],
+            [ 2, undefined ], [ 1, undefined ], [ undefined, undefined ]
+        ] as const ){
+            const { client, asClient } = fakeClient( { you: host, encoder, tiles, topQuality: '1080p' } );
+            client.encoderStats.mockResolvedValue( { width: 1920, height: 1080, fps: 30, kbps: 4500, limited: null, ...( keyframeSeconds !== undefined ? { keyframeSeconds } : {} ) } as any );
+            const view = render( <EasyStreamApp client={ asClient } /> );
+            await flush();
+            expect( said(), String( keyframeSeconds ) ).toBe( words );
+            // The steps say where Keyframe Interval is, which Simple output mode has not, and Max B-frames, which
+            // Advanced has of its own.
+            expect( screen.getByText( /Keyframe Interval to 1 s and Max B-frames to 0/ ).textContent ).toContain( 'In Settings → Output, choose the Advanced output mode.' );
+            // Going live is not held back for it.
+            expect( ( screen.getByText( 'Go live' ).closest( 'button' ) as HTMLButtonElement ).disabled ).toBe( false );
+            view.unmount();
+        }
+    } );
+
+    it( 'says when OBS sends fewer frames than it should, as B-frames or a slow encoder make it, after a few looks', async () => {
+        vi.useFakeTimers();
+        try {
+            const encoder = { url: 'https://cloud.example/live-stream/v1/whip', key: 'esk_secret' };
+            const picture = { attach: vi.fn(), detach: vi.fn() } as unknown as Tile['camera'];
+            const tiles : Tile[] = [ { identity: 'ingest', name: 'Host', role: 'host', local: false, camera: picture, screen: null, audio: [], micMuted: false, speaking: false, encoder: true } ];
+            const { client, asClient } = fakeClient( { you: host, encoder, tiles } );
+            // AMD's encoder with Max B-frames 2 arrived at about 22 frames a second.
+            let fps = 22;
+            client.encoderStats.mockImplementation( async () => ( { width: 1280, height: 720, fps, kbps: 2500, limited: null } as any ) );
+            render( <EasyStreamApp client={ asClient } /> );
+            const said = () => screen.queryAllByRole( 'status' ).map( ( s ) => s.textContent ?? '' ).find( ( t ) => t.includes( 'frames a second' ) );
+            const look = () => act( async () => { await vi.advanceTimersByTimeAsync( 2000 ); } );
+            await act( async () => {} );
+
+            // One or two slow looks are a moment, three are said.
+            expect( said() ).toBeUndefined();
+            await look();
+            expect( said() ).toBeUndefined();
+            await look();
+            expect( said() ).toBe( 'OBS sends 22 frames a second, fewer than it should, and viewers see the picture stutter. In OBS, set Max B-frames to 0 under Settings → Output → Streaming, in the Advanced output mode, since browsers skip B-frames. If it is 0 already, the encoder cannot keep up: choose a faster preset or fewer Total Layers.' );
+            // Going live is not held back for it.
+            expect( ( screen.getByText( 'Go live' ).closest( 'button' ) as HTMLButtonElement ).disabled ).toBe( false );
+
+            // Smooth again, gone. A picture at 25 on purpose is never said.
+            fps = 30;
+            await look();
+            expect( said() ).toBeUndefined();
+            fps = 25;
+            for( let i = 0; i < 4; i++ ) await look();
+            expect( said() ).toBeUndefined();
+        } finally {
+            vi.useRealTimers();
+        }
+    } );
+
+    it( 'reads what arrives from OBS once a studio reloaded while live learns it streams from OBS', async () => {
+        vi.useFakeTimers();
+        try {
+            const picture = { attach: vi.fn(), detach: vi.fn() } as unknown as Tile['camera'];
+            const tiles : Tile[] = [ { identity: 'ingest', name: 'Host', role: 'host', local: false, camera: picture, screen: null, audio: [], micMuted: false, speaking: false, encoder: true } ];
+            // Live, sending nothing from here: the camera's picture is read until the engine finds OBS (findEncoder).
+            const { client, update, asClient } = fakeClient( { you: host, stream: liveStream, tiles } );
+            client.sendingStats.mockResolvedValue( null );
+            client.encoderStats.mockImplementation( async () => ( { width: 1920, height: 1080, fps: 30, kbps: 4500, limited: null } as any ) );
+            render( <EasyStreamApp client={ asClient } /> );
+            await act( async () => {} );
+            expect( client.encoderStats ).not.toHaveBeenCalled();
+
+            update( { encoder: { url: 'https://cloud.example/live-stream/v1/whip', key: 'esk_secret' } } );
+            await act( async () => { await vi.advanceTimersByTimeAsync( 2000 ); } );
+            expect( client.encoderStats ).toHaveBeenCalled();
+            expect( document.querySelector( '.estream-encoder .estream-studio__numbers' )?.textContent ).toBe( '1080p · 30 fps · 4.5 Mbps' );
+        } finally {
+            vi.useRealTimers();
         }
     } );
 
