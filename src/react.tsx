@@ -9,6 +9,8 @@
 //
 //     <CallScreen rt={ rt } lang="de" />                      // the rings and the call window, once on the page
 //     <CallSpot rt={ rt } call="match:34:42" className="h-96" /> // that call in the page, in place of the window
+//     <CallSpot rt={ rt } call="meeting:daily" join="video" />   // that group call, joined as the page opens, camera and microphone off
+//     <CallSpot rt={ rt } call="meeting:daily" join="video" joinWith="microphone" />   // joined with the microphone on
 //     <OnlineList rt={ rt } room="shop" actions={ ( m ) => <CallButton rt={ rt } to={ m.id } call={ … } name={ m.name } /> } />
 //     <Typing rt={ rt } room="chat:34:42" />
 //     <Chat rt={ rt } room="chat:34:42" />                     // the conversation, its history, typing and reactions
@@ -19,7 +21,7 @@ import { translator, direction } from "./inc/translations.ts";
 import { setOwnTooltips } from "./inc/shared-parts.ts";
 import { ownTooltips } from "./inc/floater.ts";
 import { _x } from "./inc/globals.ts";
-import { showingName } from "./sdk/controller.ts";
+import { joinMedia, showingName } from "./sdk/controller.ts";
 import { useController, type CallsSource } from "./sdk/use-controller.ts";
 import CallsApp, { type CallView } from "./sdk/calls-app.tsx";
 import { callUserOf } from "./sdk/types.ts";
@@ -100,6 +102,14 @@ export interface CallSpotProps {
      * (`match:{a}:{b}`), or every call when left out. A group call by its name (`meeting:daily`).
      */
     call?: string;
+    /**
+     * Joins the group call `call` names as the spot comes onto the page, as its GroupCallButton would: `video` or
+     * `audio`. Once: someone who leaves it isn't brought back while the spot stays, and one already in a call stays there.
+     * With the camera and the microphone off, turned on from the call's controls, unless `joinWith` names them.
+     */
+    join?: "audio" | "video";
+    /** What `join` turns on as it joins: `microphone`, `camera`, or both (`microphone camera`). Nothing when left out. */
+    joinWith?: "microphone" | "camera" | "microphone camera" | "camera microphone";
     className?: string;
     style?: CSSProperties;
     /** What the spot shows while no call is in it. With none, the spot is hidden until a call comes. */
@@ -115,7 +125,7 @@ const noView = () => null;
  * throughout, its camera and microphone as they were. `data-call` holds the call's name while one is here, for the
  * page's CSS. The CallScreen on the page still rings for it and runs it: the spot only says where it shows.
  */
-export function CallSpot( { rt, call, className, style, children }: CallSpotProps ) {
+export function CallSpot( { rt, call, join, joinWith, className, style, children }: CallSpotProps ) {
     const controller = useController( rt );
     const place = useRef<HTMLDivElement>( null );
 
@@ -123,6 +133,12 @@ export function CallSpot( { rt, call, className, style, children }: CallSpotProp
         if ( ! controller || ! place.current ) return;
         return controller.spot( call ?? null, place.current );
     }, [ controller, call ] );
+
+    // A group call by its name only: a pattern names no one call to join.
+    useEffect( () => {
+        if ( ! controller || ! join || ! call || call.includes( "{" ) ) return;
+        void controller.join( call, join, call, joinMedia( joinWith ) );
+    }, [ controller, call, join, joinWith ] );
 
     const view = useSyncExternalStore( controller?.subscribe ?? noCalls, controller?.snapshot ?? noView, noView );
     const here = view !== null && view.spot !== null && view.spot === place.current;

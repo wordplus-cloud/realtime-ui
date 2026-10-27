@@ -24,6 +24,7 @@ import { cssRatio, useMediaRatio, usePictureDrawn } from "../../inc/calls/ratio.
 import useHeld, { PAUSED_NOTICE_MS } from "../../inc/hooks/held.ts";
 import { Piece } from "../../pieces.tsx";
 import { CameraOptimizingNotice, useCameraOptimizing } from "./optimizing.tsx";
+import { pictureless, stalledShown, STALLED_VIDEO_CLASS, VideoInterruptedNotice } from "./stalled.tsx";
 
 /**
  * A call between two people, from the CallContext: ringing out (the other side's picture, Calling..., cancel) or in
@@ -320,6 +321,19 @@ export default function PrivateCallLayout() {
     const peerOptimizingShown = peerOptimizing.shown && peerPresent && ( ! otherParticipant.screen || primaryVideo === 'camera' );
     const peerPaused = useHeld( action === 'call_in_progress' && peerPresent && ! peerOptimizingShown
         && ( ( !! otherParticipant.video && !! otherParticipant.videoPaused ) || ( !! otherParticipant.screen && !! otherParticipant.screenPaused ) ), PAUSED_NOTICE_MS );
+    // Their media stopped arriving while they are still in the call (stalled.tsx): their camera's last frame blurred,
+    // and their screen's when nothing of theirs arrives, which the call says as "The other side lost connection";
+    // "Video interrupted" while their camera alone stopped and the stage shows it, unless the call says why it holds it.
+    const peerStalled = action === 'call_in_progress' && peerPresent ? stalledShown( otherParticipant, false ) : null;
+    const peerInterrupted = peerStalled === 'video' && ! peerOptimizingShown && ! peerPaused;
+    const peerCameraClass = ( base: string ) => base + ( peerStalled === 'all' || peerInterrupted ? ' ' + STALLED_VIDEO_CLASS : '' );
+    const peerScreenClass = ( base: string ) => base + ( peerStalled === 'all' ? ' ' + STALLED_VIDEO_CLASS : '' );
+    // Their camera on the stage never showed a frame here, so there is no last frame to blur: their face on it.
+    const peerFaceShown = ( peerStalled === 'all' || peerInterrupted ) && !! otherParticipant?.video
+        && ( ! otherParticipant.screen || primaryVideo === 'camera' ) && pictureless( videoElement );
+    const peerFace = peerFaceShown && <div className="bm-call-animation bm-animation-pause">
+        <UserAvatar user_id={ thread.participants[0] } link={ false } size={ 100 } fromThread={ thread } />
+    </div>;
 
     // A keyboard reaches the call (an SDK review, 2026-10-14): the window is a stop in the Tab order and takes the focus
     // as it opens, so the next Tab is on its controls, which show while it or one of them has the keyboard (call-stage
@@ -433,7 +447,7 @@ export default function PrivateCallLayout() {
                     </div>
                 }
 
-                { ( ! justConnected && otherParticipant && otherParticipant.quality === 'lost' ) && <>
+                { ( ( ! justConnected && otherParticipant && otherParticipant.quality === 'lost' ) || peerStalled === 'all' ) && <>
                     <div className="bm-placeholder-participant-lost-message">
                         <Icon name="wifiOff" size={ 24 } />
 
@@ -445,15 +459,19 @@ export default function PrivateCallLayout() {
 
                 {( !! otherParticipant ) && <>
                     { ( otherParticipant.video && ! otherParticipant.screen ) &&
-                        <video ref={setVideoElement} datatype="camera" autoPlay playsInline className="video1" muted={false}/>
+                        <video ref={setVideoElement} datatype="camera" autoPlay playsInline className={ peerCameraClass( 'video1' ) } muted={false}/>
                     }
 
                     { otherParticipant.screen && <>
-                        { ( primaryVideo === 'screen' ) && <video ref={setScreenElement} datatype="screen" autoPlay playsInline className="video2" muted={false}/> }
-                        { ( primaryVideo === 'camera' ) && <video ref={setVideoElement} datatype="camera" autoPlay playsInline className="video1" muted={false}/> }
+                        { ( primaryVideo === 'screen' ) && <video ref={setScreenElement} datatype="screen" autoPlay playsInline className={ peerScreenClass( 'video2' ) } muted={false}/> }
+                        { ( primaryVideo === 'camera' ) && <video ref={setVideoElement} datatype="camera" autoPlay playsInline className={ peerCameraClass( 'video1' ) } muted={false}/> }
                     </> }
 
                     { peerOptimizingShown && <CameraOptimizingNotice state={ peerOptimizing } avatar={ otherParticipant.avatar } main /> }
+
+                    { ( peerInterrupted && !! otherParticipant.video && ( ! otherParticipant.screen || primaryVideo === 'camera' ) ) && <VideoInterruptedNotice main face={ peerFace || undefined } /> }
+
+                    { ( peerFaceShown && peerStalled === 'all' ) && <div className="bm-call-stalled-face-main" aria-hidden="true">{ peerFace }</div> }
 
                     { peerPaused &&
                         <div className="bm-call-paused bm-call-paused-main" part="video-paused">
@@ -484,14 +502,14 @@ export default function PrivateCallLayout() {
                 { primaryVideo === 'screen' &&
                     <Resizable className={"bm-call-small-video-2"} resizeDirection={"top-right"} aspectRatio={ peerCameraRatio }>
                         <span className="bm-switch-videos" onClick={switchVideos}><Icon name="swapVideos" size={ 14 } /></span>
-                        <video ref={ setVideoElement } autoPlay playsInline muted={true} />
+                        <video ref={ setVideoElement } className={ peerCameraClass( '' ).trim() || undefined } autoPlay playsInline muted={true} />
                     </Resizable>
                 }
 
                 { primaryVideo === 'camera' &&
                     <Resizable className={"bm-call-small-video-2"} resizeDirection={"top-right"} aspectRatio={ peerScreenRatio }>
                         <span className="bm-switch-videos" onClick={switchVideos}><Icon name="swapVideos" size={ 14 } /></span>
-                        <video ref={ setScreenElement } autoPlay playsInline muted={true} />
+                        <video ref={ setScreenElement } className={ peerScreenClass( '' ).trim() || undefined } autoPlay playsInline muted={true} />
                     </Resizable>
                 }
                 </>

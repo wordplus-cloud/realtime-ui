@@ -1,4 +1,4 @@
-import { type CameraCodec, type CameraTune } from "./room-publish.js";
+import { type CallSettings, type CameraCodec, type CameraTune } from "./room-publish.js";
 /**
  * A camera's hardware encoder that drops frames, found while it sends, so this device's next camera goes out in
  * software (cameraCodecFor()'s avoid, room-publish.ts).
@@ -33,6 +33,22 @@ export declare const HARDWARE_DROP_MAX_ENCODE_MS = 25;
 export declare const HARDWARE_DROP_MIN_TARGET = 100000;
 export declare const HARDWARE_DROP_MIN_SENT = 0.25;
 export declare const HARDWARE_WATCH_GONE_MS: number;
+/**
+ * 1.0.53: the watch's numbers as the node's settings give them (watch.everyMs, watch.warmups, watch.dropShare,
+ * watch.minCapturedFps, watch.maxEncodeMs, watch.minTargetKbps, watch.minSent, watch.idleEndMin), the constants above
+ * without them. Live: a watch reads them at every look.
+ */
+export interface WatchNumbers {
+    everyMs: number;
+    warmups: number;
+    dropShare: number;
+    minCaptured: number;
+    maxEncodeMs: number;
+    minTarget: number;
+    minSent: number;
+    goneMs: number;
+}
+export declare function watchNumbers(settings?: CallSettings | null): WatchNumbers;
 /**
  * A camera in software that its CPU can't carry (camera-adapt.ts moves it, only on sustained evidence: a camera that's
  * merely CPU-limited a little, under half the time, stays): over the last CPU_HELD_READINGS
@@ -81,7 +97,7 @@ export declare const readingsFor: (seconds: number, readMs?: number) => number;
  * A reading of a hardware encoder that isn't held back by anything the browser names (above): the frames a second of
  * the layer it sends that keeps the most, and its source's; null for any other.
  */
-export declare function hardwareReading(r: EncoderReading): {
+export declare function hardwareReading(r: EncoderReading, n?: WatchNumbers): {
     best: number;
     captured: number;
 } | null;
@@ -89,7 +105,7 @@ export declare function hardwareReading(r: EncoderReading): {
  * Whether readings, the last `count` of them (HARDWARE_DROP_READINGS, 30 s), are a hardware encoder taking the whole
  * camera's frames off.
  */
-export declare function dropsFrames(readings: EncoderReading[], count?: number): boolean;
+export declare function dropsFrames(readings: EncoderReading[], count?: number, n?: WatchNumbers): boolean;
 /**
  * The encoder each layer runs on: Chrome names a simulcast's "SimulcastEncoderAdapter (OpenH264, VideoToolbox,
  * VideoToolbox)", one encoder a stream in the sender's encodings' order (rids, lowest first), on every layer's stats.
@@ -142,12 +158,18 @@ export declare function readEncoder(before: EncoderCounts | null, report: StatsL
  * tune: the node's numbers (the policy's, room-publish.ts cameraTune()): how long a hardware encoder drops frames
  * (dropWatchS) and a software one is held back (cpuWatchS) before either counts, and the share of that time held back
  * that does (cpuShare). The built-in ones without.
+ *
+ * drops: false watches the CPU alone, for a shared screen (1.0.47): a busy screen in a Mac's VideoToolbox can read as
+ * dropped frames, and what the drops watch remembers keeps this browser's next camera out of its hardware.
  */
 export declare function watchCameraEncoder(sender: RTCRtpSender | (() => RTCRtpSender | null | undefined), options?: {
     readMs?: number;
     tune?: Pick<CameraTune, 'dropWatchS' | 'cpuWatchS' | 'cpuShare'>;
     records?: boolean;
+    drops?: boolean;
     onDrops?: (codec: CameraCodec) => void;
     onCpuHeld?: (codec: CameraCodec, why: 'cpu', lines: number) => void;
+    /** 1.0.53: the node's settings, or what gives them now (the room's, live): the watch's numbers (watchNumbers()) */
+    settings?: CallSettings | null | (() => CallSettings | null | undefined);
 }): () => void;
 export {};

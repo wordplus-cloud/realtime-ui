@@ -39,6 +39,8 @@ function eventName( kind : PlaybackEvent['kind'] ) : string {
         case 'too-slow': return _x( 'Connection too slow for the picture', 'in the statistics', 'wordplus-live-stream' );
         case 'picture-off': return _x( 'Picture off', 'on a slow connection, in the statistics', 'wordplus-live-stream' );
         case 'picture-retry': return _x( 'Picture tried again', 'on a slow connection, in the statistics', 'wordplus-live-stream' );
+        // The viewer's hold on arrivals moved, by how its connection carries the stream: the buffer's new length.
+        case 'hold': return _x( 'Buffer', 'how long frames wait to play, in the statistics', 'wordplus-live-stream' );
         default: return _x( 'Left', 'a stream\'s video, in the statistics', 'wordplus-live-stream' );
     }
 }
@@ -53,11 +55,11 @@ function sourceName( source : string ) : string {
     }
 }
 
-// What a moment is, as an event says it: a length for the first picture and a picture back, what began or stopped
-// going out.
+// What a moment is, as an event says it: a length for the first picture, a picture back and the buffer, what began or
+// stopped going out.
 function eventDetail( event : PlaybackEvent ) : string {
     if( ! event.detail ) return '';
-    if( event.kind === 'first-frame' || event.kind === 'resumed' ) return seconds( Number( event.detail ) );
+    if( event.kind === 'first-frame' || event.kind === 'resumed' || event.kind === 'hold' ) return seconds( Number( event.detail ) );
     if( event.kind === 'published' || event.kind === 'unpublished' ) return sourceName( event.detail );
     return event.detail;
 }

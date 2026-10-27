@@ -14,13 +14,15 @@ import usePendingActions from "../../inc/calls/pending.ts";
 import useHeld, { PAUSED_NOTICE_MS } from "../../inc/hooks/held.ts";
 import { Piece } from "../../pieces.tsx";
 import { CameraOptimizingNotice, useCameraOptimizing } from "./optimizing.tsx";
+import { pictureless, stalledShown, STALLED_VIDEO_CLASS, VideoInterruptedNotice } from "./stalled.tsx";
 
 /**
  * One person's tile in a group video call: their camera or shared screen (their picture until one comes; the user's
  * own camera shown once a frame of it is drawn), their name, the ring of whoever speaks, microphone and raised hand,
- * "Reconnecting..." while they are briefly away, "Paused: weak connection" over their last frame while the media server
- * holds their video back from this page's download, and a moderator's controls for them (pin, broadcast, microphone,
- * remove, speaker), each spinning until the tile shows what it asked for.
+ * "Reconnecting..." while they are briefly away or nothing of theirs arrives, "Video interrupted" over their blurred
+ * last frame while their camera alone stopped arriving (stalled.tsx), "Paused: weak connection" over their last frame
+ * while the media server holds their video back from this page's download, and a moderator's controls for them (pin,
+ * broadcast, microphone, remove, speaker), each spinning until the tile shows what it asked for.
  */
 export default memo(function GroupVideoGridItem({ unique_key, participant, width, height, x, y } : {
     unique_key: string,
@@ -161,6 +163,25 @@ export default memo(function GroupVideoGridItem({ unique_key, participant, width
     const paused = useHeld( unique_key !== 'me' && ! participant.reconnecting && ! optimizingShown
         && ( ( !! participant.video && !! participant.videoPaused ) || ( !! participant.screen && !! participant.screenPaused ) ), PAUSED_NOTICE_MS );
 
+    // Their media stopped arriving while they are still in the call: their camera's last frame blurred, and their
+    // screen's too when nothing of theirs arrives; "Video interrupted" only where the tile shows their camera, a screen
+    // being still for as long as nothing on it moves. A camera the call says why it holds (moving codec, paused for the
+    // download) isn't said to be interrupted as well.
+    const stalled = stalledShown( participant, unique_key === 'me' );
+    const interrupted = stalled === 'video' && ! optimizingShown && ! paused;
+    const cameraClass = ( base?: string ) => [ base, stalled === 'all' || interrupted ? STALLED_VIDEO_CLASS : '' ].filter( Boolean ).join( ' ' ) || undefined;
+    const screenClass = stalled === 'all' ? STALLED_VIDEO_CLASS : undefined;
+    // Their camera never showed a frame here, so there is no last frame to blur: their face over the empty picture,
+    // above "Video interrupted", or under "Reconnecting..." as on a tile away.
+    const faceShown = ( stalled === 'all' || interrupted ) && !! participant.video && ! participant.screen && pictureless( videoElement );
+    if( faceShown && stalled === 'all' ){
+        innerClass += " bm-call-pictureless";
+        innerStyle.backgroundImage = "url('" + participant.avatar + "')";
+    }
+    const face = faceShown && interrupted
+        ? <span className="bm-call-stalled-face" aria-hidden="true" style={ { backgroundImage: "url('" + participant.avatar + "')" } } />
+        : undefined;
+
     // Their sound, in the tile's media, and after an app's own tile in its place (pieces.tsx).
     const sound = ( !! participant.audio && unique_key !== 'me' ) &&
         <audio ref={setAudioElement} autoPlay playsInline muted={false} style={{display: 'none'}}/>;
@@ -242,11 +263,13 @@ export default memo(function GroupVideoGridItem({ unique_key, participant, width
                     </span>
                 }
 
-                { participant.reconnecting &&
+                { ( participant.reconnecting || stalled === 'all' ) &&
                     <span className="bm-call-reconnecting" role="status">{ _x('Reconnecting...', 'Call Screen', 'bp-better-messages') }</span>
                 }
 
                 { optimizingShown && <CameraOptimizingNotice state={ optimizing } avatar={ participant.avatar } /> }
+
+                { ( interrupted && !! participant.video && ! participant.screen ) && <VideoInterruptedNotice face={ face } /> }
 
                 { paused &&
                     <span className="bm-call-paused" part="video-paused">
@@ -294,16 +317,16 @@ export default memo(function GroupVideoGridItem({ unique_key, participant, width
                 }
 
                 <div className={"bm-media-container" + ( !! participant.screen ? " bm-screen-shared" : "" )}>
-                    { ( !! participant.screen ) && <video ref={setScreenElement} datatype="screen" autoPlay={true} playsInline={true}></video> }
+                    { ( !! participant.screen ) && <video ref={setScreenElement} className={screenClass} datatype="screen" autoPlay={true} playsInline={true}></video> }
 
                     { ( !! participant.video && !! participant.screen ) &&
                         <Resizable className="bm-small-video" resizeDirection="none">
-                            <video ref={setVideoElement} datatype="camera" autoPlay playsInline muted={unique_key === 'me'}/>
+                            <video ref={setVideoElement} className={cameraClass()} datatype="camera" autoPlay playsInline muted={unique_key === 'me'}/>
                         </Resizable>
                     }
 
                     { ( !! participant.video && ! participant.screen ) &&
-                        <video ref={setVideoElement} className={selfPictureClass} datatype="camera" autoPlay={true} playsInline={true}></video>
+                        <video ref={setVideoElement} className={cameraClass( selfPictureClass )} datatype="camera" autoPlay={true} playsInline={true}></video>
                     }
                     { sound }
                 </div>

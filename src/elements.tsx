@@ -8,6 +8,8 @@
 //     <online-count room="shop"></online-count>
 //     <chat-room room="chat:34:42" style="height: 520px"></chat-room>
 //     <call-spot call="support:{a}:{b}" style="height: 420px"></call-spot>   the call in the page, not in the corner
+//     <call-spot call="meeting:daily" join="video"></call-spot>                that group call, joined as the page opens, camera and microphone off
+//     <call-spot call="meeting:daily" join="video" join-with="microphone"></call-spot>   joined with the microphone on
 //
 // The script (dist/realtime-ui.min.js, window.wordplusRealtimeUi) carries React inside and draws in a shadow root of
 // its own, so neither the page's styles nor its React reach in. @wordplus/realtime's rt.callScreen() loads it the first
@@ -15,7 +17,7 @@
 import React, { type ComponentType } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { configureUi, setUiUsers } from "./host.ts";
-import { controllerFor, showingName, type CallsController, type OwnedCall } from "./sdk/controller.ts";
+import { controllerFor, joinMedia, showingName, type CallsController, type OwnedCall } from "./sdk/controller.ts";
 import CallsApp, { type CallView } from "./sdk/calls-app.tsx";
 import { callUserOf, type CallUser, type SdkCalls } from "./sdk/types.ts";
 import { callName } from "./sdk/call-name.ts";
@@ -516,14 +518,18 @@ const spots = new Set<CallSpotElement>();
  * server's rules write them, or every call with no `call`), in place of the window in the corner. A call moves in when
  * it starts, or once the spot is on the page, and back to the window when the spot goes, going on throughout. Its
  * children show while no call is in it, and with none it is hidden until a call comes. `data-call` holds the call's
- * name while one is here.
+ * name while one is here. With `join` (`video`, or `audio`), the group call `call` names is joined as the spot comes
+ * onto the page, as its `<room-button>` would: once, so someone who leaves it isn't brought back while the spot stays.
+ * It joins with the camera and the microphone off, unless `join-with` names them (`microphone`, `camera`, or both).
  */
 class CallSpotElement extends HTMLElement {
     static readonly tag = 'call-spot';
-    static readonly observedAttributes = [ 'call' ];
+    static readonly observedAttributes = [ 'call', 'join' ];
     private place: HTMLDivElement | null = null;
     private release: ( () => void ) | null = null;
     private unplace: ( () => void ) | null = null;
+    /** The group call `join` joined while the spot is on the page. */
+    private joined: string | null = null;
 
     connectedCallback(): void {
         if ( ! this.place ) {
@@ -545,6 +551,7 @@ class CallSpotElement extends HTMLElement {
         spots.delete( this );
         schemeOf( this, false );
         this.unclaim();
+        this.joined = null;
     }
 
     attributeChangedCallback(): void {
@@ -558,6 +565,12 @@ class CallSpotElement extends HTMLElement {
         if ( ! controller || ! this.place || this.release || ! this.isConnected ) return;
         this.unplace = controller.onPlace( () => this.show() );
         this.release = controller.spot( this.getAttribute( 'call' ) || null, this.place );
+        // A group call by its name only: a pattern names no one call to join.
+        const call = this.getAttribute( 'call' ) ?? '';
+        const join = this.getAttribute( 'join' );
+        if ( join === null || ! call || call.includes( '{' ) || this.joined === call ) return;
+        this.joined = call;
+        void controller.join( call, join === 'audio' ? 'audio' : 'video', call, joinMedia( this.getAttribute( 'join-with' ) ) );
     }
 
     private unclaim(): void {

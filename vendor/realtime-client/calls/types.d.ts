@@ -149,6 +149,7 @@ export interface PulseAck {
     strikes?: number;
     peer?: PeerPulse | null;
     sfu?: SfuHandoff;
+    qms?: number;
 }
 export interface ServerMessage {
     op: 'ready' | 'signal' | 'peer_lost' | 'peer_back' | 'fallback' | 'ended';

@@ -75,6 +75,9 @@ export declare class P2PCallSession {
     private readonly traceStart;
     private traceDropped;
     private pulseTicks;
+    private readonly health;
+    private qualityEvery;
+    private qualityAt;
     private standby;
     private joinedSocket;
     private peerLost;

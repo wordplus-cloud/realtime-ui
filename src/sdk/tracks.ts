@@ -1,5 +1,6 @@
 import type { CallTrack } from "../components/calls/context.ts";
 import type { SdkRemoteTrack } from "./types.ts";
+import { forgetSound, playSound } from "./sound.ts";
 
 // The SDK's tracks as the screens attach them: with the elements they are on, as LiveKit's tracks keep them.
 
@@ -22,10 +23,14 @@ export function remoteTrack( track: SdkRemoteTrack | null | undefined ): CallTra
                 // A screen asks before its element is there: there is nothing to attach to yet.
                 if ( ! element ) return element;
                 if ( ! attached.includes( element ) ) attached.push( element );
-                return track.attach( element );
+                const on = track.attach( element );
+                // Their voice: played, or kept for the person's next click where the browser wants one (sound.ts).
+                if ( ! element.muted ) playSound( element );
+                return on;
             },
             detach( element ) {
                 if ( ! element ) return element;
+                forgetSound( element );
                 track.detach( element );
                 const at = attached.indexOf( element );
                 if ( at >= 0 ) attached.splice( at, 1 );

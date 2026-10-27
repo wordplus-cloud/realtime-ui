@@ -123,11 +123,11 @@ export function stepsDown(codec, lines) {
  * its CPU on its own. Answers the lines it has then; null where it couldn't be brought down, which a product moves to
  * another codec instead.
  */
-export async function stepDownCamera(track, sender, codec, to = CAMERA_STEP_DOWN_HEIGHT) {
-    const lines = await fitCameraTrack(track, codec, false, to);
+export async function stepDownCamera(track, sender, codec, to = CAMERA_STEP_DOWN_HEIGHT, settings) {
+    const lines = await fitCameraTrack(track, codec, false, to, settings);
     if (!lines || lines > to)
         return null;
-    const top = cameraPublish(codec, Math.max(lines, CAMERA_STEP_DOWN_HEIGHT))?.top;
+    const top = cameraPublish(codec, Math.max(lines, CAMERA_STEP_DOWN_HEIGHT), undefined, settings)?.top;
     try {
         const params = sender?.getParameters();
         // VP9 goes out as one encoding of three spatial layers: its bitrate is the top layer's

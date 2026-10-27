@@ -66,6 +66,8 @@ export type { PictureDrawn } from "./inc/calls/ratio.ts";
 // "Optimizing video quality..." over someone's picture while their camera moves to another codec during a call.
 export { useCameraOptimizing, CameraOptimizingNotice, OPTIMIZING_MAX_MS, OPTIMIZING_FADE_MS } from "./components/calls/optimizing.tsx";
 export type { CameraOptimizingState } from "./components/calls/optimizing.tsx";
+// Someone whose media stopped arriving while they are still in the call: their last frame blurred, "Video interrupted".
+export { pictureless, stalledShown, STALLED_VIDEO_CLASS, VideoInterruptedNotice } from "./components/calls/stalled.tsx";
 
 // What the screens stand on.
 export { default as Icon, iconPathD, isRegistryIcon, ResolvedIcon } from "./primitives/icon.tsx";

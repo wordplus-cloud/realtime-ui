@@ -6,8 +6,11 @@ import type { CallContextInterface } from "../components/calls/context.ts";
 import { usePrivateCall } from "./use-private-call.ts";
 import { useGroupCall } from "./use-group-call.ts";
 import { infoOf, type SdkCall, type SdkGroupCall } from "./types.ts";
-import type { CallsController, Showing } from "./controller.ts";
+import type { CallsController, JoinMedia, Showing } from "./controller.ts";
+import { soundOn, useSoundHeld } from "./sound.ts";
 import { Piece } from "../pieces.tsx";
+import Icon from "../primitives/icon.tsx";
+import { _x } from "../inc/globals.ts";
 
 /**
  * What draws a call on the screen: ours (the kit's CallScreen), or an app's own copy of it (`npx @wordplus/realtime-ui
@@ -89,12 +92,18 @@ function moveHolder( holder: HTMLDivElement, home: HTMLElement, spot: HTMLElemen
 type BesideChat = { shown: boolean; toggle: CallsController[ 'showChat' ] } | null;
 
 function CallWindow( { showing, close, view, chat }: { showing: Showing, close: ( notice: string | null ) => void, view: CallView, chat: BesideChat } ) {
+    // The others' sound held back by the browser until the person clicks, as on a page that joined by itself: a click
+    // anywhere plays it, and this says so (sound.ts).
+    const silent = useSoundHeld();
     // A key per call, so a call that becomes a group call starts its screen afresh.
     // `.bm-call-surface` carries the stage's colours, as Better Messages' call surface does.
     return <div className="realtime-call-window bm-call-surface" part="call-window" data-layout={ showing.kind === 'call' ? 'private' : showing.type }>
         { showing.kind === 'call'
             ? <PrivateWindow key={ showing.call.id } call={ showing.call } peer={ showing.peer } close={ close } view={ view } chat={ chat } adding={ { people: showing.people, addPerson: showing.add } } />
-            : <GroupWindow key="group" group={ showing.group } type={ showing.type } close={ close } view={ view } chat={ chat } adding={ { people: showing.people, addPerson: showing.add } } /> }
+            : <GroupWindow key="group" group={ showing.group } type={ showing.type } media={ showing.media } close={ close } view={ view } chat={ chat } adding={ { people: showing.people, addPerson: showing.add } } /> }
+        { silent && <button type="button" className="realtime-call-sound" part="call-sound" onClick={ soundOn }>
+            <Icon name="speakerOff" size={ 18 } />{ _x( 'Turn sound on', 'Call Screen', 'bp-better-messages' ) }
+        </button> }
     </div>;
 }
 
@@ -108,7 +117,7 @@ function PrivateWindow( { call, peer, close, adding, view: View, chat }: { call:
     return <View call={ withChat( context, chat ) } layout="private" />;
 }
 
-function GroupWindow( { group, type, close, adding, view: View, chat }: { group: SdkGroupCall, type: 'audio' | 'video', close: ( notice: string | null ) => void, adding: Parameters<typeof useGroupCall>[ 3 ], view: CallView, chat: BesideChat } ) {
-    const context = useGroupCall( group, type, close, adding );
+function GroupWindow( { group, type, media, close, adding, view: View, chat }: { group: SdkGroupCall, type: 'audio' | 'video', media?: JoinMedia, close: ( notice: string | null ) => void, adding: Parameters<typeof useGroupCall>[ 3 ], view: CallView, chat: BesideChat } ) {
+    const context = useGroupCall( group, type, close, adding, media );
     return <View call={ withChat( context, chat ) } layout={ type === 'video' ? 'group-video' : 'group-audio' } />;
 }

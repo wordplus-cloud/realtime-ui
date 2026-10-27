@@ -1,4 +1,4 @@
-import { rememberCameraCodec, rememberDroppedHardware, CAMERA_TUNE_DEFAULTS } from "./room-publish.js";
+import { rememberCameraCodec, rememberDroppedHardware, settingNumber, CAMERA_TUNE_DEFAULTS } from "./room-publish.js";
 /**
  * A camera's hardware encoder that drops frames, found while it sends, so this device's next camera goes out in
  * software (cameraCodecFor()'s avoid, room-publish.ts).
@@ -41,6 +41,18 @@ export const HARDWARE_DROP_MIN_TARGET = 100000;
 export const HARDWARE_DROP_MIN_SENT = 0.25;
 // a watch that follows a getter ends once it has given no live camera this long, its caller's stop missed
 export const HARDWARE_WATCH_GONE_MS = 10 * 60000;
+export function watchNumbers(settings) {
+    return {
+        everyMs: settingNumber(settings, 'watch.everyMs', HARDWARE_DROP_READ_MS),
+        warmups: settingNumber(settings, 'watch.warmups', HARDWARE_DROP_WARMUP),
+        dropShare: settingNumber(settings, 'watch.dropShare', HARDWARE_DROP_SHARE),
+        minCaptured: settingNumber(settings, 'watch.minCapturedFps', HARDWARE_DROP_MIN_CAPTURED),
+        maxEncodeMs: settingNumber(settings, 'watch.maxEncodeMs', HARDWARE_DROP_MAX_ENCODE_MS),
+        minTarget: settingNumber(settings, 'watch.minTargetKbps', HARDWARE_DROP_MIN_TARGET / 1000) * 1000,
+        minSent: settingNumber(settings, 'watch.minSent', HARDWARE_DROP_MIN_SENT),
+        goneMs: settingNumber(settings, 'watch.idleEndMin', HARDWARE_WATCH_GONE_MS / 60000) * 60000
+    };
+}
 /**
  * A camera in software that its CPU can't carry (camera-adapt.ts moves it, only on sustained evidence: a camera that's
  * merely CPU-limited a little, under half the time, stays): over the last CPU_HELD_READINGS
@@ -69,20 +81,20 @@ export const readingsFor = (seconds, readMs = HARDWARE_DROP_READ_MS) => Math.max
  * A reading of a hardware encoder that isn't held back by anything the browser names (above): the frames a second of
  * the layer it sends that keeps the most, and its source's; null for any other.
  */
-export function hardwareReading(r) {
+export function hardwareReading(r, n = watchNumbers()) {
     if (r.codec !== 'h264' && r.codec !== 'h265')
         return null;
-    if (!(r.captured >= HARDWARE_DROP_MIN_CAPTURED))
+    if (!(r.captured >= n.minCaptured))
         return null;
     const sent = r.layers.filter((l) => l.active);
     if (!sent.some((l) => l.hardware))
         return null;
     // the path carries what the hardware makes: none is a path gone down, not an encoder
-    if (!sent.some((l) => l.hardware && l.target !== null && l.target >= HARDWARE_DROP_MIN_TARGET
-        && l.sentBps >= l.target * HARDWARE_DROP_MIN_SENT))
+    if (!sent.some((l) => l.hardware && l.target !== null && l.target >= n.minTarget
+        && l.sentBps >= l.target * n.minSent))
         return null;
     if (sent.some((l) => (l.limit !== 'none' && l.limit !== '')
-        || (l.hardware && l.encodeMs !== null && l.encodeMs > HARDWARE_DROP_MAX_ENCODE_MS)))
+        || (l.hardware && l.encodeMs !== null && l.encodeMs > n.maxEncodeMs)))
         return null;
     return { best: Math.max(0, ...sent.map((l) => l.fps)), captured: r.captured };
 }
@@ -90,14 +102,14 @@ export function hardwareReading(r) {
  * Whether readings, the last `count` of them (HARDWARE_DROP_READINGS, 30 s), are a hardware encoder taking the whole
  * camera's frames off.
  */
-export function dropsFrames(readings, count = HARDWARE_DROP_READINGS) {
+export function dropsFrames(readings, count = HARDWARE_DROP_READINGS, n = watchNumbers()) {
     if (readings.length < count)
         return false;
-    const read = readings.slice(-count).map(hardwareReading);
+    const read = readings.slice(-count).map((r) => hardwareReading(r, n));
     if (read.some((r) => r === null))
         return false;
-    const kept = read.reduce((n, r) => n + r.best, 0), given = read.reduce((n, r) => n + r.captured, 0);
-    return kept <= given * HARDWARE_DROP_SHARE;
+    const kept = read.reduce((k, r) => k + r.best, 0), given = read.reduce((g, r) => g + r.captured, 0);
+    return kept <= given * n.dropShare;
 }
 // Chrome's names for its hardware encoders: VideoToolbox, MediaFoundationVideoEncodeAccelerator (AMDh264Encoder),
 // VaapiVideoEncodeAccelerator, V4L2VideoEncodeAccelerator, MediaCodec on Android, ExternalEncoder before
@@ -214,20 +226,24 @@ function pathUp(sender) {
  * tune: the node's numbers (the policy's, room-publish.ts cameraTune()): how long a hardware encoder drops frames
  * (dropWatchS) and a software one is held back (cpuWatchS) before either counts, and the share of that time held back
  * that does (cpuShare). The built-in ones without.
+ *
+ * drops: false watches the CPU alone, for a shared screen (1.0.47): a busy screen in a Mac's VideoToolbox can read as
+ * dropped frames, and what the drops watch remembers keeps this browser's next camera out of its hardware.
  */
 export function watchCameraEncoder(sender, options = {}) {
     const tune = options.tune ?? CAMERA_TUNE_DEFAULTS;
-    const readMs = options.readMs ?? HARDWARE_DROP_READ_MS;
+    const numbers = () => watchNumbers(typeof options.settings === 'function' ? options.settings() : options.settings);
+    const readMs = options.readMs ?? numbers().everyMs;
     // the readings each verdict is over: 6 and 4 at the built-in 30 s and 20 s
-    const dropReadings = readingsFor(tune.dropWatchS), cpuReadings = readingsFor(tune.cpuWatchS);
+    const dropReadings = readingsFor(tune.dropWatchS, readMs), cpuReadings = readingsFor(tune.cpuWatchS, readMs);
     const follows = typeof sender === 'function';
     const current = follows ? sender : () => sender;
-    let counts = null, busy = false, stopped = false, warmup = HARDWARE_DROP_WARMUP;
+    let counts = null, busy = false, stopped = false, warmup = numbers().warmups;
     let watched = null, goneSince = 0;
     const last = [];
     const over = () => {
         counts = null;
-        warmup = HARDWARE_DROP_WARMUP;
+        warmup = numbers().warmups;
         last.length = 0;
     };
     const stop = () => {
@@ -247,7 +263,7 @@ export function watchCameraEncoder(sender, options = {}) {
             if (!follows)
                 return stop();
             goneSince || (goneSince = Date.now());
-            if (Date.now() - goneSince >= HARDWARE_WATCH_GONE_MS)
+            if (Date.now() - goneSince >= numbers().goneMs)
                 return stop();
             return over();
         }
@@ -276,8 +292,9 @@ export function watchCameraEncoder(sender, options = {}) {
             const codec = read.reading.codec;
             if (!codec)
                 return;
-            if (dropsFrames(last, dropReadings)) {
-                const kept = last.slice(-dropReadings).map(hardwareReading);
+            const n = numbers();
+            if (options.drops !== false && dropsFrames(last, dropReadings, n)) {
+                const kept = last.slice(-dropReadings).map((r) => hardwareReading(r, n));
                 const given = kept.reduce((n, r) => n + (r?.captured ?? 0), 0);
                 rememberDroppedHardware(codec, Date.now(), options.records ? { sentShare: given > 0 ? kept.reduce((n, r) => n + (r?.best ?? 0), 0) / given : null } : null);
                 stop();

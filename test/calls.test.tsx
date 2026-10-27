@@ -107,6 +107,8 @@ describe( 'the group calls', () => {
         const call = fakeCall( { participants: three(), adminMode: true } );
         const { container } = wrapped( call, 'group-audio' );
         await act( async () => {} );
+        // A call that lists no acts, as Better Messages' calls, takes every one: switching to broadcast mode among them.
+        expect( container.querySelector( '.bm-set-broadcast-mode' ) ).not.toBeNull();
 
         await act( async () => { fireEvent.click( container.querySelector( '.bm-mute-all' )! ); } );
         await act( async () => { fireEvent.click( container.querySelector( '.bm-lock-room' )! ); } );
@@ -263,6 +265,8 @@ describe( 'a camera moving to another codec during the call', () => {
         const { container, rerender } = render( tile( 'user_34', { videoOptimizing: true, videoPaused: true } ) );
         expect( notice( container )?.textContent ).toBe( 'Optimizing video quality...' );
         expect( notice( container )?.getAttribute( 'role' ) ).toBe( 'status' );
+        // a ring with an arc turning on it, as the busy controls spin, hidden from a screen reader
+        expect( notice( container )?.querySelector( 'svg.bm-call-optimizing-spinner[aria-hidden="true"] circle + path' ) ).not.toBeNull();
 
         // The pause it stands in for isn't said beside it.
         act( () => { vi.advanceTimersByTime( PAUSED_NOTICE_MS + 100 ); } );
@@ -455,6 +459,143 @@ describe( 'the private call\'s controls on a touch', () => {
         // A click with no touch before it, as from a mouse or a key, is pressed as ever.
         fireEvent.click( end );
         expect( call.calls ).toEqual( [ 'enableMic', 'endCall' ] );
+    } );
+} );
+
+describe( 'someone whose media stopped arriving while they are still in the call', () => {
+    const tile = ( key: string, extra: Partial<CallParticipant> ) => render(
+        <CallContext.Provider value={ fakeCall() }>
+            <GroupVideoGridItem unique_key={ key } participant={ participant( key, extra ) } width={ 50 } height={ 50 } x={ 0 } y={ 0 } />
+        </CallContext.Provider> ).container;
+    const blurred = ( container: HTMLElement, kind: 'camera' | 'screen' ) =>
+        container.querySelector( 'video[datatype="' + kind + '"], .bm-small-video video' )?.classList.contains( 'bm-call-video-stalled' );
+
+    it( 'blurs a stopped camera\'s last frame on their tile and says "Video interrupted", and "Reconnecting..." when their sound stopped too', () => {
+        const camera = tile( 'user_34', { video: fakeTrack(), audio: fakeTrack(), stalled: 'video' } );
+        expect( camera.querySelector( '.bm-call-stalled .bm-call-paused-notice' )?.textContent ).toBe( 'Video interrupted' );
+        expect( blurred( camera, 'camera' ) ).toBe( true );
+        expect( camera.querySelector( '.bm-call-reconnecting' ) ).toBeNull();
+
+        const everything = tile( 'user_43', { video: fakeTrack(), audio: fakeTrack(), stalled: 'all' } );
+        expect( everything.querySelector( '.bm-call-reconnecting' )?.textContent ).toBe( 'Reconnecting...' );
+        expect( everything.querySelector( '.bm-call-stalled' ) ).toBeNull();
+        expect( blurred( everything, 'camera' ) ).toBe( true );
+
+        const flowing = tile( 'user_44', { video: fakeTrack(), audio: fakeTrack(), stalled: null } );
+        expect( flowing.querySelector( '.bm-call-stalled, .bm-call-reconnecting, .bm-call-video-stalled' ) ).toBeNull();
+
+        // never the user's own
+        const own = tile( 'me', { video: fakeTrack(), stalled: 'all' } );
+        expect( own.querySelector( '.bm-call-stalled, .bm-call-reconnecting, .bm-call-video-stalled' ) ).toBeNull();
+    } );
+
+    it( 'never says a shared screen is interrupted, still for as long as nothing on it moves, but blurs it when nothing of theirs arrives', () => {
+        const camera = tile( 'user_34', { video: fakeTrack(), screen: fakeTrack(), stalled: 'video' } );
+        expect( camera.querySelector( '.bm-call-stalled' ) ).toBeNull();
+        expect( camera.querySelector( 'video[datatype="screen"]' )?.classList.contains( 'bm-call-video-stalled' ) ).toBe( false );
+        expect( camera.querySelector( '.bm-small-video video' )?.classList.contains( 'bm-call-video-stalled' ) ).toBe( true );
+
+        const everything = tile( 'user_43', { screen: fakeTrack(), stalled: 'all' } );
+        expect( everything.querySelector( 'video[datatype="screen"]' )?.classList.contains( 'bm-call-video-stalled' ) ).toBe( true );
+        expect( everything.querySelector( '.bm-call-reconnecting' ) ).not.toBeNull();
+    } );
+
+    it( 'leaves a camera the call says why it holds (paused for the download, moving codec) to that notice', () => {
+        vi.useFakeTimers();
+        try {
+            const paused = tile( 'user_34', { video: fakeTrack(), videoPaused: true, stalled: 'video' } );
+            act( () => { vi.advanceTimersByTime( PAUSED_NOTICE_MS ); } );
+            expect( paused.querySelector( '.bm-call-paused-notice' )?.textContent ).toBe( 'Paused: weak connection' );
+            expect( paused.querySelector( '.bm-call-stalled' ) ).toBeNull();
+
+            const moving = tile( 'user_43', { video: fakeTrack(), videoOptimizing: true, stalled: 'video' } );
+            expect( moving.querySelector( '.bm-call-optimizing' ) ).not.toBeNull();
+            expect( moving.querySelector( '.bm-call-stalled' ) ).toBeNull();
+        } finally {
+            vi.useRealTimers();
+        }
+    } );
+
+    it( 'says "Reconnecting..." on their row in a group audio call when their sound stopped', () => {
+        const people = ( stalled: 'video' | 'all' | null ) => new Map<string, CallParticipant>( [
+            [ 'me', participant( 'me', { audio: fakeTrack() } ) ],
+            [ 'user_34', participant( 'user_34', { audio: fakeTrack(), stalled } ) ],
+        ] );
+        const { container, rerender } = wrapped( fakeCall( { participants: people( 'all' ) } ), 'group-audio' );
+        expect( container.querySelector( '[data-key="user_34"] .bm-call-reconnecting' )?.textContent ).toBe( 'Reconnecting...' );
+        expect( container.querySelector( '[data-key="me"] .bm-call-reconnecting' ) ).toBeNull();
+
+        rerender( <CallScreen call={ { ...fakeCall( { participants: people( null ) } ), wrapper: createRef<HTMLDivElement>() as never } } layout="group-audio" /> );
+        expect( container.querySelector( '.bm-call-reconnecting' ) ).toBeNull();
+    } );
+
+    it( 'in a call between two, says "Video interrupted" and why over the blurred stage, and "The other side lost connection" when nothing arrives', () => {
+        const two = ( stalled: 'video' | 'all' | null ) => new Map<string, CallParticipant>( [
+            [ 'me', participant( 'me', { audio: fakeTrack() } ) ],
+            [ 'user_34', participant( 'user_34', { video: fakeTrack(), audio: fakeTrack(), stalled } ) ],
+        ] );
+        const screen = ( stalled: 'video' | 'all' | null ) =>
+            <CallScreen call={ { ...fakeCall( { participants: two( stalled ) } ), wrapper: createRef<HTMLDivElement>() as never } } layout="private" />;
+        const { container, rerender } = render( screen( 'video' ) );
+
+        expect( container.querySelector( '.bm-main-video .bm-call-stalled.bm-call-paused-main' )?.textContent )
+            .toBe( 'Video interruptedTheir video stopped arriving. It comes back by itself.' );
+        expect( container.querySelector( '.bm-main-video video.video1' )?.classList.contains( 'bm-call-video-stalled' ) ).toBe( true );
+        expect( container.querySelector( '.bm-placeholder-participant-lost-message' ) ).toBeNull();
+
+        rerender( screen( 'all' ) );
+        expect( container.querySelector( '.bm-placeholder-participant-lost-message' )?.textContent ).toBe( 'The other side lost connection' );
+        expect( container.querySelector( '.bm-call-stalled' ) ).toBeNull();
+        expect( container.querySelector( '.bm-main-video video.video1' )?.classList.contains( 'bm-call-video-stalled' ) ).toBe( true );
+
+        rerender( screen( null ) );
+        expect( container.querySelector( '.bm-call-stalled, .bm-placeholder-participant-lost-message, .bm-call-video-stalled' ) ).toBeNull();
+    } );
+
+    describe( 'a camera that never showed a frame here', () => {
+        // jsdom's <video> has drawn nothing (videoWidth 0); `drawn` makes every one say it has
+        const drawn = () => Object.defineProperty( HTMLVideoElement.prototype, 'videoWidth', { configurable: true, get: () => 640 } );
+        afterEach( () => { delete ( HTMLVideoElement.prototype as { videoWidth?: number } ).videoWidth; } );
+
+        it( 'shows their face on their tile, above "Video interrupted", or under "Reconnecting...", where a last frame would be blurred', () => {
+            const empty = tile( 'user_34', { video: fakeTrack(), audio: fakeTrack(), avatar: 'https://example.com/ann.png', stalled: 'video' } );
+            expect( empty.querySelector<HTMLElement>( '.bm-call-stalled.bm-call-stalled-faced .bm-call-stalled-face' )?.style.backgroundImage ).toContain( 'https://example.com/ann.png' );
+            expect( empty.querySelector( '.bm-call-stalled .bm-call-paused-notice' )?.textContent ).toBe( 'Video interrupted' );
+
+            const away = tile( 'user_43', { video: fakeTrack(), avatar: 'https://example.com/cara.png', stalled: 'all' } );
+            const inner = away.querySelector<HTMLElement>( '.bm-group-call-input-video-inner' );
+            expect( inner?.classList.contains( 'bm-call-pictureless' ) ).toBe( true );
+            expect( inner?.style.backgroundImage ).toContain( 'https://example.com/cara.png' );
+            expect( away.querySelector( '.bm-call-reconnecting' ) ).not.toBeNull();
+
+            drawn();
+            const frozen = tile( 'user_44', { video: fakeTrack(), audio: fakeTrack(), stalled: 'video' } );
+            expect( frozen.querySelector( '.bm-call-stalled' ) ).not.toBeNull();
+            expect( frozen.querySelector( '.bm-call-stalled-faced, .bm-call-stalled-face' ) ).toBeNull();
+            const frozenAway = tile( 'user_45', { video: fakeTrack(), stalled: 'all' } );
+            expect( frozenAway.querySelector( '.bm-call-pictureless' ) ).toBeNull();
+        } );
+
+        it( 'shows their face on the stage of a call between two, and only there', () => {
+            const two = ( stalled: 'video' | 'all' | null ) => new Map<string, CallParticipant>( [
+                [ 'me', participant( 'me', { audio: fakeTrack() } ) ],
+                [ 'user_34', participant( 'user_34', { video: fakeTrack(), audio: fakeTrack(), stalled } ) ],
+            ] );
+            const screen = ( stalled: 'video' | 'all' | null ) =>
+                <CallScreen call={ { ...fakeCall( { participants: two( stalled ) } ), wrapper: createRef<HTMLDivElement>() as never } } layout="private" />;
+            const { container, rerender } = render( screen( 'video' ) );
+
+            expect( container.querySelector<HTMLImageElement>( '.bm-main-video .bm-call-stalled-faced .bm-call-animation img' )?.src ).toBe( 'https://example.com/ann.png' );
+
+            rerender( screen( 'all' ) );
+            expect( container.querySelector<HTMLImageElement>( '.bm-main-video .bm-call-stalled-face-main img' )?.src ).toBe( 'https://example.com/ann.png' );
+            expect( container.querySelector( '.bm-placeholder-participant-lost-message' ) ).not.toBeNull();
+
+            drawn();
+            rerender( screen( 'video' ) );
+            expect( container.querySelector( '.bm-call-stalled' ) ).not.toBeNull();
+            expect( container.querySelector( '.bm-call-stalled-faced, .bm-call-stalled-face-main' ) ).toBeNull();
+        } );
     } );
 } );
 

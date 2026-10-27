@@ -135,7 +135,10 @@ export function CameraOptimizingNotice( { state, avatar, main }: { state: Camera
                  part="video-optimizing" role="status" aria-live="polite">
         { backdrop && <span className="bm-call-optimizing-backdrop" aria-hidden="true" style={ { backgroundImage: 'url("' + backdrop.replace( /"/g, '%22' ) + '")' } } /> }
         <span className="bm-call-optimizing-notice">
-            <span className="bm-call-optimizing-pulse" aria-hidden="true" />
+            <svg className="bm-call-optimizing-spinner" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                <circle cx="12" cy="12" r="9" />
+                <path d="M12 3a9 9 0 0 1 9 9" />
+            </svg>
             <span>{ _x( 'Optimizing video quality...', 'Call Screen', 'bp-better-messages' ) }</span>
         </span>
     </span>;

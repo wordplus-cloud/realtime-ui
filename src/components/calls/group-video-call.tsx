@@ -349,14 +349,14 @@ export default function GroupVideoCallLayout() {
                                         </Tooltip>
                                     }
 
-                                    { callMode === 'participatory' &&
+                                    { callMode === 'participatory' && moderates( moderation, 'set_broadcast_mode' ) &&
                                         <Tooltip content={_x('Switch to Broadcast Mode', 'Group Video Chat', 'bp-better-messages')}>
                                             <span onClick={() => run( 'mode', () => setCallMode('broadcast') )} data-busy={ busy( 'mode' ) } className="bm-set-broadcast-mode">
                                                 { glyph( 'mode', 'megaphone' ) }
                                             </span>
                                         </Tooltip>
                                     }
-                                    { callMode === 'broadcast' &&
+                                    { callMode === 'broadcast' && moderates( moderation, 'set_participatory_mode' ) &&
                                         <Tooltip content={_x('Switch to Participatory Mode', 'Group Video Chat', 'bp-better-messages')}>
                                             <span onClick={() => run( 'mode', () => setCallMode('participatory') )} data-busy={ busy( 'mode' ) } className="bm-set-participatory-mode">
                                                 { glyph( 'mode', 'users' ) }

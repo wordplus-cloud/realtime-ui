@@ -4,7 +4,8 @@ import { type Banned, type ChatMessage, type Corner, type Hand, type Layout, typ
 import { type Media } from "./media.js";
 import { type PictureLayer, type PlaybackStats } from "./playback.js";
 import type { SendingStats } from "./playback-types.js";
-import { type CameraCodec, type CameraCodecCaps } from "../calls/room-publish.js";
+import { type CameraCodec, type CameraCodecCaps, type CodecPolicy } from "../calls/room-publish.js";
+import { checkedCameraChoice } from "../calls/camera-check.js";
 export type MediaPhase = 'off' | 'connecting' | 'waiting' | 'live' | 'reconnecting';
 export type VideoChoice = 'auto' | 'high' | 'medium' | 'low';
 export type ConnectionHealth = 'good' | 'poor' | 'lost' | 'unknown';
@@ -121,7 +122,9 @@ export interface EasyStreamOptions {
     random?: () => number;
     cameraCodec?: () => Promise<CameraCodec>;
     codecCaps?: () => Promise<CameraCodecCaps | null>;
+    cameraCheck?: typeof checkedCameraChoice;
 }
+export declare function streamCameraPolicy(policy: CodecPolicy | null | undefined): CodecPolicy | null;
 export type { CameraCodec };
 type CodecNavigator = {
     userAgent?: string;
@@ -211,6 +214,9 @@ export declare class EasyStreamClient {
     private syncing;
     private pictureHolds;
     private readonly playback;
+    private readonly viewerHold;
+    private readonly trace;
+    private played;
     private readonly sending;
     private pixelDensity;
     private screenDensity;
@@ -290,7 +296,13 @@ export declare class EasyStreamClient {
     private keepEncoderOn;
     private findEncoder;
     private encoderOf;
+    private watchingOnly;
     private ownHold;
+    private looked;
+    private holdMoved;
+    private traceEvent;
+    private countPlayed;
+    private summarize;
     private followPictures;
     private stopFollowing;
     private soundFollowsPicture;
@@ -322,6 +334,7 @@ export declare class EasyStreamClient {
     private watchCamera;
     private chosenCodecs;
     private pickCodecs;
+    private checkCamera;
     private publishUnpublished;
     startPreview(devices?: {
         camera?: boolean;

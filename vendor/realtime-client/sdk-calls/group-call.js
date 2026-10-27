@@ -12,7 +12,9 @@ import { encryptionWorker, kitSource, liveKitSource, MESH_JOIN_BUDGET_MS } from 
 import { probeCodecCaps } from '../calls/codecs.js';
 import { watchCameraEncoder } from '../calls/encoder-watch.js';
 import { callUserOf } from '../calls/users.js';
-import { cameraPublish, fitCameraTrack, hardwareFromCaps, roomCallChoice, roomPixelDensity, screenCodecFor, screenPublish, SCREEN_DEGRADATION, SCREEN_ENCODING } from '../calls/room-publish.js';
+import { checkedCameraChoice, meshCameraReport, reportMeshCamera } from '../calls/camera-check.js';
+import { applyViewSettings, roomPolicy, roomSettings } from '../calls/room-settings.js';
+import { applyNowDelayMs, applyScreenSettings, cameraPublish, cameraPublishChanged, cameraTune, fitCameraTrack, hardwareFromCaps, micPublish, roomCallChoice, roomPixelDensity, screenCodecFor, screenEncoding, screenPublish, screenVideoMode, } from '../calls/room-publish.js';
 const refused = (code) => Object.assign(new Error(code), { code });
 /**
  * Why the room let this page go, as `ended` says it: `removed` when the site's server took them out (remove(), the media
@@ -87,6 +89,8 @@ export class GroupCall {
         this.granted = null;
         this.encryption = null;
         this.ended = false;
+        // the shared screen's codec, for its live settings
+        this.screenCodec = null;
         this.caps = null;
         this.choice = null;
         // the camera's sender watched for a hardware encoder dropping its frames (encoder-watch.ts); its stop
@@ -146,6 +150,9 @@ export class GroupCall {
                 void this.publishWanted();
         });
         this.livekit.on(E.ActiveSpeakersChanged, (speakers) => !this.ended && this.listeners.fire('speakers', [speakers.filter((p) => !p.isLocal).map((p) => this.person(p))], false));
+        // The node's settings changed (rtc-client 1.0.23): the live ones taken now, a camera's ceilings by the room client
+        if (E.MeshSettingsChanged)
+            this.livekit.on(E.MeshSettingsChanged, (settings, changed) => this.settingsChanged(settings, changed));
         this.livekit.on(E.Reconnecting, () => this.setState('reconnecting'));
         this.livekit.on(E.Reconnected, () => this.setState('connected'));
         this.livekit.on(E.Disconnected, (reason) => this.finish(disconnectedBy(reason)));
@@ -304,9 +311,11 @@ export class GroupCall {
         catch {
             /* a track without settings: the library's own layers */
         }
+        // the node's settings (rtc-client 1.0.23): each number below is theirs where they give it
+        const node = roomSettings(this.livekit);
         if (source === 'camera') {
-            const { codec, hardware, backup } = await this.cameraChoice();
-            const camera = cameraPublish(codec, await fitCameraTrack(track, codec, hardware), backup);
+            const { codec, hardware, backup, height } = await this.cameraChoice(track);
+            const camera = cameraPublish(codec, await fitCameraTrack(track, codec, hardware, height, node), backup, node);
             return {
                 videoCodec: codec,
                 ...(camera ? { simulcast: true, videoEncoding: camera.top, videoSimulcastLayers: camera.layers.map((layer) => this.preset(layer)) } : {}),
@@ -317,9 +326,10 @@ export class GroupCall {
         }
         if (source === 'screen_share') {
             const codec = screenCodecFor(globalThis.navigator?.userAgent ?? '', hardwareFromCaps(await this.capabilities()), this.codecOptions());
-            const screen = screenPublish(settings.width ?? 0, settings.height ?? 0, codec);
+            this.screenCodec = codec;
+            const screen = screenPublish(settings.width ?? 0, settings.height ?? 0, codec, node);
             // smooth where it can be, sharp where it can't (SCREEN_CONTENT_HINT: marked detail, Chrome dropped two
-            // frames in three of a busy screen in H.264), and in VP9 or AV1 sharp as it scrolls (SCREEN_CONTENT_HINT_SVC)
+            // frames in three of a busy screen in H.264), in every codec
             try {
                 track.contentHint = screen.contentHint;
             }
@@ -329,16 +339,50 @@ export class GroupCall {
             // one picture unless the rule gives a second (screenPublish: VP8 simulcast held a screen to 5 frames)
             return {
                 videoCodec: codec,
-                screenShareEncoding: SCREEN_ENCODING,
-                degradationPreference: SCREEN_DEGRADATION,
-                // VP9 and AV1 in one spatial layer of two frame rates (SCREEN_SCALABILITY_MODE_SVC)
+                screenShareEncoding: screenEncoding(node),
+                degradationPreference: screenVideoMode(codec, false, node).degradationPreference,
+                // VP9 and AV1 in one layer (SCREEN_SCALABILITY_MODE_SVC)
                 ...(screen.scalabilityMode ? { scalabilityMode: screen.scalabilityMode } : {}),
                 ...(screen.simulcast && screen.layer
                     ? { simulcast: true, screenShareSimulcastLayers: [this.preset(screen.layer)] }
                     : { simulcast: false }),
             };
         }
+        // a microphone at the library's own bitrate, with RED and DTX, unless the node says otherwise
+        if (source === 'microphone' && node && ['mic.kbps', 'mic.red', 'mic.dtx'].some((key) => node.has(key))) {
+            const mic = micPublish(node);
+            return {
+                ...(node.has('mic.kbps') ? { audioPreset: { maxBitrate: mic.maxBitrate } } : {}),
+                ...(node.has('mic.red') ? { red: mic.red } : {}),
+                ...(node.has('mic.dtx') ? { dtx: mic.dtx } : {}),
+            };
+        }
         return {};
+    }
+    /**
+     * The node's settings changed on a running call (rtc-client 1.0.23, RoomEvent.MeshSettingsChanged): what it receives
+     * asked at the pixel density they say, a shared screen sent as they say now, and a camera whose publish settings
+     * changed chosen again at its next turn on, or now, at its moment of the minute, where the revision says applyNow.
+     */
+    settingsChanged(settings, changed) {
+        if (this.ended)
+            return;
+        applyViewSettings(this.livekit, globalThis.devicePixelRatio);
+        const screen = this.published.get('screen_share')?.track;
+        if (screen && this.screenCodec && changed.some((key) => key.startsWith('screen.'))) {
+            void applyScreenSettings(screen, settings, this.screenCodec).catch(() => { });
+        }
+        if (!cameraPublishChanged(changed))
+            return;
+        this.choice = null;
+        if (!settings.applyNow || !this.published.has('camera'))
+            return;
+        clearTimeout(this.applyNowTimer);
+        this.applyNowTimer = setTimeout(() => {
+            const track = this.wanted.get('camera');
+            if (!this.ended && track && this.published.has('camera'))
+                void this.setTrack('camera', track);
+        }, applyNowDelayMs(this.livekit.localParticipant?.identity ?? ''));
     }
     /**
      * Watches the camera sent for a hardware encoder dropping its frames (encoder-watch.ts): once seen, this browser
@@ -348,24 +392,46 @@ export class GroupCall {
         this.cameraWatch?.();
         // the track's sender as it is now: a full reconnect publishes the camera again on a new one
         const track = publication?.track;
-        this.cameraWatch = track?.sender ? watchCameraEncoder(() => track.sender, { onDrops: () => { this.choice = null; } }) : null;
+        // the node's numbers for the watch, as they are at each look (rtc-client 1.0.23)
+        this.cameraWatch = track?.sender
+            ? watchCameraEncoder(() => track.sender, {
+                tune: cameraTune(this.codecOptions().policy),
+                settings: () => roomSettings(this.livekit),
+                onDrops: () => {
+                    this.choice = null;
+                },
+            })
+            : null;
     }
     /** What this browser encodes, asked once a call. */
     capabilities() {
         this.caps ?? (this.caps = probeCodecCaps().catch(() => null));
         return this.caps;
     }
-    /** The room as the codec rules see it: encrypted, on the mesh, and the server's codec policy once joined. */
+    /**
+     * The room as the codec rules see it: encrypted, on the mesh, and the server's policy once joined, from its settings
+     * where its node sends them (rtc-client 1.0.23) or its codec policy. A call's camera (`call`), as Better Messages'
+     * is: the policy's rules, its check and its tune apply where the node turned them on.
+     */
     codecOptions() {
         const h265 = !!this.server && !!this.lib.isMeshServer?.(this.server);
-        return { encrypted: this.encrypted, h265, policy: this.livekit?.meshCodecPolicy ?? null };
+        return { encrypted: this.encrypted, h265, policy: roomPolicy(this.livekit), call: true };
     }
     /**
      * The camera's codec on this device, asked once the room is joined (room-publish.ts): the server's policy, VP8 in
-     * an encrypted room, where the room client sends no backup codec, H.265 only on the mesh.
+     * an encrypted room, where the room client sends no backup codec, H.265 only on the mesh. Measured first where the
+     * node turned the camera check on and a rule names this machine (camera-check.ts), and told to the node.
      */
-    cameraChoice() {
-        this.choice ?? (this.choice = this.capabilities().then((caps) => roomCallChoice(caps, globalThis.navigator?.userAgent ?? '', this.codecOptions())));
+    cameraChoice(track) {
+        this.choice ?? (this.choice = this.capabilities().then(async (caps) => {
+            const options = this.codecOptions();
+            const agent = globalThis.navigator?.userAgent ?? '';
+            if (options.policy?.check !== true || !track)
+                return roomCallChoice(caps, agent, options);
+            const checked = await checkedCameraChoice(track, caps, agent, options);
+            reportMeshCamera(this.livekit, meshCameraReport(checked));
+            return checked;
+        }));
         return this.choice;
     }
     preset(layer) {
@@ -428,6 +494,7 @@ export class GroupCall {
         this.state = 'ended';
         this.cameraWatch?.();
         this.cameraWatch = null;
+        clearTimeout(this.applyNowTimer);
         try {
             // The page's tracks stay as they are: they are the page's, and a call moving from the room it fell back to
             // into its group call's sends them on there.

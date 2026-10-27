@@ -11,14 +11,16 @@ import { cssRatio, useMediaRatio } from "../../inc/calls/ratio.ts";
 import { moderates, useModerationActs } from "./moderation.ts";
 import usePendingActions from "../../inc/calls/pending.ts";
 import { Piece } from "../../pieces.tsx";
+import { stalledShown, STALLED_VIDEO_CLASS } from "./stalled.tsx";
 
 // How long the entrance keyframe in styles/calls/_call-stage.scss runs for.
 const TILE_ENTER_MS = 300;
 
 /**
  * One person in a group audio call's roster: their picture with the ring of whoever speaks, their name, microphone and
- * raised hand, "Reconnecting..." while they are briefly away, and a moderator's controls for them (remove, let them
- * broadcast, make them a speaker), each spinning until the row shows what it asked for.
+ * raised hand, "Reconnecting..." while they are briefly away or nothing of theirs arrives (stalled.tsx), and a
+ * moderator's controls for them (remove, let them broadcast, make them a speaker), each spinning until the row shows
+ * what it asked for.
  */
 export default memo(function GroupAudioGridItem({ unique_key, participant } : {
     unique_key: string,
@@ -139,15 +141,18 @@ export default memo(function GroupAudioGridItem({ unique_key, participant } : {
     const sound = ( !! participant.audio && unique_key !== 'me') &&
         <audio ref={setAudioElement} autoPlay playsInline muted={false} style={{display: 'none'}}/>;
 
+    // Nothing of theirs arrives while they are still in the call: said as for a row away for a moment.
+    const stalled = stalledShown( participant, unique_key === 'me' );
+
     return <div ref={itemRef} data-key={unique_key} className={className} style={style} part="grid-tile">
         <Piece name="GridTile" props={ { participant, layout: 'group-audio' } } always={ sound }>
         <div className={innerClass} style={innerStyle}>
-            { participant.reconnecting &&
+            { ( participant.reconnecting || stalled === 'all' ) &&
                 <span className="bm-call-reconnecting" role="status">{ _x('Reconnecting...', 'Call Screen', 'bp-better-messages') }</span>
             }
             {( !! participant.screen ) &&
                 <div className="bm-group-call-input-audio-screen-wrapper">
-                    <video ref={setScreenElement} datatype="screen" autoPlay={true} playsInline={true} muted={unique_key === 'me'}></video>
+                    <video ref={setScreenElement} className={ stalled === 'all' ? STALLED_VIDEO_CLASS : undefined } datatype="screen" autoPlay={true} playsInline={true} muted={unique_key === 'me'}></video>
                 </div>
             }
 

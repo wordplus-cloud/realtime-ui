@@ -25,10 +25,25 @@ export function controllerFor( calls: SdkCalls, options: { add?: boolean } = {} 
     return controller;
 }
 
+/**
+ * What a group call turns on as it is joined. A click on its button turns on the microphone, and the camera on a video
+ * call. A page that joins by itself (a spot's `join`) turns on only what its `join-with` names.
+ */
+export interface JoinMedia {
+    microphone: boolean;
+    camera: boolean;
+}
+
+/** A spot's `join-with` (`microphone`, `camera`, or both, space-separated) as what its join turns on: nothing without it. */
+export function joinMedia( joinWith: string | null | undefined ): JoinMedia {
+    const named = ( joinWith ?? '' ).split( /\s+/ );
+    return { microphone: named.includes( 'microphone' ), camera: named.includes( 'camera' ) };
+}
+
 /** What is on the screen: a call between two people, or a group call, and how it adds people. */
 export type Showing =
     | { kind: 'call'; call: SdkCall; peer: { name: string; avatar?: string }; people?: () => Promise<CallPerson[]>; add?: ( person: CallPerson ) => Promise<void> }
-    | { kind: 'group'; group: SdkGroupCall; name: string; type: 'audio' | 'video'; title: string; people?: () => Promise<CallPerson[]>; add?: ( person: CallPerson ) => Promise<void> };
+    | { kind: 'group'; group: SdkGroupCall; name: string; type: 'audio' | 'video'; title: string; media?: JoinMedia; people?: () => Promise<CallPerson[]>; add?: ( person: CallPerson ) => Promise<void> };
 
 export interface CallsView {
     rings: SdkIncoming[];
@@ -66,8 +81,8 @@ export function namePattern( pattern: string ): RegExp {
 /**
  * The page's calls as the screens show them, with the SDK's call screen's behaviour: every call ringing here gets a
  * ring, one call is on the screen at a time and a call ringing during it is answered busy, a call that becomes a group
- * call goes on in its room, and a call that can't start says why for a moment. Add Person is offered where the app
- * lists whom a user may add (`add`).
+ * call goes on in its room, a call that can't start says why for a moment, and leaving the page during a call asks
+ * first. Add Person is offered where the app lists whom a user may add (`add`).
  */
 export class CallsController {
     private view: CallsView = { rings: [], showing: null, notice: null, spot: null, chat: null };
@@ -77,6 +92,8 @@ export class CallsController {
     private spots: Array<{ pattern: RegExp; element: HTMLElement; rank: number; chat: boolean }> = [];
     private noticeTimer: ReturnType<typeof setTimeout> | null = null;
     private owners: Array<{ pattern: RegExp; take: ( call: OwnedCall ) => void }> = [];
+    /** The group calls being joined (join()), until the cloud answers: a second join of one meanwhile asks nothing. */
+    private readonly joining = new Set<string>();
 
     /**
      * Hands the calls whose names match `pattern` (`support:{a}:{b}`) to a plugin's own screen, in place of ours: their
@@ -177,16 +194,23 @@ export class CallsController {
         }
     }
 
-    /** Joins the group call `name`: what `<room-button>` does. */
-    async join( name: string, type: 'audio' | 'video', title: string ): Promise<void> {
+    /**
+     * Joins the group call `name`: what `<room-button>` does, and a spot with `join`. Once while it is being joined: a
+     * second click, or a second spot that joins it, asks nothing more. `media`: what it turns on as it joins, the
+     * microphone and on a video call the camera when not given (JoinMedia).
+     */
+    async join( name: string, type: 'audio' | 'video', title: string, media?: JoinMedia ): Promise<void> {
         const owner = this.ownerOf( name );
-        if ( this.busy && ! owner ) return;
+        if ( ( this.busy && ! owner ) || this.joining.has( name ) ) return;
+        this.joining.add( name );
         try {
             const group = await this.calls.group( name, { type } );
             if ( owner ) return owner.take( { kind: 'group', group } );
-            this.set( { showing: { kind: 'group', group, name, type, title, ...this.adding( name, group ) } } );
+            this.set( { showing: { kind: 'group', group, name, type, title, ...( media ? { media } : {} ), ...this.adding( name, group ) } } );
         } catch ( error ) {
             this.refused( error );
+        } finally {
+            this.joining.delete( name );
         }
     }
 
@@ -274,8 +298,21 @@ export class CallsController {
         this.noticeTimer = setTimeout( () => this.set( { notice: null } ), 4000 );
     }
 
+    /**
+     * While a call is on, leaving the page asks first: a reload, a closed tab or a link to another site would drop the
+     * user from it. The browser asks in its own words, and only once the user has clicked or typed on the page.
+     */
+    private readonly stay = ( event: BeforeUnloadEvent ) => {
+        event.preventDefault();
+        event.returnValue = true;   // as browsers before preventDefault() asked
+    };
+
     private set( change: Partial<CallsView> ): void {
         const view = { ...this.view, ...change };
+        if ( ( view.showing === null ) !== ( this.view.showing === null ) && typeof window !== 'undefined' ) {
+            if ( view.showing ) window.addEventListener( 'beforeunload', this.stay );
+            else window.removeEventListener( 'beforeunload', this.stay );
+        }
         const spot = this.spotOf( view.showing );
         // A chat's spot shows its chat beside the call as the call comes in, and then as the user leaves it.
         view.chat = spot?.chat ? ( spot.element === this.view.spot && view.chat !== null ? view.chat : true ) : null;

@@ -39,7 +39,7 @@
  * window had to start), the codec goes out as the policy has it, unmeasured, as before. An encoder still starting is
  * never taken for one that drops frames. Every threshold is the node's to change (room-publish.ts, cameraTune()).
  */
-import { type CameraChoice, type CameraCodec, type CameraCodecCaps, type CameraCodecOptions, type CameraCodecResult, type CameraTune } from "./room-publish.js";
+import { type CallSettings, type CameraChoice, type CameraCodec, type CameraCodecCaps, type CameraCodecOptions, type CameraCodecResult, type CameraTune } from "./room-publish.js";
 /** How long the loopback may take to connect (its first frame may take longer: as long as a measuring still fits). */
 export declare const CAMERA_CHECK_CONNECT_MS = 1500;
 /** After the first frame is encoded, how long at least before the measuring starts (the encoder's first frames run slow). */
@@ -67,6 +67,23 @@ export declare const CHECK_MAX_CPU_SHARE: number;
 export declare const CHECK_MAX_FRAME_SHARE: number;
 /** The frames the camera must give over the window for a verdict: fewer (a dim room, a camera starting) say too little. */
 export declare const CHECK_MIN_FRAMES = 6;
+/**
+ * 1.0.53: the check's own numbers, the node's to change without a client update (check.connectMs, check.warmupMs,
+ * check.keepUpMs, check.windowMs, check.minFrames, check.bandwidthShare, check.pollMs, check.headroom,
+ * check.fallbackKbps): the constants here without settings.
+ */
+export interface CheckNumbers {
+    connectMs: number;
+    warmupMs: number;
+    keepUpMs: number;
+    windowMs: number;
+    minFrames: number;
+    bandwidthShare: number;
+    pollMs: number;
+    headroom: number;
+    fallbackKbps: number;
+}
+export declare function checkNumbers(settings?: CallSettings | null): CheckNumbers;
 /** What a loopback's stats said over its window: the counts between two readings. */
 export interface EncoderSample {
     /** frames the camera gave */
@@ -119,6 +136,20 @@ export interface CameraCheckVerdict {
     fps?: number;
     /** the lines it encoded at the end (EncoderSample.frameHeight) */
     frameHeight?: number;
+    /** how its warm-up went, wherever the loopback was set up (1.0.58): what an unsure verdict says beside its why */
+    warmup?: CheckWarmup;
+}
+/**
+ * How a measurement's warm-up went (measureCameraEncoder()): a check that gave up as "slow-start" says only that, and a
+ * trace needs these to tell an encoder slow to give its first frame from one that gave it and then sent too few.
+ */
+export interface CheckWarmup {
+    /** ms from the loopback's start to the encoder's first frame; null: none came */
+    firstFrameMs: number | null;
+    /** the most of the camera's frames it sent over any CAMERA_CHECK_KEEPUP_MS of the warm-up (passSent to keep up); null: none read */
+    bestShare: number | null;
+    /** what the browser said held the encoder back at its last reading (qualityLimitationReason: none, bandwidth, cpu, other); '' not said */
+    limit: string;
 }
 /**
  * The verdict on one codec from its loopback's numbers. wantHardware: the codec was to go out in hardware (H.264,
@@ -138,7 +169,7 @@ export interface CameraCheckVerdict {
  * VP9 L3T3 about 31 a second from a 15 fps camera), which spread a picture's time over two or three. The three shares
  * are the policy's tune's where given (passSent, passCpu, passEncode).
  */
-export declare function judgeEncoder(codec: CameraCodec, wantHardware: boolean, s: EncoderSample, tune?: Pick<CameraTune, 'passSent' | 'passCpu' | 'passEncode'>): CameraCheckVerdict;
+export declare function judgeEncoder(codec: CameraCodec, wantHardware: boolean, s: EncoderSample, tune?: Pick<CameraTune, 'passSent' | 'passCpu' | 'passEncode'>, check?: Pick<CheckNumbers, 'minFrames' | 'bandwidthShare'>): CameraCheckVerdict;
 /**
  * Whether an encoder keeps up with its camera over a stretch (the check's warm-up, CAMERA_CHECK_KEEPUP_MS): the camera
  * gave two frames or more, and it sent at least passSent of them.
@@ -158,7 +189,7 @@ export declare const CHECK_INFER_HEADROOM = 0.8;
  * the lines it encoded at the end, which the CPU may already have shrunk: an encoder held back to `to` lines or under
  * doesn't fit them. Only a `cpu` verdict with its time and frame rate.
  */
-export declare function fitsLower(verdict: CameraCheckVerdict, to: number, tune?: Pick<CameraTune, 'passEncode'>): boolean;
+export declare function fitsLower(verdict: CameraCheckVerdict, to: number, tune?: Pick<CameraTune, 'passEncode'>, headroom?: number): boolean;
 type StatsLike = {
     forEach(fn: (s: any) => void): void;
 };
@@ -178,6 +209,13 @@ export interface EncoderCountsNow {
     known: boolean;
     /** the lines of the picture it encodes now (frameHeight, the tallest of its outbound streams); 0 not said */
     frameHeight: number;
+    /**
+     * the lines of the pictures the camera gives (media-source height), which its settings may not say: OBS Virtual
+     * Camera says 720 and gives 1080. 0 not said
+     */
+    sourceHeight: number;
+    /** what the browser says holds the encoder back now (qualityLimitationReason); '' not said */
+    limit: string;
 }
 /** The sender's counts from its stats (an RTCStatsReport): its outbound-rtp's, summed, and its media-source's frames. */
 export declare function encoderCounts(report: StatsLike): EncoderCountsNow;
@@ -197,13 +235,19 @@ export interface MeasureOptions {
     tune?: Pick<CameraTune, 'passSent' | 'passCpu' | 'passEncode'>;
     /** true once the camera is let go of: the measuring stops at once ("ended"), as when its track ends */
     stop?: () => boolean;
+    /** 1.0.53: the check's own numbers (checkNumbers()); the constants when not given */
+    numbers?: CheckNumbers;
+    /** 1.0.53: the node's settings, for the top layer it is measured at (cameraPublish(), cameraMaxHeight()) */
+    settings?: CallSettings | null;
 }
 /** How often a measurement looks whether its camera was let go of. */
 export declare const CAMERA_CHECK_POLL_MS = 100;
 /**
  * Measures codec on this device: the camera's picture (a clone of track, stopped after) through a loopback of two peer
  * connections in the page, at the room's top layer for codec (VP9 and AV1 as their one SVC stream), for
- * CAMERA_CHECK_WINDOW_MS after CAMERA_CHECK_WARMUP_MS; the verdict as judgeEncoder() gives it. Too little to tell
+ * CAMERA_CHECK_WINDOW_MS after CAMERA_CHECK_WARMUP_MS; the verdict as judgeEncoder() gives it. A camera whose pictures
+ * are taller than its settings say is scaled down to the lines measured before the window (EncoderCountsNow.sourceHeight,
+ * 1.0.56). Too little to tell
  * (result null, why "failed") where the browser can't run it or it didn't connect within CAMERA_CHECK_CONNECT_MS.
  *
  * Every wait in it ends by `until` ("timeout"), and every CAMERA_CHECK_POLL_MS it looks whether the camera was let go

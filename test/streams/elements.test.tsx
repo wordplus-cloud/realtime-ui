@@ -99,6 +99,30 @@ it( 'shows the studio to the host alone', async () => {
     await waitFor( () => expect( document.querySelector( 'stream-studio .estream-part--studio' ) ).toBeTruthy() );
 } );
 
+it( 'shows its host the studio as a page of its own, with the links it is given, in the element\'s height', async () => {
+    await place( '<live-stream name="lesson:7" view="studio-page" title="Your first tune" url="/lessons/7" back-url="/studio" style="display: block; height: 600px"></live-stream>' );
+    await waitFor( () => expect( shows.get( 'lesson:7' ) ).toBeTruthy() );
+    expect( calls.stream ).toHaveBeenCalledWith( 'lesson:7', { video: true } );
+
+    shows.get( 'lesson:7' )!.update( { you: { identity: 'u:34', role: 'host', name: 'Mia', chat: 'write', mod: true } } );
+    await waitFor( () => expect( document.querySelector( 'live-stream .estream-studio-page' ) ).toBeTruthy() );
+    const element = document.querySelector( 'live-stream' )!;
+    expect( element.querySelector( '.estream-studio-page__title' )!.textContent ).toBe( 'Your first tune' );
+    expect( element.querySelector( '.estream-studio-page__back' )!.getAttribute( 'href' ) ).toBe( '/studio' );
+    // Where viewers watch, whole, to open and to share.
+    expect( [ ...element.querySelectorAll( 'a' ) ].map( ( a ) => a.getAttribute( 'href' ) ) ).toContain( new URL( '/lessons/7', document.baseURI ).href );
+    // Its place is the element's whole height.
+    expect( ( element.firstElementChild as HTMLElement ).style.height ).toBe( '100%' );
+} );
+
+it( 'tells anyone but the host that the studio page is not theirs', async () => {
+    await place( '<live-stream name="lesson:8" view="studio-page"></live-stream>' );
+    await waitFor( () => expect( shows.get( 'lesson:8' ) ).toBeTruthy() );
+    shows.get( 'lesson:8' )!.update( { status: 'ready', you: { identity: 'u:35', role: 'viewer', name: 'Ava', chat: 'write', mod: false } } );
+    await waitFor( () => expect( document.querySelector( '.estream-studio-page__refused' ) ).toBeTruthy() );
+    expect( document.querySelector( '.estream-studio-page' ) ).toBeNull();
+} );
+
 it( 'leaves the stream once its last element goes, and keeps it for one moved on the page', async () => {
     await place( '<live-stream id="a" name="show:mugs" view="player"></live-stream><live-stream id="b" name="show:mugs" view="chat"></live-stream><section id="elsewhere"></section>' );
     await waitFor( () => expect( shows.get( 'show:mugs' ) ).toBeTruthy() );

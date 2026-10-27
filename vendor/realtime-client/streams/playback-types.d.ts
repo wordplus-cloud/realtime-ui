@@ -96,7 +96,7 @@ export interface SendingStats {
     audio: AudioOut | null;
     transport: TransportOut | null;
 }
-export type PlaybackEventKind = 'joining' | 'joined' | 'first-frame' | 'stalled' | 'resumed' | 'reconnecting' | 'reconnected' | 'rejoined' | 'offline' | 'online' | 'quality' | 'error' | 'left' | 'published' | 'unpublished' | 'too-slow' | 'picture-off' | 'picture-retry';
+export type PlaybackEventKind = 'joining' | 'joined' | 'first-frame' | 'stalled' | 'resumed' | 'reconnecting' | 'reconnected' | 'rejoined' | 'offline' | 'online' | 'quality' | 'error' | 'left' | 'published' | 'unpublished' | 'too-slow' | 'picture-off' | 'picture-retry' | 'hold';
 export interface PlaybackEvent {
     at: number;
     kind: PlaybackEventKind;

@@ -1,6 +1,7 @@
 import { RemoteMediaTrack } from "./remote-track.js";
 import { answerOrder, applyCodecPreferences, chooseSendFamily, familyOf, fastDirection, negotiatedCodec, offerOrder } from "./codecs.js";
 import { VIEW_STEPS } from "./types.js";
+import { QualityWatch } from "./quality.js";
 // How a direct path that has died is left, and how fast.
 //
 // The measure of 19 to 21 Sep 2026 was that every failure took the same
@@ -487,6 +488,10 @@ export class P2PPeer {
         this.brokenCodecs = new Set();
         this.starvedNotedAt = new Map();
         this.peerCaps = null;
+        // How the call is going here, from the stats passes this peer makes
+        // anyway (quality.ts), and which of the other side's sounds are on.
+        this.quality = new QualityWatch();
+        this.expectedAudio = new Set();
         this.connection = 'connecting';
         this.stats = { bytesSent: 0, bytesReceived: 0, rtt: null, packetLoss: 0, quality: 'unknown', candidatePair: null, restarts: 0, codecs: { videoSend: null, videoRecv: null, audioSend: null, audioRecv: null }, impl: { enc: null, dec: null }, counters: { inAudio: 0, inVideo: 0, outAudio: 0, outVideo: 0, remoteAudio: 0, remoteVideo: 0, remoteAt: 0 } };
         this.ownCaps = options.caps;
@@ -624,6 +629,53 @@ export class P2PPeer {
                 this.videoProgress.delete(source);
         }
         this.expectedVideo = new Set(sources);
+    }
+    // Which of the other side's sounds are on, for what a quality reading says
+    // this side plays.
+    setExpectedAudio(sources) {
+        this.expectedAudio = new Set(sources);
+    }
+    // What changed here since the last reading (quality.ts), with the page's
+    // and machine's own; nothing before the connection has had two stats
+    // passes.
+    qualityReading(health) {
+        return this.quality.reading(health);
+    }
+    // Whether redundant audio (RED, RFC 2198) leads the microphone's codecs
+    // each way. What a sender sends is the first of its negotiated codecs,
+    // and a browser sends RED only when it comes first; a stats entry names a
+    // RED stream after the opus inside it, so the parameters are what say.
+    redState() {
+        const transceiver = this.transceivers.get('microphone');
+        if (!transceiver)
+            return null;
+        const leads = (codecs) => String(codecs?.[0]?.mimeType ?? '').toLowerCase() === 'audio/red';
+        try {
+            return { send: leads(transceiver.sender.getParameters().codecs), recv: leads(transceiver.receiver.getParameters().codecs) };
+        }
+        catch (e) {
+            return null;
+        }
+    }
+    // Which sources a quality reading speaks of at this stats pass: this
+    // side's that are live, switched on and not paused for the other side
+    // drawing none of them, and the other side's that are on and shown here.
+    qualityScope(sources) {
+        const sending = new Set();
+        for (const source of SOURCE_ORDER) {
+            const track = this.localTracks.get(source);
+            if (!track || track.readyState !== 'live' || track.enabled === false)
+                continue;
+            if (SOURCE_KIND[source] === 'video' && this.wanted.get(source) === 0)
+                continue;
+            sending.add(source);
+        }
+        return {
+            sources,
+            sending,
+            playing: new Set([...this.expectedVideo, ...this.expectedAudio]),
+            sourceOfTrack: (id) => this.sourceOfInboundTrack(id)
+        };
     }
     get isConnected() {
         const state = this.pc.iceConnectionState;
@@ -2016,6 +2068,11 @@ export class P2PPeer {
                 }
             });
             const now = Date.now();
+            // The same report, for the quality reading the next pulse may
+            // carry: only while connected, which is when there is a call to
+            // tell of.
+            if (this.isConnected)
+                this.quality.tick(report, this.qualityScope(sources), now);
             // The test switch holds this side's view of its inbound still
             // while the packets really do arrive, so the verdict and the
             // road after it can be walked on a working network.

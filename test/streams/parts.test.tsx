@@ -743,8 +743,12 @@ describe( 'the studio page', () => {
     } );
 
     it( 'counts those asking to join on the Guests tab while live, and tells someone who isn\'t a host', () => {
-        const { at } = show( live( { you: host, hands: [ { identity: 'u:4', name: 'Jordan', at: Date.now() - 60_000 } ] } ), [ 'studio-page' ], { options, guests: true } );
+        const { at, update } = show( live( { you: host, hands: [ { identity: 'u:4', name: 'Jordan', at: Date.now() - 60_000 } ] } ), [ 'studio-page' ], { options, guests: true } );
         expect( within( at( 'studio-page' ) ).getByRole( 'tab', { name: 'Guests 1' } ) ).toBeTruthy();
+
+        // Ended: the hands left over are no one's to invite, and the tab counts none.
+        update( { stream: { id: 's', state: 'ended', started_at: 1, ended_at: 2 } } );
+        expect( within( at( 'studio-page' ) ).getByRole( 'tab', { name: 'Guests' } ) ).toBeTruthy();
         cleanup();
         document.body.innerHTML = '';
 

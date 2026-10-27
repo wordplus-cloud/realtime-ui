@@ -54,6 +54,11 @@ export interface CallParticipant {
     // "optimizing" to their "ready"; `me` while the user's own moves): the tile says "Optimizing video quality..." over
     // their last frame (optimizing.tsx), and keeps its place in the grid as a tile with a picture does
     videoOptimizing?: boolean,
+    // what of theirs stopped arriving while they are still in the call and nothing holds it back (no mute, no pause),
+    // as whoever runs the call reads it off what it receives: `video` their camera, while their sound still comes or
+    // their microphone is off; `all` their sound too. Their last frame is blurred, so it doesn't pass for live, and the
+    // tile says "Video interrupted", or "Reconnecting..." as for a tile away for a moment (stalled.tsx)
+    stalled?       : 'video' | 'all' | null,
 }
 
 export type CallAction = 'outgoing_call' | 'incoming_call' | 'call_in_progress' | 'connecting';

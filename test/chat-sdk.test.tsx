@@ -199,6 +199,27 @@ describe( 'the chat on the conversation the app keeps', () => {
         expect( container.querySelector( '.bm-history-start' )?.getAttribute( 'data-visible' ) ).toBeNull();
     } );
 
+    it( 'names the people of a group by the names and pictures the page gives, where the directory knows them not', async () => {
+        const at = Date.now() - 60_000;
+        const { rt } = chatWith();
+        // Cara (77) wrote in the channel but has not been online for days: the directory has no Cara.
+        const load = vi.fn( async () => ( {
+            messages: [
+                { id: 'k1', from: 77, text: 'Design review at three?', at },
+                { id: 'k2', from: 42, text: 'Works for me', at: at + 1000 },
+            ],
+            more: false,
+        } ) );
+        const { container } = render( <Chat rt={ rt } room="chat:34:42" load={ load } people={ { 77: { name: 'Cara', avatar: '/people/cara.jpg' } } } /> );
+        await settle();
+
+        const stack = ( id: string ) => container.querySelector( `[data-message-id="${ id }"]` )!.closest( '.bm-msg-stack' )!;
+        expect( stack( 'k1' ).querySelector( '.bm-name' )?.textContent ).toBe( 'Cara' );
+        expect( stack( 'k1' ).innerHTML ).toContain( '/people/cara.jpg' );
+        // Ben, whom the page leaves out, by the directory.
+        expect( stack( 'k2' ).querySelector( '.bm-name' )?.textContent ).toBe( 'Ben' );
+    } );
+
     it( 'pages back through the app, not the room, and leaves out a room message older than the app\'s page', async () => {
         const at = Date.now() - 60_000;
         const { rt, room } = chatWith( [ { event: 'message', data: { text: 'Older, on the app\'s next page' }, id: 'k0', at: at - 5000, from: '42' } ] );

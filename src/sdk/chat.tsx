@@ -60,6 +60,13 @@ export interface ChatProps {
     name?: string;
     avatar?: string;
     /**
+     * The names and pictures of the people in a group conversation, by id, where the page has them, as `name` and
+     * `avatar` give the other person's in a chat between two: on their messages and as they type. Someone the page
+     * leaves out takes the directory's, which knows a person for a day after they were last online, so the older
+     * messages of a channel keep the names of those who wrote them.
+     */
+    people?: Record<string, { name: string; avatar?: string }>;
+    /**
      * The conversation's own call, which shows in the chat while it is on: `true` for the call named as the room, or
      * the call's name (`{pair}` the page's user and `to` in order). Beside the messages where the chat is wide, over
      * them where it is narrow, its controls showing and hiding them. The page's CallScreen rings for it and runs it,
@@ -83,14 +90,18 @@ export function Chat( { components, messages, load, ...props }: ChatProps ) {
     return <PiecesProvider pieces={ components }><Conversation { ...props } load={ load ?? fromRoute } /></PiecesProvider>;
 }
 
-function Conversation( { rt, room, events, reactions = DEFAULT_REACTIONS, maxLength = 0, placeholder, locale, load, onSent, to, name, avatar, call, startCall }: Omit<ChatProps, "components"> ) {
+function Conversation( { rt, room, events, reactions = DEFAULT_REACTIONS, maxLength = 0, placeholder, locale, load, onSent, to, name, avatar, people, call, startCall }: Omit<ChatProps, "components"> ) {
     const chat = useChat( { rt, room, events, maxLength, load, onSent } );
     const { me, messages, history, writers } = chat;
     const other = to === undefined || to === null || to === "" ? null : String( to );
     const ownCall = useChatCall( rt, room, call, other );
     const peer = useChatPeer( rt, other, chat.person, { name, avatar } );
-    // The other person by the name and picture the page gave, on their messages too.
-    const person = ( id: string ) => peer && id === peer.id ? { ...chat.person( id ), name: peer.name, avatar: peer.avatar } : chat.person( id );
+    // The other person, and anyone of a group, by the name and picture the page gave, on their messages too.
+    const person = ( id: string ) => {
+        if ( peer && id === peer.id ) return { ...chat.person( id ), name: peer.name, avatar: peer.avatar };
+        const given = people?.[ id ];
+        return given ? { ...chat.person( id ), name: given.name, ...( given.avatar ? { avatar: given.avatar } : {} ) } : chat.person( id );
+    };
     useStartCall( ownCall, startCall, peer );
     const lang = locale ?? ( ( typeof document !== "undefined" && document.documentElement.lang ) || undefined );
 

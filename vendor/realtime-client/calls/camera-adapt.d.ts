@@ -26,7 +26,7 @@
  *
  * Screens and microphones are never moved: only a camera's sender is watched, and only a camera republished.
  */
-import { type CameraCodec, type CameraCodecCaps, type CodecPolicy } from "./room-publish.js";
+import { type CallSettings, type CameraCodec, type CameraCodecCaps, type CodecPolicy } from "./room-publish.js";
 import { type CameraCheckOptions, type CameraSwitch, type CheckedCameraChoice } from "./camera-check.js";
 /** At most this many moves a call (tune.switchesMax, 0 none): in practice one, a second only when the codec moved to fails as well. */
 export declare const CAMERA_SWITCHES_MAX: number;
@@ -86,7 +86,7 @@ export declare function stepsDown(codec: CameraCodec, lines: number): boolean;
  * its CPU on its own. Answers the lines it has then; null where it couldn't be brought down, which a product moves to
  * another codec instead.
  */
-export declare function stepDownCamera(track: MediaStreamTrack, sender: RTCRtpSender | null | undefined, codec: CameraCodec, to?: number): Promise<number | null>;
+export declare function stepDownCamera(track: MediaStreamTrack, sender: RTCRtpSender | null | undefined, codec: CameraCodec, to?: number, settings?: CallSettings | null): Promise<number | null>;
 /**
  * The codec a camera moves to once `from` failed in this call: checkedCameraChoice() without `from`, without whatever
  * else failed in this call (guard.failed) and what this browser remembers failing (as long as the policy's tune keeps

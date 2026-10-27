@@ -5,6 +5,58 @@ const CAMERA_CODECS = ['h265', 'h264', 'vp8', 'vp9', 'av1'];
  * VideoToolbox or Media Foundation (an AMD encoder), and Constrained Baseline not, which it encodes in OpenH264.
  */
 export const CHROMIUM_H264_ENCODE = 'video/H264;profile-level-id=42002a;packetization-mode=1';
+/** A number of the settings, or `fallback` without them, or where they give no number. */
+export function settingNumber(settings, key, fallback) {
+    const v = settings?.get(key);
+    return typeof v === 'number' && Number.isFinite(v) ? v : fallback;
+}
+/** A switch of the settings, or `fallback`. */
+export function settingFlag(settings, key, fallback) {
+    const v = settings?.get(key);
+    return typeof v === 'boolean' ? v : fallback;
+}
+/** A word of the settings, or `fallback`. */
+export function settingWord(settings, key, fallback) {
+    const v = settings?.get(key);
+    return typeof v === 'string' && v ? v : fallback;
+}
+/**
+ * The policy a product's camera and screen go by: from the node's settings once it sent any (settings.rev 0 or more),
+ * which say everything the codec policy does and more, else the codec policy as a node before them sends it (rtc-client's
+ * Room.meshCodecPolicy). A node of the settings sends both, the policy made from the same document, so either way a
+ * browser publishes alike. The settings go with it (CodecPolicy.settings).
+ */
+export function callPolicy(codecPolicy, settings) {
+    if (!settings || !(settings.rev >= 0))
+        return codecPolicy ?? null;
+    const policy = { settings };
+    const list = (key) => {
+        const v = settings.has(key) ? settings.get(key) : null;
+        return Array.isArray(v) && v.length ? v.filter((x) => typeof x === 'string') : undefined;
+    };
+    const camera = list('camera.codecs'), screen = list('screen.codecs');
+    if (camera)
+        policy.camera = camera;
+    if (screen)
+        policy.screen = screen;
+    if (settings.has('camera.backup'))
+        policy.backup = settingWord(settings, 'camera.backup', 'vp8');
+    policy.check = settingFlag(settings, 'check.enabled', true);
+    policy.adapt = settingFlag(settings, 'adapt.enabled', true);
+    if (settings.has('camera.codecRules')) {
+        const rules = settings.get('camera.codecRules');
+        if (Array.isArray(rules))
+            policy.rules = rules;
+    }
+    const tune = {};
+    for (const name of Object.keys(CAMERA_TUNE_DEFAULTS)) {
+        if (settings.has('tune.' + name))
+            tune[name] = settingNumber(settings, 'tune.' + name, CAMERA_TUNE_DEFAULTS[name]);
+    }
+    if (Object.keys(tune).length)
+        policy.tune = tune;
+    return policy;
+}
 /** The numbers where the policy gives none. */
 export const CAMERA_TUNE_DEFAULTS = Object.freeze({
     // room for two codecs measured: VP9 and then the hardware H.264 on Windows, 1.9 s each at most
@@ -69,18 +121,25 @@ export function cameraTune(policy, now = Date.now()) {
 }
 const DAY_MS = 24 * 3600 * 1000;
 /**
- * The rules where the policy has no `rules` key: Windows and Linux (ChromeOS too, cameraEnvironment()), every browser
- * and kind of device, put VP9 first, ahead of a hardware H.264 that may drop frames there (Chrome trusts no Windows
- * encoder's rate control for H.264). These are also the only machines the camera check measures by default
- * (camera-check.ts). A Mac, an iPhone or iPad and Android are named by none: their hardware H.264 goes out first,
- * unmeasured. A week of calls to 2026-10-24 (production traces, viewers' freezes by sender): hardware H.264 frozen
- * 2.1% of the time watched from Windows, 13% of its 91 senders 5% or more, 3.7% from Linux and ChromeOS, 1.5% from a Mac
- * and from iOS, 0.7% from an Android browser, none of its 19 senders 5% or more. So Android stays on hardware H.264
- * first, like a Mac and iOS, in browsers and the app; VP9 goes first only on Windows, Linux and the rest.
+ * The rules where the policy has no `rules` key, and the only machines the camera check measures by default
+ * (camera-check.ts): Windows and Linux (ChromeOS too, cameraEnvironment()), every browser, kind of device and GPU.
+ *
+ * Windows measures its hardware H.264 first (1.0.55), then VP9, then VP8. Many Windows encoders carry a camera well, and
+ * the ones that don't drop whole frames (Chrome turns its own rate control off over AMD's and Qualcomm's H.264 encoder:
+ * Chromium's gpu_driver_bug_list.json, entries 448 and 449), which the check counts before the camera goes out and the
+ * call's watch counts after (encoder-watch.ts): either way the camera goes on in VP9, remembered for a month. Whichever
+ * encoder Chrome opens is what is measured, not a GPU's name: on a PC with two GPUs, WebGPU's name for one says nothing
+ * of the encoder, which Chrome picks among every hardware H.264 encoder there by merit (1.0.50 went by the name, 1.0.54
+ * put VP9 first everywhere instead). Linux keeps VP9 first: Chrome there encodes nothing in hardware by default.
+ *
+ * A Mac, an iPhone or iPad and Android are named by none: their hardware H.264 goes out first, unmeasured. A week of
+ * calls to 2026-10-24 (production traces, viewers' freezes by sender): hardware H.264 frozen 2.1% of the time watched
+ * from Windows, 13% of its 91 senders 5% or more, 3.7% from Linux and ChromeOS, 1.5% from a Mac and from iOS, 0.7% from
+ * an Android browser, none of its 19 senders 5% or more. A node's own rules may still name a GPU (cameraRuleFor()).
  * Firefox sends VP8 wherever it is (codecsOf()).
  */
 export const DEFAULT_CAMERA_RULES = Object.freeze([
-    { os: 'windows', camera: ['vp9', 'h264:hw', 'vp8'] },
+    { os: 'windows', camera: ['h264:hw', 'vp9', 'vp8'] },
     { os: 'linux', camera: ['vp9', 'h264:hw', 'vp8'] }
 ]);
 /** The rules policy gives: its `rules` (none where the key holds anything but a list), else DEFAULT_CAMERA_RULES. */
@@ -160,9 +219,15 @@ export function rememberAdapter(name) {
 export function knownAdapter() {
     return adapterName;
 }
-/** Whether any of rules names a graphics maker: a check waits for the adapter's name only then. */
-export function rulesNeedGpu(rules) {
-    return rules.some((r) => !!r && typeof r === 'object' && r.gpu !== undefined);
+/**
+ * Whether any of rules names a graphics maker: a check waits for the adapter's name only then. Given env (this browser's,
+ * its GPU not read yet), only a rule that could match it counts, so a Mac's camera doesn't wait for the adapter's name
+ * of a rule for Windows.
+ */
+export function rulesNeedGpu(rules, env) {
+    return rules.some((r) => !!r && typeof r === 'object' && r.gpu !== undefined
+        && (!env || ((r.os === undefined || r.os === env.os) && (r.browser === undefined || r.browser === env.browser)
+            && (r.device === undefined || r.device === env.device))));
 }
 /**
  * Where a browser remembers the codecs whose hardware encoder dropped frames on it (encoder-watch.ts tells why), and
@@ -494,16 +559,25 @@ const cameraList = (options) => {
  * room. The built-in rules (a policy without the key) only where the camera's list has VP9 (on the mesh), so a camera off
  * it, or under a policy without VP9, keeps its list as it was; the node's own rules as they are. Null where none matches.
  */
-export function cameraRuleOrder(agent, options = {}) {
+export function cameraRuleOrder(agent, options = {}, builtIn = DEFAULT_CAMERA_RULES) {
     if (legacyCamera(options) || options.encrypted)
         return null;
     const policy = options.policy ?? null;
     const own = !!policy && Object.prototype.hasOwnProperty.call(policy, 'rules');
     if (!own && !cameraList(options).some((e) => nameOf(e) === 'vp9'))
         return null;
-    const rule = cameraRuleFor(cameraRules(policy), cameraEnvironment(agent, options.gpu !== undefined ? options.gpu : adapterName));
+    const rule = cameraRuleFor(own ? cameraRules(policy) : builtIn, cameraEnvironment(agent, options.gpu !== undefined ? options.gpu : adapterName));
     return rule ? rule.camera : null;
 }
+/**
+ * The built-in rules a call's screen takes where the policy has no `rules` key: VP9 first on Windows and Linux, as the
+ * camera's were until 1.0.55. A screen in VP9 in one layer marked motion was measured the smoothest from Windows, and
+ * the camera's measuring of its hardware H.264 says nothing of a screen's.
+ */
+export const DEFAULT_SCREEN_RULES = Object.freeze([
+    { os: 'windows', camera: ['vp9', 'h264:hw', 'vp8'] },
+    { os: 'linux', camera: ['vp9', 'h264:hw', 'vp8'] }
+]);
 /**
  * A camera on the old rules exactly, as before the camera check: not a checked call's (a stream's, the SDK's group
  * calls'), or one whose node didn't turn the check on (its policy's `check` anything but true: an older mesh, a
@@ -560,12 +634,27 @@ export function encodesInHardware(codec, agent, hardware, options = {}) {
     return inHardware(codec, agent, hardware, options);
 }
 /**
- * The screen's codec, as cameraCodecFor() the camera's (the server's policy's screen list; VP8 without one). A camera's
- * dropped frames don't steer it: a screen costs an encoder little but where it moves, and VP8 shares a screen worse.
+ * The screen's codecs on this device, in the order to try them: the server's policy's screen list as it is; else the
+ * rule for this machine (cameraRuleOrder(): the node's rules where it sends them, else DEFAULT_SCREEN_RULES, Windows and
+ * Linux VP9 first, then hardware H.264, then VP8), without what its camera won't send here (hardware that dropped
+ * frames, software too heavy for its CPU), as a call's camera has it; else DEFAULT_SCREEN_POLICY, a Mac, iOS and
+ * Android in hardware H.264. A Windows PC's hardware H.264 gets no rate control Chrome trusts, and its screen went out
+ * at 15 frames or fewer from an AMD encoder. VP8 last, alone from Firefox and in an encrypted room. The rule is the
+ * machine's whatever its GPU (1.0.51): where a node's rule puts a camera on some GPU in hardware H.264, its screen stays
+ * in VP9 in one layer marked motion, as measured smoothest from Windows, and the same whether a camera check read the
+ * GPU's name on this page or not. A Windows camera measured in hardware H.264 first (1.0.55) leaves its screen in VP9.
  */
+export function screenCodecOrder(agent, hardware, options = {}) {
+    if (options.policy?.screen?.length)
+        return codecsOf(options.policy.screen, agent, hardware, options);
+    const ruled = cameraRuleOrder(agent, { ...options, gpu: null }, DEFAULT_SCREEN_RULES);
+    if (ruled)
+        return codecsOf(ruled, agent, hardware, { ...options, avoid: avoidOf(agent, options) });
+    return codecsOf(DEFAULT_SCREEN_POLICY, agent, hardware, options);
+}
+/** The screen's codec, the first of screenCodecOrder(). */
 export function screenCodecFor(agent, hardware, options = {}) {
-    const list = options.policy?.screen?.length ? options.policy.screen : DEFAULT_SCREEN_POLICY;
-    return pickCodec(list, agent, hardware, options);
+    return screenCodecOrder(agent, hardware, options)[0];
 }
 /**
  * What probeCodecCaps() says this device encodes, for cameraCodecFor(), and what its WebRTC sends at all (`sendable`,
@@ -608,9 +697,13 @@ export function roomCallCodec(caps, agent, options = {}) {
  * what this browser found of it (vp9Height(): VP9_TOP_HEIGHT once measured able there, CAMERA_STEP_DOWN_HEIGHT else).
  */
 export function choiceHeight(codec, hardware, agent, options = {}) {
+    const settings = options.policy?.settings;
     if (codec !== 'vp9' || hardware || legacyCamera(options) || options.encrypted)
-        return cameraMaxHeight(codec, hardware);
-    return vp9Height(agent, Date.now(), cameraTune(options.policy));
+        return cameraMaxHeight(codec, hardware, settings);
+    // camera.vp9FullHdAfterCheck false (1.0.53): VP9 in software at the software height, however it measured
+    if (!settingFlag(settings, 'camera.vp9FullHdAfterCheck', true))
+        return cameraMaxHeight(codec, false, settings);
+    return Math.min(vp9Height(agent, Date.now(), cameraTune(options.policy)), Math.max(cameraMaxHeight(codec, true, settings), CAMERA_STEP_DOWN_HEIGHT));
 }
 /** roomCallCodec(), with what cameraPublish() and fitCameraTrack() need to know of it. */
 export function roomCallChoice(caps, agent, options = {}) {
@@ -643,33 +736,55 @@ export function backupFor(codec, policy) {
  * either at those. VP9 and AV1 go as one SVC stream (scalabilityMode), at about 70% and 60% of VP8's.
  *
  * backupCodec: what goes behind it (CameraChoice.backup); VP8 when not given, and nothing behind VP8.
+ *
+ * settings (1.0.53): the node's, which give each of these numbers (camera.ladder.1080, camera.ladder.720,
+ * camera.topKbps.<codec>.<1080|720>, camera.fps, camera.svcMode); without them, the ones above.
  */
-export function cameraPublish(codec, height, backupCodec) {
+export function cameraPublish(codec, height, backupCodec, settings) {
     if (height < 720)
         return null;
     const full = height >= 1080;
+    const size = full ? '1080' : '720';
+    const fps = Math.round(settingNumber(settings, 'camera.fps', 30));
+    const top = (name, fallback) => ({
+        maxBitrate: Math.round(settingNumber(settings, `camera.topKbps.${name}.${size}`, fallback / 1000) * 1000),
+        maxFramerate: fps
+    });
     const tops = {
-        h265: { maxBitrate: full ? H265_TOP_1080 : H265_TOP_720, maxFramerate: 30 },
-        h264: { maxBitrate: full ? 3500000 : 1800000, maxFramerate: 30 },
-        vp8: { maxBitrate: full ? 4000000 : 2000000, maxFramerate: 30 },
-        vp9: { maxBitrate: full ? 2800000 : 1400000, maxFramerate: 30 },
-        av1: { maxBitrate: full ? 2400000 : 1200000, maxFramerate: 30 }
+        h265: top('h265', full ? H265_TOP_1080 : H265_TOP_720),
+        h264: top('h264', full ? 3500000 : 1800000),
+        vp8: top('vp8', full ? 4000000 : 2000000),
+        vp9: top('vp9', full ? 2800000 : 1400000),
+        av1: top('av1', full ? 2400000 : 1200000)
     };
     const behind = codec === 'vp8' ? null : backupCodec === undefined ? 'vp8' : backupCodec === 'h264' && codec === 'h264' ? 'vp8' : backupCodec;
     return {
         codec,
         top: tops[codec],
-        layers: full ? [
-            { width: 480, height: 270, bitrate: 400000, fps: 30 },
-            { width: 960, height: 540, bitrate: 1200000, fps: 30 }
-        ] : [
-            { width: 320, height: 180, bitrate: 200000, fps: 30 },
-            { width: 640, height: 360, bitrate: 600000, fps: 30 }
-        ],
-        ...(codec === 'vp9' || codec === 'av1' ? { scalabilityMode: 'L3T3_KEY' } : {}),
+        layers: ladderOf(settings, size),
+        ...(codec === 'vp9' || codec === 'av1' ? { scalabilityMode: settingWord(settings, 'camera.svcMode', 'L3T3_KEY') } : {}),
         backup: behind ? tops[behind] : null,
         backupCodec: behind
     };
+}
+/** The lower layers of a camera at 1080 or 720 lines, smallest first, each 16:9 of an even width (camera.ladder.*). */
+function ladderOf(settings, size) {
+    const fallback = size === '1080' ? [
+        { width: 480, height: 270, bitrate: 400000, fps: 30 },
+        { width: 960, height: 540, bitrate: 1200000, fps: 30 }
+    ] : [
+        { width: 320, height: 180, bitrate: 200000, fps: 30 },
+        { width: 640, height: 360, bitrate: 600000, fps: 30 }
+    ];
+    const given = settings?.has('camera.ladder.' + size) ? settings.get('camera.ladder.' + size) : null;
+    if (!Array.isArray(given) || !given.length)
+        return fallback;
+    const top = size === '1080' ? 1080 : 720;
+    const layers = given
+        .filter((l) => !!l && [l.h, l.kbps, l.fps].every((n) => typeof n === 'number' && Number.isFinite(n)))
+        .filter((l) => l.h < top)
+        .map((l) => ({ width: evenOf(l.h * 16 / 9), height: Math.round(l.h), bitrate: Math.round(l.kbps * 1000), fps: Math.round(l.fps) }));
+    return layers.length ? layers : fallback;
 }
 /**
  * The tallest picture a camera goes out at in a room, by its codec. VP8 is encoded in software on every computer, and
@@ -682,9 +797,13 @@ export function cameraPublish(codec, height, backupCodec) {
  * hardware: whether this device encodes it in hardware (CameraChoice.hardware); not given, H.264 and H.265 are taken
  * to be, VP8, VP9 and AV1 not. Any codec in software goes out from 720 lines: VP9 and AV1 cost a CPU more than VP8.
  * The one exception is a checked call camera in VP9 that this browser measured able at 1080 (choiceHeight()).
+ *
+ * settings (1.0.53): camera.maxHeight.hw and camera.maxHeight.sw, the node's to change; 1080 and 720 without them.
  */
-export function cameraMaxHeight(codec, hardware) {
-    return (hardware ?? (codec === 'h264' || codec === 'h265')) ? 1080 : 720;
+export function cameraMaxHeight(codec, hardware, settings) {
+    return (hardware ?? (codec === 'h264' || codec === 'h265'))
+        ? Math.round(settingNumber(settings, 'camera.maxHeight.hw', 1080))
+        : Math.round(settingNumber(settings, 'camera.maxHeight.sw', 720));
 }
 /**
  * Brings a camera down to cameraMaxHeight() for its codec before it is published (or to `maxHeight`, a choice's
@@ -695,9 +814,9 @@ export function cameraMaxHeight(codec, hardware) {
  *
  * And a camera opened in a mode of fewer than CAMERA_MIN_FPS frames is tried at smaller sizes (fasterCameraMode).
  */
-export async function fitCameraTrack(track, codec, hardware, maxHeight) {
+export async function fitCameraTrack(track, codec, hardware, maxHeight, settings) {
     const { width, height } = cameraSize(track);
-    const max = maxHeight && maxHeight > 0 ? maxHeight : cameraMaxHeight(codec, hardware);
+    const max = maxHeight && maxHeight > 0 ? maxHeight : cameraMaxHeight(codec, hardware, settings);
     if (height > max) {
         let constraints;
         try {
@@ -713,7 +832,7 @@ export async function fitCameraTrack(track, codec, hardware, maxHeight) {
         if (constraints)
             await applyWithin(track, constraints);
     }
-    await fasterCameraMode(track);
+    await fasterCameraMode(track, settings);
     return cameraSize(track).height;
 }
 const FIT_TIMEOUT_MS = 2000;
@@ -757,8 +876,9 @@ const CAMERA_FASTER_TRIES = 2;
  * A camera opened in a mode of fewer than CAMERA_MIN_FPS frames (its settings' frameRate, the mode's, not what a dim
  * room leaves of it) is asked for smaller sizes at 30 frames, and kept at the first whose mode gives CAMERA_MIN_FPS or
  * more; none does, it goes back to what it was asked before. A browser that says no frame rate is left as it is.
+ * settings (1.0.53): camera.minFps, the node's (0: never); CAMERA_MIN_FPS without them.
  */
-export async function fasterCameraMode(track) {
+export async function fasterCameraMode(track, settings) {
     const rate = () => {
         try {
             return track.getSettings().frameRate ?? 0;
@@ -767,8 +887,9 @@ export async function fasterCameraMode(track) {
             return 0;
         }
     };
+    const minFps = settingNumber(settings, 'camera.minFps', CAMERA_MIN_FPS);
     const fps = rate();
-    if (!fps || fps >= CAMERA_MIN_FPS)
+    if (!minFps || !fps || fps >= minFps)
         return;
     const { width, height } = cameraSize(track);
     if (!height)
@@ -800,7 +921,7 @@ export async function fasterCameraMode(track) {
         else
             delete constraints.width;
         await applyWithin(track, constraints);
-        if (rate() >= CAMERA_MIN_FPS)
+        if (rate() >= minFps)
             return;
     }
     await applyWithin(track, before);
@@ -813,6 +934,14 @@ const H265_TOP_1080 = 2500000;
 const H265_TOP_720 = 1300000;
 /** A shared screen in a group call: up to 10 Mbit/s at 30 frames, the library's own is 1080p at 15 and 2.5. */
 export const SCREEN_ENCODING = { maxBitrate: 10000000, maxFramerate: 30, priority: 'medium' };
+/** SCREEN_ENCODING as the node's settings give it (screen.maxKbps, screen.fps), 1.0.53: live, applyScreenSettings(). */
+export function screenEncoding(settings) {
+    return {
+        maxBitrate: Math.round(settingNumber(settings, 'screen.maxKbps', SCREEN_ENCODING.maxBitrate / 1000) * 1000),
+        maxFramerate: Math.round(settingNumber(settings, 'screen.fps', SCREEN_ENCODING.maxFramerate)),
+        priority: SCREEN_ENCODING.priority
+    };
+}
 /**
  * A shared screen's track is marked motion, and its sender keeps its resolution when it must give: smooth wherever the
  * upload and the CPU allow, and sharp where they don't. Marked detail, as it was, Chrome encodes it in its
@@ -820,25 +949,21 @@ export const SCREEN_ENCODING = { maxBitrate: 10000000, maxFramerate: 30, priorit
  * VideoToolbox went out at 10 frames a second on 3.9 of the 10 Mbit/s it may take, at an average quantizer of 43;
  * marked motion, 24-26 frames at 42, and text as sharp as before (16 in H.264, 2 in VP8 where detail gave 15), on more
  * bits (the mesh lab's TestScreenShareBusyMatrix, 2026-10-18; a Windows PC's share in H.264 from its AMD encoder went
- * out at 15 frames or fewer): smooth without losing details. That is H.264's and VP8's: a screen in VP9 or AV1 is the
- * other way round (SCREEN_CONTENT_HINT_SVC).
+ * out at 15 frames or fewer): smooth without losing details. A screen in VP9 or AV1 too, in one layer
+ * (SCREEN_SCALABILITY_MODE_SVC).
  */
 export const SCREEN_CONTENT_HINT = 'motion';
 export const SCREEN_DEGRADATION = 'maintain-resolution';
 /**
- * A shared screen's track in VP9 or AV1 is marked detail (1.0.44): Chrome encodes it in its screen-content mode, which
- * keeps scrolled text sharp, where marked motion it encodes it as camera video, which blurs it. Chromium 156, a 1080-line
- * page scrolled every frame on a 5 Mbit/s budget, one spatial layer: motion at an average quantizer of 208 of 255 and 7
- * frames a second on 4.7 Mbit/s, detail at 152 and 18 frames on 3.5. The screen-content mode sends nothing of a screen
- * in two spatial layers, so such a screen goes out in one (@wordplus/rtc-client 1.0.19 keeps the hint for it).
+ * A screen in VP9 or AV1 goes out in one layer, no temporal layers, marked motion as H.264 is (1.0.47; @wordplus/rtc-client
+ * 1.0.20 keeps the mode and the mark). Chromium 156, a room's share of 1440 lines on up to 10 Mbit/s: marked motion in
+ * L1T1, a page scrolled every frame at 28 to 29 frames a second and an average quantizer of 10.6, a video with a cut
+ * every 2 s at 27 to 29 frames; marked motion with temporal layers (L1T2, L1T3), the scrolled page fell to 5 to 8 frames
+ * at 208 of 255 in every run; marked detail (1.0.44 to 1.0.46), 19 to 26 frames at 32 on a fifth of the budget, as
+ * Chrome's screen-content mode holds frames back. Shared from a Windows PC through the mesh, motion in L1T1 was the
+ * smoothest of the three. A viewer that can't take it whole gets it whole, as a VP8 screen.
  */
-export const SCREEN_CONTENT_HINT_SVC = 'detail';
-/**
- * A screen in VP9 or AV1 goes out in one spatial layer of two frame rates (1.0.45; @wordplus/rtc-client 1.0.20 keeps
- * it, earlier ones send L1T3). Chromium 156, 1080 lines on a 5 Mbit/s budget, marked detail: a page scrolled every
- * frame at an average quantizer of 141 against L1T3's 152, a video with a cut every 2 s at 20 frames a second against 14.
- */
-export const SCREEN_SCALABILITY_MODE_SVC = 'L1T2';
+export const SCREEN_SCALABILITY_MODE_SVC = 'L1T1';
 /**
  * A screen in H.264 or H.265 from 1280 by 640 goes out in two pictures: the whole one for everyone who can take it, and
  * one half its size at 15 frames for a connection that can't (Opera behind a VPN froze on a 2560×1428 share it could
@@ -850,34 +975,61 @@ export const SCREEN_SCALABILITY_MODE_SVC = 'L1T2';
  * frames and 20 (TestScreenShareQualityMatrix, 2026-10-18; a Windows PC's share, its CPU and upload idle, "not smooth,
  * framerate seems to be bad"). Smaller screens go out whole.
  *
- * In VP9 or AV1 it goes out whole, one spatial layer of two frame rates (SCREEN_SCALABILITY_MODE_SVC), marked detail
- * (SCREEN_CONTENT_HINT_SVC): sharp as it scrolls, where two spatial layers can be had only as camera video, which blurs
- * it, and two pictures not at all (the mesh's worker refuses VP9 and AV1 as simulcast). A viewer that can't take it
- * whole is given half its frames.
+ * In VP9 or AV1 it goes out whole, one layer marked motion (SCREEN_SCALABILITY_MODE_SVC): two spatial layers blur a
+ * scrolled page, temporal layers drop its frames, and two pictures can't be had at all (the mesh's worker refuses VP9
+ * and AV1 as simulcast).
  */
-export function screenPublish(width, height, codec = 'vp8') {
+export function screenPublish(width, height, codec = 'vp8', settings) {
+    // 1.0.53: the node's numbers (screen.simulcastFromWidth/Height, screen.lowLayerKbps/Fps, screen.contentHint), and
+    // screen.vp8Simulcast, the apps' rule (a large screen in VP8 with the half layer), off by default
+    const contentHint = settingWord(settings, 'screen.contentHint', SCREEN_CONTENT_HINT);
+    const fromW = settingNumber(settings, 'screen.simulcastFromWidth', 1280), fromH = settingNumber(settings, 'screen.simulcastFromHeight', 640);
     if (codec === 'vp9' || codec === 'av1')
-        return { codec, layer: null, simulcast: false, contentHint: SCREEN_CONTENT_HINT_SVC, scalabilityMode: SCREEN_SCALABILITY_MODE_SVC };
-    if ((codec !== 'h264' && codec !== 'h265') || width < 1280 || height < 640)
-        return { codec, layer: null, simulcast: false, contentHint: SCREEN_CONTENT_HINT };
-    return { codec, layer: { width: Math.round(width / 2), height: Math.round(height / 2), bitrate: 1500000, fps: 15 }, simulcast: true, contentHint: SCREEN_CONTENT_HINT };
+        return { codec, layer: null, simulcast: false, contentHint, scalabilityMode: SCREEN_SCALABILITY_MODE_SVC };
+    const layered = codec === 'h264' || codec === 'h265' || (codec === 'vp8' && settingFlag(settings, 'screen.vp8Simulcast', false));
+    if (!layered || width < fromW || height < fromH)
+        return { codec, layer: null, simulcast: false, contentHint };
+    return {
+        codec,
+        layer: {
+            width: Math.round(width / 2), height: Math.round(height / 2),
+            bitrate: Math.round(settingNumber(settings, 'screen.lowLayerKbps', 1500) * 1000),
+            fps: Math.round(settingNumber(settings, 'screen.lowLayerFps', 15))
+        },
+        simulcast: true,
+        contentHint
+    };
 }
 /**
  * A shared screen sent for a video played on it, the presenter's "Optimize for video" (1.0.45): marked motion, which
- * Chrome encodes as camera video, and keeping its frame rate when the link or the CPU can't give both, so a cut in the
- * video comes out whole at once. In the screen-content mode a VP9 screen of a video with a cut every 2 s went out at 14
- * frames a second, each cut rough for the frames after it; marked motion, at 27. Text blurs as it scrolls, so the
- * presenter turns it on for a video and off again.
+ * Chrome encodes as camera video, and keeping its frame rate when the link or the CPU can't give both. In the
+ * screen-content mode a VP9 screen of a video with a cut every 2 s went out at 14 frames a second, each cut rough for
+ * the frames after it; marked motion, at 27.
  */
 export const SCREEN_DEGRADATION_VIDEO = 'maintain-framerate';
 /**
- * How a screen shared in `codec` is sent: for a video played on it (forVideo), or as screenPublish marks it. A direct
- * call marks its share detail in every codec (it sends a screen in the codec that keeps text), so it passes 'vp9'.
+ * A direct call's shared screen is marked detail, Chrome's screen-content mode, in every codec: it goes out in the codec
+ * that keeps text (codecs.ts), AV1 or VP9 first. Rooms mark theirs motion (SCREEN_CONTENT_HINT).
  */
-export function screenVideoMode(codec, forVideo) {
+export const DIRECT_SCREEN_CONTENT_HINT = 'detail';
+/**
+ * How a room's screen shared in `codec` is sent: for a video played on it (forVideo), its frame rate kept, or as
+ * screenPublish marks it, its resolution kept. Marked motion either way, in every codec. settings (1.0.53):
+ * screen.contentHint and screen.degradation, the node's ("default" there: balanced, the browser's own); a video's
+ * frame rate is kept whatever they say.
+ */
+export function screenVideoMode(codec, forVideo, settings) {
+    const contentHint = settingWord(settings, 'screen.contentHint', SCREEN_CONTENT_HINT);
     if (forVideo)
-        return { contentHint: SCREEN_CONTENT_HINT, degradationPreference: SCREEN_DEGRADATION_VIDEO };
-    return { contentHint: codec === 'vp9' || codec === 'av1' ? SCREEN_CONTENT_HINT_SVC : SCREEN_CONTENT_HINT, degradationPreference: SCREEN_DEGRADATION };
+        return { contentHint: 'motion', degradationPreference: SCREEN_DEGRADATION_VIDEO };
+    const degradation = settingWord(settings, 'screen.degradation', SCREEN_DEGRADATION);
+    return { contentHint, degradationPreference: (degradation === 'default' ? 'balanced' : degradation) };
+}
+/** How a direct call's screen is sent: for a video played on it, as a room's, or marked detail, its resolution kept. */
+export function directScreenMode(forVideo) {
+    return forVideo
+        ? { contentHint: SCREEN_CONTENT_HINT, degradationPreference: SCREEN_DEGRADATION_VIDEO }
+        : { contentHint: DIRECT_SCREEN_CONTENT_HINT, degradationPreference: SCREEN_DEGRADATION };
 }
 /**
  * Puts a screen shared into a room in a mode while it is sent, nothing published again: no key frame, and a VP9 screen
@@ -897,6 +1049,89 @@ export async function applyScreenVideoMode(track, options, mode) {
  * The pixel density a receiver asks layers by (adaptive stream): the screen's, at most 1.5. At 2 or 3 (a Retina
  * screen, a phone) a tile asked for twice its size or more, the larger layer for every tile in a grid.
  */
-export function roomPixelDensity(devicePixelRatio) {
-    return Math.min(1.5, Math.max(1, Number(devicePixelRatio) || 1));
+export function roomPixelDensity(devicePixelRatio, settings) {
+    return Math.min(settingNumber(settings, 'view.pixelDensityMax', 1.5), Math.max(1, Number(devicePixelRatio) || 1));
+}
+/**
+ * 1.0.53: a shared screen's sending as the node's settings say it now (screen.maxKbps, screen.fps, screen.contentHint,
+ * screen.degradation; all live): its encodings' bitrate and frame rate, its mark and its degradation preference, nothing
+ * published again. forVideo: the presenter's "Optimize for video", which keeps its own mark and frame rate.
+ */
+export async function applyScreenSettings(track, settings, codec, forVideo = false) {
+    const encoding = screenEncoding(settings);
+    try {
+        const params = track.sender?.getParameters();
+        const top = params?.encodings?.[params.encodings.length - 1];
+        if (track.sender && params && top && (top.maxBitrate !== encoding.maxBitrate || top.maxFramerate !== encoding.maxFramerate)) {
+            top.maxBitrate = encoding.maxBitrate;
+            top.maxFramerate = encoding.maxFramerate;
+            await track.sender.setParameters(params);
+        }
+    }
+    catch {
+        // it keeps what it went out with
+    }
+    await applyScreenVideoMode(track, undefined, screenVideoMode(codec, forVideo, settings));
+}
+/** 1.0.53: a call microphone's publish options from the settings (mic.kbps, mic.red, mic.dtx); 64 kbit/s, RED and DTX on without them. */
+export function micPublish(settings) {
+    return {
+        maxBitrate: Math.round(settingNumber(settings, 'mic.kbps', 64) * 1000),
+        red: settingFlag(settings, 'mic.red', true),
+        dtx: settingFlag(settings, 'mic.dtx', true)
+    };
+}
+/** 1.0.53: a shared screen's sound (screenAudio.kbps): stereo, without DTX or RED; 128 kbit/s without settings. */
+export function screenAudioPublish(settings) {
+    return { maxBitrate: Math.round(settingNumber(settings, 'screenAudio.kbps', 128) * 1000), forceStereo: true, dtx: false, red: false };
+}
+/** 1.0.53: what a call's microphone is opened with (mic.echoCancellation, noiseSuppression, autoGainControl, voiceIsolation). */
+export function micCapture(settings) {
+    return {
+        echoCancellation: settingFlag(settings, 'mic.echoCancellation', true),
+        noiseSuppression: settingFlag(settings, 'mic.noiseSuppression', true),
+        autoGainControl: settingFlag(settings, 'mic.autoGainControl', true),
+        voiceIsolation: settingFlag(settings, 'mic.voiceIsolation', true)
+    };
+}
+/** 1.0.53: the size and frame rate a call's camera is opened at (camera.captureHeight, camera.captureFps): 1080p30 without settings. */
+export function cameraCapture(settings) {
+    const height = Math.round(settingNumber(settings, 'camera.captureHeight', 1080));
+    return { width: evenOf(height * 16 / 9), height, frameRate: Math.round(settingNumber(settings, 'camera.captureFps', 30)) };
+}
+/** 1.0.53: the size and frame rate a room's screen is captured at (screen.captureHeight, screen.captureFps): 1080p30 without settings. */
+export function screenCapture(settings) {
+    const height = Math.round(settingNumber(settings, 'screen.captureHeight', 1080));
+    return { width: evenOf(height * 16 / 9), height, frameRate: Math.round(settingNumber(settings, 'screen.captureFps', 30)) };
+}
+/** 1.0.53: how long a product waits on an unreachable server before it says so (connect.giveUpMs), ms; 20 s without settings. */
+export function connectGiveUpMs(settings) {
+    return Math.round(settingNumber(settings, 'connect.giveUpMs', 20000));
+}
+/**
+ * 1.0.53: the keys whose change re-publishes a camera with the node's `applyNow` (the publish keys a camera goes out
+ * by), and a screen's. A key of another class reaches the camera by itself: live ones at once, capture ones at its next
+ * open.
+ */
+const CAMERA_PUBLISH_KEYS = /^(camera\.(codecs|codecRules|backup|ladder\.|topKbps\.|fps$|svcMode|maxHeight\.|vp9FullHdAfterCheck)|check\.|tune\.(checkMs|pass))/;
+const SCREEN_PUBLISH_KEYS = /^screen\.(codecs|simulcastFrom|lowLayer|vp8Simulcast)/;
+/** Whether a change of these keys (RoomEvent.MeshSettingsChanged's) is one a camera goes out by. */
+export function cameraPublishChanged(changed) {
+    return changed.some((k) => CAMERA_PUBLISH_KEYS.test(k));
+}
+/** Whether a change of these keys is one a screen goes out by. */
+export function screenPublishChanged(changed) {
+    return changed.some((k) => SCREEN_PUBLISH_KEYS.test(k));
+}
+/**
+ * When a camera re-publishes for an `applyNow` revision: a moment within spreadMs fixed by its identity (FNV-1a), so a
+ * room's cameras don't all go out again at once, and each the same moment on every revision.
+ */
+export function applyNowDelayMs(identity, spreadMs = 60000) {
+    let h = 0x811c9dc5;
+    for (let i = 0; i < identity.length; i++) {
+        h ^= identity.charCodeAt(i);
+        h = Math.imul(h, 0x01000193) >>> 0;
+    }
+    return h % Math.max(1, Math.round(spreadMs));
 }

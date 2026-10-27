@@ -125,6 +125,29 @@
     font-size: var(--bm-font-size-sm, 13px);
 }
 
+// Turn sound on, over the top of the call while the browser holds the others' sound back (src/sdk/sound.ts): in the
+// window in the corner and in a page's spot alike, as both place their children.
+.realtime-call-sound {
+    position: absolute;
+    z-index: 5;
+    top: 12px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 14px;
+    border: 0;
+    border-radius: 999px;
+    background: rgba(var(--wplus-toast-bg), 1);
+    color: rgba(var(--wplus-toast-fg), 1);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+    font: inherit;
+    font-size: var(--bm-font-size-sm, 13px);
+    cursor: pointer;
+    white-space: nowrap;
+}
+
 // How <chat-room> and <online-list> fill the place the page gives them is theirs (src/elements.tsx, hostCss, and
 // .realtime-online in presence.css), as a page's prefix renames them: no rule here names an element.
 

@@ -109,9 +109,9 @@ export class P2PSignaling {
     // This side's counters, every couple of seconds while the direct path
     // runs; the reply carries the other side's and, when the relay has
     // judged the path dead, the room. One attempt: the next pulse is two
-    // seconds away.
-    pulse(pulse) {
-        return this.request({ op: 'pulse', pulse }, 1);
+    // seconds away. A quality reading rides on one when it is due.
+    pulse(pulse, quality) {
+        return this.request(quality ? { op: 'pulse', pulse, quality } : { op: 'pulse', pulse }, 1);
     }
     // What this side is running the call on, for the call record. Best
     // effort: a call is not worth failing over its own bookkeeping.

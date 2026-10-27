@@ -26,6 +26,7 @@
  * does it there: +3 ms held). A browser that gives no reading (Firefox, or tracks of two streams) leaves the pair to
  * the caller's own rule (syncPair answers null).
  */
+import { settingNumber } from "./room-publish.js";
 export const LIP_SYNC = {
     /** A gap this small either way is left alone, ms: a reading's own wander from one look to the next. */
     tolerance: 10,
@@ -38,6 +39,19 @@ export const LIP_SYNC = {
     /** The most a hold is set to, ms: jitterBufferTarget's 4 s. */
     max: 4000,
 };
+/**
+ * 1.0.53: LIP_SYNC as the node's settings give it (lipsync.toleranceMs, lipsync.samples, lipsync.gain,
+ * lipsync.maxStepMs, playout.maxHoldMs): live, read at every look.
+ */
+export function lipSyncNumbers(settings) {
+    return {
+        tolerance: settingNumber(settings, 'lipsync.toleranceMs', LIP_SYNC.tolerance),
+        samples: settingNumber(settings, 'lipsync.samples', LIP_SYNC.samples),
+        gain: settingNumber(settings, 'lipsync.gain', LIP_SYNC.gain),
+        maxStep: settingNumber(settings, 'lipsync.maxStepMs', LIP_SYNC.maxStep),
+        max: settingNumber(settings, 'playout.maxHoldMs', LIP_SYNC.max)
+    };
+}
 /**
  * The sender's time of what a receiver plays now, less now, in ms (estimatedPlayoutTimestamp, at its stats' instant);
  * null when the browser doesn't say.
@@ -112,7 +126,7 @@ function setHold(receiver, hold) {
  * meeting, neither under base (the call's own hold) nor over LIP_SYNC.max. The lag read, or null when the browser
  * can't tell or can't hold: the caller's own rule then holds the pair.
  */
-export async function syncPair(pair, state, base, soundDelay = 0) {
+export async function syncPair(pair, state, base, soundDelay = 0, n = LIP_SYNC) {
     const sounds = pair.sounds.filter((sound) => 'jitterBufferTarget' in sound);
     if (!('jitterBufferTarget' in pair.picture) || sounds.length === 0)
         return null;
@@ -122,7 +136,7 @@ export async function syncPair(pair, state, base, soundDelay = 0) {
     const lag = read - Math.round(soundDelay);
     const seen = state.get(pair.picture) ?? { lags: [] };
     state.set(pair.picture, seen);
-    if (Math.abs(lag) <= LIP_SYNC.tolerance) {
+    if (Math.abs(lag) <= n.tolerance) {
         seen.lags = [];
         return lag;
     }
@@ -130,19 +144,19 @@ export async function syncPair(pair, state, base, soundDelay = 0) {
     if (seen.lags.length > 0 && Math.sign(seen.lags[0]) !== Math.sign(lag))
         seen.lags = [];
     seen.lags.push(lag);
-    if (seen.lags.length < LIP_SYNC.samples)
+    if (seen.lags.length < n.samples)
         return lag;
     const sorted = [...seen.lags].sort((a, b) => a - b);
     const gap = sorted[sorted.length >> 1];
     seen.lags = [];
-    let move = Math.sign(gap) * Math.min(LIP_SYNC.maxStep, Math.round(Math.abs(gap) * LIP_SYNC.gain));
+    let move = Math.sign(gap) * Math.min(n.maxStep, Math.round(Math.abs(gap) * n.gain));
     let picture = holdOf(pair.picture, base);
     let sound = Math.max(...sounds.map((s) => holdOf(s, base)));
     if (move > 0) {
         // the picture behind: played sooner while it was held longer than the call's own, then the sound held longer
         const sooner = Math.min(move, picture - base);
         picture -= sooner;
-        sound = Math.min(LIP_SYNC.max, sound + move - sooner);
+        sound = Math.min(n.max, sound + move - sooner);
     }
     else {
         move = -move;
@@ -150,7 +164,7 @@ export async function syncPair(pair, state, base, soundDelay = 0) {
         // held longer
         const sooner = Math.min(move, sound - base);
         sound -= sooner;
-        picture = Math.min(LIP_SYNC.max, picture + move - sooner);
+        picture = Math.min(n.max, picture + move - sooner);
     }
     setHold(pair.picture, picture);
     for (const s of sounds)

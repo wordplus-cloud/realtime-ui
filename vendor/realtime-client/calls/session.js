@@ -4,6 +4,7 @@ import { isSealedSignal, SignalCipher } from "./cipher.js";
 import { forgetBroken, markBroken, probeCodecCaps } from "./codecs.js";
 import { browserLabel, platformLabel } from "./platform.js";
 import { callUserOf } from "./users.js";
+import { CallHealthWatch } from "./health.js";
 import { compareStreamIds } from "./types.js";
 const VISIBLE_DEFAULT = { camera: false, microphone: false, screen_share: false, screen_share_audio: false };
 // Layout changes (a chip resized, the stage swapped, a tab hidden) come in
@@ -147,6 +148,12 @@ export class P2PCallSession {
         this.traceStart = Date.now();
         this.traceDropped = 0;
         this.pulseTicks = 0;
+        // How the call is going here, told on a pulse every `qualityEvery` ms as
+        // the relay's reply asks (quality.ts); the page's and machine's part from
+        // their own events.
+        this.health = new CallHealthWatch();
+        this.qualityEvery = 0;
+        this.qualityAt = 0;
         // The room token the join handed over up front, so a hand-off needs no
         // round trip and no answer.
         this.standby = null;
@@ -366,9 +373,17 @@ export class P2PCallSession {
         if (this.pulseTicks % STATE_RESEND_TICKS === 0) {
             this.sendState();
         }
+        // A quality reading when one is due: the window since the last one,
+        // which the peer keeps from the stats passes it makes anyway.
+        let quality;
+        const now = Date.now();
+        if (this.qualityEvery > 0 && now - this.qualityAt >= this.qualityEvery) {
+            this.qualityAt = now;
+            quality = peer.qualityReading(this.health.reading(now));
+        }
         let ack;
         try {
-            ack = await this.signaling.pulse(peer.pulseBody());
+            ack = await this.signaling.pulse(peer.pulseBody(), quality);
         }
         catch (e) {
             return;
@@ -379,6 +394,19 @@ export class P2PCallSession {
             if (ack.error === 'not_joined')
                 void this.resume();
             return;
+        }
+        // How often the relay wants them, every reply: a relay before them
+        // says nothing and gets none, and 0 stops them.
+        const every = typeof ack.qms === 'number' && ack.qms > 0 ? ack.qms : 0;
+        if (every !== this.qualityEvery) {
+            this.qualityEvery = every;
+            this.qualityAt = now;
+            // The page's and machine's watch only once readings are asked
+            // for: against a relay that asks none, nothing listens.
+            if (every > 0)
+                this.health.start();
+            else
+                this.health.stop();
         }
         peer.setPeerPulse(ack.peer ?? null);
         if (ack.sfu && !ignoreFallback()) {
@@ -804,6 +832,7 @@ export class P2PCallSession {
         });
         this.peer.setExpectInbound(expected);
         this.peer.setExpectedVideo(video);
+        this.peer.setExpectedAudio(new Set(['microphone', 'screen_share_audio'].filter((source) => this.remoteState[source])));
     }
     // How big each of the other side's video sources is shown here, as the
     // VIEW_STEPS height of its largest visible box; a source they have off
@@ -915,6 +944,7 @@ export class P2PCallSession {
         }
         this.bytesSeen.sent = Math.max(this.bytesSeen.sent, stats.bytesSent);
         this.bytesSeen.recv = Math.max(this.bytesSeen.recv, stats.bytesReceived);
+        const red = peer.redState();
         const report = {
             browser: browserLabel(),
             platform: platformLabel(),
@@ -929,7 +959,9 @@ export class P2PCallSession {
             candidate: { local: pair.local ?? '', remote: pair.remote ?? '', protocol: pair.protocol ?? '' },
             restarts: stats.restarts,
             video: { send: codecs.videoSend ?? '', recv: codecs.videoRecv ?? '' },
-            audio: { send: codecs.audioSend ?? '', recv: codecs.audioRecv ?? '' },
+            // `red`: whether redundant audio leads the microphone's codecs
+            // each way, which its codec name never says.
+            audio: { send: codecs.audioSend ?? '', recv: codecs.audioRecv ?? '', ...(red ? { red } : {}) },
             // Which encoder and decoder ran it, so a record says whether the
             // call cost the CPU rather than only which codec it agreed on.
             // Empty where the browser will not say — Safari never does, and
@@ -1229,6 +1261,7 @@ export class P2PCallSession {
     }
     teardown(keepListening = false) {
         this.ended = true;
+        this.health.stop();
         if (this.stopReconnectListener) {
             this.stopReconnectListener();
             this.stopReconnectListener = null;

@@ -160,6 +160,14 @@ export declare class GroupCall {
      * included.
      */
     private publishOptions;
+    /**
+     * The node's settings changed on a running call (rtc-client 1.0.23, RoomEvent.MeshSettingsChanged): what it receives
+     * asked at the pixel density they say, a shared screen sent as they say now, and a camera whose publish settings
+     * changed chosen again at its next turn on, or now, at its moment of the minute, where the revision says applyNow.
+     */
+    private settingsChanged;
+    private screenCodec;
+    private applyNowTimer?;
     private caps;
     private choice;
     private cameraWatch;
@@ -171,11 +179,16 @@ export declare class GroupCall {
     private server;
     /** What this browser encodes, asked once a call. */
     private capabilities;
-    /** The room as the codec rules see it: encrypted, on the mesh, and the server's codec policy once joined. */
+    /**
+     * The room as the codec rules see it: encrypted, on the mesh, and the server's policy once joined, from its settings
+     * where its node sends them (rtc-client 1.0.23) or its codec policy. A call's camera (`call`), as Better Messages'
+     * is: the policy's rules, its check and its tune apply where the node turned them on.
+     */
     private codecOptions;
     /**
      * The camera's codec on this device, asked once the room is joined (room-publish.ts): the server's policy, VP8 in
-     * an encrypted room, where the room client sends no backup codec, H.265 only on the mesh.
+     * an encrypted room, where the room client sends no backup codec, H.265 only on the mesh. Measured first where the
+     * node turned the camera check on and a rule names this machine (camera-check.ts), and told to the node.
      */
     private cameraChoice;
     private preset;

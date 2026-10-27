@@ -39,7 +39,7 @@
  * window had to start), the codec goes out as the policy has it, unmeasured, as before. An encoder still starting is
  * never taken for one that drops frames. Every threshold is the node's to change (room-publish.ts, cameraTune()).
  */
-import { backupFor, cameraCodecOrder, cameraCodecRecord, cameraCodecRecords, cameraFinding, cameraRuleOrder, cameraRules, cameraTune, choiceHeight, encodesInHardware, hardwareFromCaps, knownAdapter, rememberAdapter, rememberCameraCodec, roomCallChoice, rulesNeedGpu, uncheckedBrowser, CAMERA_STEP_DOWN_HEIGHT, CAMERA_TUNE_DEFAULTS, CAMERA_TUNE_RANGES, VP9_TOP_HEIGHT, cameraMaxHeight, cameraPublish } from "./room-publish.js";
+import { backupFor, cameraCodecOrder, cameraCodecRecord, cameraCodecRecords, cameraEnvironment, cameraFinding, cameraRuleOrder, cameraRules, cameraTune, choiceHeight, encodesInHardware, hardwareFromCaps, knownAdapter, rememberAdapter, rememberCameraCodec, roomCallChoice, rulesNeedGpu, uncheckedBrowser, CAMERA_STEP_DOWN_HEIGHT, CAMERA_TUNE_DEFAULTS, CAMERA_TUNE_RANGES, VP9_TOP_HEIGHT, cameraMaxHeight, cameraPublish, settingNumber } from "./room-publish.js";
 import { isHardwareEncoder } from "./encoder-watch.js";
 /** How long the loopback may take to connect (its first frame may take longer: as long as a measuring still fits). */
 export const CAMERA_CHECK_CONNECT_MS = 1500;
@@ -72,6 +72,19 @@ export const CHECK_MAX_FRAME_SHARE = CAMERA_TUNE_DEFAULTS.passEncode;
 export const CHECK_MIN_FRAMES = 6;
 /** The share of the time limited by bandwidth over which the loopback said too little (its estimate not risen yet). */
 const CHECK_MAX_BANDWIDTH_SHARE = 0.5;
+export function checkNumbers(settings) {
+    return {
+        connectMs: settingNumber(settings, 'check.connectMs', CAMERA_CHECK_CONNECT_MS),
+        warmupMs: settingNumber(settings, 'check.warmupMs', CAMERA_CHECK_WARMUP_MS),
+        keepUpMs: settingNumber(settings, 'check.keepUpMs', CAMERA_CHECK_KEEPUP_MS),
+        windowMs: settingNumber(settings, 'check.windowMs', CAMERA_CHECK_WINDOW_MS),
+        minFrames: settingNumber(settings, 'check.minFrames', CHECK_MIN_FRAMES),
+        bandwidthShare: settingNumber(settings, 'check.bandwidthShare', CHECK_MAX_BANDWIDTH_SHARE),
+        pollMs: settingNumber(settings, 'check.pollMs', CAMERA_CHECK_POLL_MS),
+        headroom: settingNumber(settings, 'check.headroom', CHECK_INFER_HEADROOM),
+        fallbackKbps: settingNumber(settings, 'check.fallbackKbps', 1500)
+    };
+}
 /**
  * The verdict on one codec from its loopback's numbers. wantHardware: the codec was to go out in hardware (H.264,
  * H.265), whose failure is its frames taken off (`drops`); otherwise a software codec, whose failure is the CPU's (`cpu`).
@@ -90,13 +103,13 @@ const CHECK_MAX_BANDWIDTH_SHARE = 0.5;
  * VP9 L3T3 about 31 a second from a 15 fps camera), which spread a picture's time over two or three. The three shares
  * are the policy's tune's where given (passSent, passCpu, passEncode).
  */
-export function judgeEncoder(codec, wantHardware, s, tune = CAMERA_TUNE_DEFAULTS) {
+export function judgeEncoder(codec, wantHardware, s, tune = CAMERA_TUNE_DEFAULTS, check = checkNumbers()) {
     const base = { codec, implementation: s.implementation, hardware: s.hardware };
     const seconds = Math.max(s.elapsedMs, 1) / 1000;
     const none = (why) => ({ ...base, result: null, msPerFrame: null, sentShare: null, cpuShare: null, why });
-    if (s.captured < CHECK_MIN_FRAMES || s.encoded <= 0)
+    if (s.captured < check.minFrames || s.encoded <= 0)
         return none('few-frames');
-    if (s.bandwidthSeconds / seconds > CHECK_MAX_BANDWIDTH_SHARE)
+    if (s.bandwidthSeconds / seconds > check.bandwidthShare)
         return none('bandwidth');
     const sentShare = sentShareOf(s);
     // the encoding time of a picture the camera gave: an SVC encoding's layer frames are no more pictures
@@ -152,17 +165,18 @@ export const CHECK_INFER_HEADROOM = 0.8;
  * the lines it encoded at the end, which the CPU may already have shrunk: an encoder held back to `to` lines or under
  * doesn't fit them. Only a `cpu` verdict with its time and frame rate.
  */
-export function fitsLower(verdict, to, tune = CAMERA_TUNE_DEFAULTS) {
+export function fitsLower(verdict, to, tune = CAMERA_TUNE_DEFAULTS, headroom = CHECK_INFER_HEADROOM) {
     if (verdict.result !== 'cpu' || verdict.msPerFrame === null || !verdict.fps)
         return false;
     const at = verdict.frameHeight || verdict.height || 0;
     if (at <= to)
         return false;
-    return verdict.msPerFrame * (to / at) ** 2 <= tune.passEncode * CHECK_INFER_HEADROOM * 1000 / verdict.fps;
+    return verdict.msPerFrame * (to / at) ** 2 <= tune.passEncode * headroom * 1000 / verdict.fps;
 }
 /** The sender's counts from its stats (an RTCStatsReport): its outbound-rtp's, summed, and its media-source's frames. */
 export function encoderCounts(report) {
-    const out = { at: 0, captured: 0, encoded: 0, sent: 0, encodeSeconds: 0, cpuSeconds: 0, bandwidthSeconds: 0, captureFps: 0, implementation: '', hardware: false, known: false, frameHeight: 0 };
+    const out = { at: 0, captured: 0, encoded: 0, sent: 0, encodeSeconds: 0, cpuSeconds: 0, bandwidthSeconds: 0, captureFps: 0, implementation: '', hardware: false, known: false, frameHeight: 0,
+        sourceHeight: 0, limit: '' };
     report.forEach((s) => {
         if (s?.type === 'outbound-rtp' && (!s.kind || s.kind === 'video')) {
             out.at = Math.max(out.at, Number(s.timestamp) || 0);
@@ -179,10 +193,13 @@ export function encoderCounts(report) {
                 out.known = true;
             if (s.powerEfficientEncoder === true || (name && isHardwareEncoder(name)))
                 out.hardware = true;
+            if (s.qualityLimitationReason)
+                out.limit = String(s.qualityLimitationReason);
         }
         else if (s?.type === 'media-source' && (!s.kind || s.kind === 'video')) {
             out.captured = Math.max(out.captured, Number(s.frames) || 0);
             out.captureFps = Math.max(out.captureFps, Number(s.framesPerSecond) || 0);
+            out.sourceHeight = Math.max(out.sourceHeight, Number(s.height) || 0);
         }
     });
     return out;
@@ -262,7 +279,9 @@ function preferred(codec, mesh) {
 /**
  * Measures codec on this device: the camera's picture (a clone of track, stopped after) through a loopback of two peer
  * connections in the page, at the room's top layer for codec (VP9 and AV1 as their one SVC stream), for
- * CAMERA_CHECK_WINDOW_MS after CAMERA_CHECK_WARMUP_MS; the verdict as judgeEncoder() gives it. Too little to tell
+ * CAMERA_CHECK_WINDOW_MS after CAMERA_CHECK_WARMUP_MS; the verdict as judgeEncoder() gives it. A camera whose pictures
+ * are taller than its settings say is scaled down to the lines measured before the window (EncoderCountsNow.sourceHeight,
+ * 1.0.56). Too little to tell
  * (result null, why "failed") where the browser can't run it or it didn't connect within CAMERA_CHECK_CONNECT_MS.
  *
  * Every wait in it ends by `until` ("timeout"), and every CAMERA_CHECK_POLL_MS it looks whether the camera was let go
@@ -279,6 +298,7 @@ export async function measureCameraEncoder(track, codec, wantHardware, options =
     const codecs = preferred(codec, !!options.mesh);
     if (!codecs.length)
         return failed('unsupported');
+    const n = options.numbers ?? checkNumbers(options.settings);
     const until = options.until ?? Date.now() + CAMERA_TUNE_RANGES.checkMs[1];
     // a step of the measuring, within until, given up at once when the camera is let go of
     const step = (work) => new Promise((resolve, reject) => {
@@ -292,7 +312,7 @@ export async function measureCameraEncoder(track, codec, wantHardware, options =
             end();
         };
         const poll = setInterval(() => { if (gone())
-            finish(() => reject(new GaveUp('ended'))); }, CAMERA_CHECK_POLL_MS);
+            finish(() => reject(new GaveUp('ended'))); }, n.pollMs);
         const timer = setTimeout(() => finish(() => reject(new GaveUp(gone() ? 'ended' : 'timeout'))), Math.max(0, until - Date.now()));
         work.then((value) => finish(() => resolve(value)), (e) => finish(() => reject(e)));
     });
@@ -303,12 +323,18 @@ export async function measureCameraEncoder(track, codec, wantHardware, options =
         captured = track.getSettings().height ?? 0;
     }
     catch { }
-    const height = Math.min(options.height ?? (captured || 720), options.maxHeight ?? cameraMaxHeight(codec, wantHardware));
-    const publish = cameraPublish(codec, Math.max(height, 720), null);
-    const top = publish?.top ?? { maxBitrate: 1500000, maxFramerate: 30 };
+    const height = Math.min(options.height ?? (captured || 720), options.maxHeight ?? cameraMaxHeight(codec, wantHardware, options.settings));
+    const publish = cameraPublish(codec, Math.max(height, 720), null, options.settings);
+    const top = publish?.top ?? { maxBitrate: n.fallbackKbps * 1000, maxFramerate: 30 };
     let clone = null;
     let a = null, b = null;
+    // the warm-up as it goes (CheckWarmup): when the loopback started and gave its first frame, the best share of the
+    // camera's frames sent over a keep-up stretch, and the browser's last word on what held the encoder back
+    let began = 0, firstAt = 0, best = null, limit = '';
+    const warmup = () => ({ firstFrameMs: firstAt ? firstAt - began : null, bestShare: best === null ? null : Math.round(best * 100) / 100, limit });
+    const gaveUp = (why) => ({ ...failed(why), ...(began ? { warmup: warmup() } : {}) });
     try {
+        began = Date.now();
         const pa = a = new RTCPeerConnection(), pb = b = new RTCPeerConnection();
         clone = track.clone();
         pa.onicecandidate = (e) => { if (e.candidate)
@@ -335,29 +361,58 @@ export async function measureCameraEncoder(track, codec, wantHardware, options =
         await step(pb.setLocalDescription(answer));
         await step(pa.setRemoteDescription({ type: 'answer', sdp: startingAt(answer.sdp ?? '', kbps) }));
         const sender = transceiver.sender;
-        const counts = async () => encoderCounts(await step(sender.getStats()));
-        const connectBy = Math.min(Date.now() + CAMERA_CHECK_CONNECT_MS, until);
+        // the camera's own pictures, from the sender's stats: one taller than its settings say (OBS Virtual Camera says
+        // 720 and gives 1080) reached the encoder whole on the budget of the lines measured, had its frames taken off
+        // and was brought down by the browser for bandwidth, all before the window could start, so its check ended
+        // unsure every time. Scaled down to those lines once, as a camera that says its size is, and only before the
+        // window starts
+        let fitting = true;
+        const fit = async (c) => {
+            const scale = c.sourceHeight / height;
+            if (!fitting || scale <= (encoding.scaleResolutionDownBy ?? 1) + 0.05)
+                return;
+            fitting = false;
+            try {
+                const params = sender.getParameters();
+                if (!params.encodings?.[0])
+                    return;
+                params.encodings[0].scaleResolutionDownBy = scale;
+                await step(sender.setParameters(params));
+                encoding.scaleResolutionDownBy = scale;
+            }
+            catch (e) {
+                if (e instanceof GaveUp)
+                    throw e;
+            }
+        };
+        const counts = async () => {
+            const c = encoderCounts(await step(sender.getStats()));
+            if (c.limit)
+                limit = c.limit;
+            await fit(c);
+            return c;
+        };
+        const connectBy = Math.min(Date.now() + n.connectMs, until);
         // the latest the window may start and still end by until
-        const lastStart = until - CAMERA_CHECK_WINDOW_MS - CAMERA_CHECK_POLL_MS;
+        const lastStart = until - n.windowMs - n.pollMs;
         // connected and encoding: the first frame out of the encoder, waited for as long as a measuring still fits after
         // it (a hardware encoder's first session in a browser gives it late)
-        let firstAt = 0;
         for (;;) {
             // looked at each time round too: a wait as long as step()'s own look ends before it
             if (gone())
-                return failed('ended');
+                return gaveUp('ended');
             if (pa.connectionState === 'failed' || pa.connectionState === 'closed')
-                return failed();
+                return gaveUp('failed');
             const connected = pa.connectionState === 'connected';
             if (!connected && Date.now() > connectBy)
-                return failed(Date.now() > until ? 'timeout' : 'failed');
+                return gaveUp(Date.now() > until ? 'timeout' : 'failed');
             if (connected && (await counts()).encoded > 0) {
                 firstAt = Date.now();
                 break;
             }
-            if (Date.now() + CAMERA_CHECK_WARMUP_MS > lastStart)
-                return failed('slow-start');
-            await step(sleep(CAMERA_CHECK_POLL_MS));
+            if (Date.now() + n.warmupMs > lastStart)
+                return gaveUp('slow-start');
+            await step(sleep(n.pollMs));
         }
         // the warm-up: CAMERA_CHECK_WARMUP_MS at least, and until the encoder keeps up with its camera (sent passSent of
         // what it gave over the last CAMERA_CHECK_KEEPUP_MS). Not by the latest start: an encoder still starting, too
@@ -373,29 +428,34 @@ export async function measureCameraEncoder(track, codec, wantHardware, options =
                 // the latest reading a whole stretch back
                 let from;
                 for (const r of readings)
-                    if (now - r.at >= CAMERA_CHECK_KEEPUP_MS)
+                    if (now - r.at >= n.keepUpMs)
                         from = r;
-                if (from && now - firstAt >= CAMERA_CHECK_WARMUP_MS && keepsUp(sampleBetween(from.counts, c), passSent))
+                const stretch = from && sampleBetween(from.counts, c);
+                if (stretch && stretch.captured > 0)
+                    best = Math.max(best ?? 0, sentShareOf(stretch));
+                if (stretch && now - firstAt >= n.warmupMs && keepsUp(stretch, passSent))
                     return c;
-                if (Date.now() + CAMERA_CHECK_POLL_MS > lastStart)
+                if (Date.now() + n.pollMs > lastStart)
                     return null;
-                await step(sleep(CAMERA_CHECK_POLL_MS));
+                await step(sleep(n.pollMs));
             }
         };
         const first = await warmed();
         if (!first)
-            return failed('slow-start');
+            return gaveUp('slow-start');
+        fitting = false;
         // the window, read at its middle too: an encoder rising through it is still starting (judgeEncoder, `late`)
-        await step(sleep(CAMERA_CHECK_WINDOW_MS / 2));
+        await step(sleep(n.windowMs / 2));
         const middle = await counts();
-        await step(sleep(CAMERA_CHECK_WINDOW_MS / 2));
+        await step(sleep(n.windowMs / 2));
         const last = await counts();
         if (gone())
-            return failed('ended');
-        return { ...judgeEncoder(codec, wantHardware, { ...sampleBetween(first, last), late: sampleBetween(middle, last) }, options.tune), height };
+            return gaveUp('ended');
+        return { ...judgeEncoder(codec, wantHardware, { ...sampleBetween(first, last), late: sampleBetween(middle, last) }, options.tune, n), height,
+            warmup: warmup() };
     }
     catch (e) {
-        return failed(e instanceof GaveUp ? e.message : 'failed');
+        return gaveUp(e instanceof GaveUp ? e.message : 'failed');
     }
     finally {
         try {
@@ -535,18 +595,35 @@ export async function checkedCameraChoice(track, caps, agent, given = {}) {
     // a camera already out: what's remembered decides (a rule's first in software only once it passed), nothing measured
     if (options.live)
         return { ...roomCallChoice(caps, agent, options), checked: [], source: tests.length ? 'memory' : 'default', checkMs: Date.now() - started, tests };
-    // a rule naming a graphics maker waits for the adapter's name (300 ms at most, once a page); only then is it asked
-    if (options.gpu === undefined && rulesNeedGpu(cameraRules(options.policy)))
+    // a rule naming a graphics maker, for a machine like this one, waits for the adapter's name (300 ms at most, once a
+    // page); only then is it asked. The camera control's spinner shows from the start of that wait, as the check's own.
+    let spinning = false;
+    if (options.gpu === undefined && rulesNeedGpu(cameraRules(options.policy), cameraEnvironment(agent))) {
+        spinning = true;
+        running++;
+        announce();
         options.gpu = (await graphicsAdapter()) ?? null;
-    if (gone())
+    }
+    const unspin = () => {
+        if (!spinning)
+            return;
+        spinning = false;
+        running--;
+        announce();
+    };
+    if (gone()) {
+        unspin();
         return today();
+    }
     // a camera turned on is measured only on a machine a camera rule names (cameraRuleOrder(): by default Windows and
     // Linux, where hardware H.264 was seen freezing; the node's rules where it sends them, none for `rules: []`): every
     // other starts as today at once, no spinner. A Mac's first hardware session in a browser starts 2 s late and slow,
     // so its check ends unsure every day for nothing (the mesh lab, 2026-10-23). A move's pick (`move`) measures on
     // any machine.
-    if (!options.move && cameraRuleOrder(agent, options) === null)
+    if (!options.move && cameraRuleOrder(agent, options) === null) {
+        unspin();
         return today();
+    }
     const order = cameraCodecOrder(agent, hardware, options);
     // a rule's first codec in software (by default VP9 on Windows and Linux) is never taken unmeasured
     const ruleFirst = cameraRuleOrder(agent, options) !== null && order[0] !== 'vp8' && !encodesInHardware(order[0], agent, hardware, options);
@@ -566,14 +643,21 @@ export async function checkedCameraChoice(track, caps, agent, given = {}) {
     };
     const measure = options.measure ?? measureCameraEncoder;
     const deadline = started + (options.budgetMs ?? tune.checkMs);
+    // 1.0.53: the check's own numbers, the node's to change
+    const settings = options.policy?.settings ?? null;
+    const checkNos = checkNumbers(settings);
+    const measureMinMs = checkNos.warmupMs + checkNos.windowMs + 300;
     // the lines this camera gives, which VP9 in software is tried at up to VP9_TOP_HEIGHT
     let lines = options.height ?? 0;
     try {
         lines || (lines = track.getSettings().height ?? 0);
     }
     catch { }
-    running++;
-    announce();
+    // spinning since the adapter's name was asked, or from now: the finally below ends it either way
+    if (!spinning) {
+        running++;
+        announce();
+    }
     try {
         for (const [i, codec] of order.entries()) {
             const inHardware = encodesInHardware(codec, agent, hardware, options);
@@ -598,12 +682,12 @@ export async function checkedCameraChoice(track, caps, agent, given = {}) {
                 return { ...unchecked(), source: 'memory' };
             // the rule's first in software, unmeasured or measured too little: today's choice, the same whoever gives up
             const onlyMeasured = i === 0 && ruleFirst;
-            if (deadline - Date.now() < MEASURE_MIN_MS) {
+            if (deadline - Date.now() < measureMinMs) {
                 // out of time: anything else goes as the order has it (VP9 passed at fewer lines: at those)
                 return onlyMeasured && !passedLower ? unchecked() : choice(codec, passedLower ? 'memory' : 'default');
             }
             const verdict = await measure(track, codec, inHardware, { height: options.height, ...(layered ? { maxHeight: VP9_TOP_HEIGHT } : {}),
-                mesh: options.h265, until: deadline, tune, stop: given.stop });
+                mesh: options.h265, until: deadline, tune, stop: given.stop, numbers: checkNos, settings });
             // let go of meanwhile: nothing more is measured, nothing written
             if (gone())
                 return unchecked();
@@ -624,7 +708,7 @@ export async function checkedCameraChoice(track, caps, agent, given = {}) {
             }
             // VP9 its CPU can't carry at its lines, but would at CAMERA_STEP_DOWN_HEIGHT (passed there before, or by the
             // same measurement, fitsLower()): remembered too heavy at its lines, and out at CAMERA_STEP_DOWN_HEIGHT
-            if (layered && verdict.result === 'cpu' && at > CAMERA_STEP_DOWN_HEIGHT && (passedLower || fitsLower(verdict, CAMERA_STEP_DOWN_HEIGHT, tune))) {
+            if (layered && verdict.result === 'cpu' && at > CAMERA_STEP_DOWN_HEIGHT && (passedLower || fitsLower(verdict, CAMERA_STEP_DOWN_HEIGHT, tune, checkNos.headroom))) {
                 rememberCameraCodec(codec, { result: 'cpu', ...numbers, height: at }, agent);
                 return choice(codec, 'check', CAMERA_STEP_DOWN_HEIGHT);
             }

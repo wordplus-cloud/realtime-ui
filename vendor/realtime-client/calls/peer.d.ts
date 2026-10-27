@@ -1,5 +1,6 @@
 import { RemoteMediaTrack } from "./remote-track.js";
 import { CodecCaps, CodecDirection, IceServer, P2PConnection, P2PSource, P2PStats, PeerPulse, PulseBody, SignalBody, ViewHint } from "./types.js";
+import { type QualityHealth, type QualityReading } from "./quality.js";
 export interface PeerOptions {
     polite: boolean;
     iceServers: IceServer[];
@@ -82,6 +83,8 @@ export declare class P2PPeer {
     private readonly starvedNotedAt;
     private peerCaps;
     private ownCaps;
+    private readonly quality;
+    private expectedAudio;
     connection: P2PConnection;
     stats: P2PStats;
     constructor(options: PeerOptions);
@@ -95,6 +98,13 @@ export declare class P2PPeer {
     setPeerPulse(pulse: PeerPulse | null): void;
     pulseBody(): PulseBody;
     setExpectedVideo(sources: Set<P2PSource>): void;
+    setExpectedAudio(sources: Set<P2PSource>): void;
+    qualityReading(health?: QualityHealth): QualityReading | undefined;
+    redState(): {
+        send: boolean;
+        recv: boolean;
+    } | null;
+    private qualityScope;
     get isConnected(): boolean;
     setLocalTrack(source: P2PSource, track: MediaStreamTrack | null): Promise<void>;
     private attachLocalTrack;

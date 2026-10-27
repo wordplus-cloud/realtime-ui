@@ -1,5 +1,6 @@
 import type { CallId, CallTransport } from "./transport.js";
 import { AliveAck, FailedAck, IceAck, JoinAck, PulseAck, PulseBody, SealedSignal, ServerMessage, SignalAck, SignalBody, SyncAck } from "./types.js";
+import type { QualityReading } from "./quality.js";
 export declare function leaveUnjoined(transport: CallTransport, callId: CallId, reason: string): void;
 export declare class P2PSignaling {
     readonly transport: CallTransport;
@@ -23,7 +24,7 @@ export declare class P2PSignaling {
     sync(lastId: string | null): Promise<SyncAck>;
     iceServers(): Promise<IceAck>;
     alive(): Promise<AliveAck>;
-    pulse(pulse: PulseBody): Promise<PulseAck>;
+    pulse(pulse: PulseBody, quality?: QualityReading): Promise<PulseAck>;
     report(report: unknown): Promise<{
         ok: boolean;
     }>;

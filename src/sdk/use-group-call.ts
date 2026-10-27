@@ -9,6 +9,7 @@ import { remoteTrack } from "./tracks.ts";
 import { blankParticipant } from "./use-private-call.ts";
 import { infoOf, type SdkCallPermissions, type SdkGroupCall, type SdkModerationAct, type SdkPerson } from "./types.ts";
 import type { CallModeration } from "../components/calls/context.ts";
+import type { JoinMedia } from "./controller.ts";
 
 const notModerated = () => Object.assign( new Error( 'not_moderated' ), { code: 'not_moderated' } );
 const noModeration = () => Promise.reject( notModerated() );
@@ -27,13 +28,15 @@ const hosts = ( group: SdkGroupCall, can: SdkCallPermissions | undefined ) => !!
 /**
  * A group call made with the SDK (`calls.group()`, a call that became one, or a ring into one accepted), as the group
  * video grid and the group audio roster read it: everyone in its room with their pictures and sound and who speaks,
- * this page's own tile, its camera, microphone and screen, and leaving. `close` is called once it is over.
+ * this page's own tile, its camera, microphone and screen, and leaving. `close` is called once it is over. `turnOn`: what
+ * it turns on as it starts, the microphone and on a video call the camera when not given.
  */
 export function useGroupCall(
     group: SdkGroupCall,
     type: 'audio' | 'video',
     close: ( notice: string | null ) => void,
     adding: Pick<CallContextInterface, 'people' | 'addPerson'> = {},
+    turnOn?: JoinMedia,
 ): CallContextInterface {
     const wrapper = useRef<HTMLDivElement | null>( null );
     const media = useLocalMedia( ( source, track ) => group.setTrack( source, track ) );
@@ -86,10 +89,15 @@ export function useGroupCall(
         onState( group.state );
         refresh();
 
-        // A listener starts with nothing on: what they may not send, they never ask the browser for.
+        // A listener starts with nothing on: what they may not send, they never ask the browser for. A page that joined by
+        // itself turns on only what it was given, so nothing is asked of the browser until the person turns it on.
         if ( group.can?.publish !== false ) {
+            const microphone = turnOn?.microphone ?? true;
+            const camera = type === 'video' && ( turnOn?.camera ?? true );
             // On a video call, the camera asked for with the microphone, so the browser asks once.
-            void ( type === 'video' ? media.enableMicAndCamera() : media.enableMic() );
+            if ( microphone && camera ) void media.enableMicAndCamera();
+            else if ( microphone ) void media.enableMic();
+            else if ( camera ) void media.enableCamera();
         }
 
         const tick = window.setInterval( () => {

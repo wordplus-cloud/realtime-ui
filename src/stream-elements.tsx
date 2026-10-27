@@ -6,6 +6,10 @@
 //     <live-stream name="show:42" view="player"></live-stream>            or its parts, each where the page puts it:
 //     <live-stream name="show:42" view="chat" height="480"></live-stream> player, chat, details, studio
 //     <stream-studio name="show:42"></stream-studio>                      the studio alone, which only a host sees
+//     <live-stream name="show:42" view="studio-page" url="/shows/42" back-url="/studio"></live-stream>
+//                                                                       the studio as a page of its own, filling the
+//                                                                       element's height: the picture, Go live, and the
+//                                                                       chat, the guests and the stream beside it
 //
 // The elements of one stream share one join, one chat and the player's state, however many there are. The script
 // (dist/realtime-ui-streams.min.js, window.wordplusRealtimeStreams) is apart from the call screen's realtime-ui.min.js,
@@ -16,6 +20,7 @@
 import { createRoot, type Root } from "react-dom/client";
 import type { EasyStreamClient } from "@wordplus/realtime-client/streams";
 import { EasyStreamParts, PART_NAMES, VIDEO_PARTS, type Part, type PartName, type PartOptions } from "./components/streams/parts.tsx";
+import type { StudioPageOptions } from "./components/streams/studio-page.tsx";
 import { errorText } from "./components/streams/words.ts";
 import { configureUi } from "./host.ts";
 import { direction, translator } from "./inc/translations.ts";
@@ -32,8 +37,11 @@ export interface StreamElementsSettings {
     prefix?: string;
 }
 
-/** The parts an element may be: the stream in one piece (`all`), or one of its parts. */
-const PARTS: readonly PartName[] = PART_NAMES.filter( ( name ) => [ "all", "player", "chat", "details", "studio" ].includes( name ) );
+/**
+ * The parts an element may be: the stream in one piece (`all`), or one of its parts, the studio as a page of its own
+ * (`studio-page`) among them.
+ */
+const PARTS: readonly PartName[] = PART_NAMES.filter( ( name ) => [ "all", "player", "chat", "details", "studio", "studio-page" ].includes( name ) );
 
 let lang = "en";
 let started = false;
@@ -138,7 +146,11 @@ function draw( group: Group ): void {
         return;
     }
 
-    for ( const element of group.elements ) element.mount.dir = direction( lang );
+    for ( const element of group.elements ) {
+        element.mount.dir = direction( lang );
+        // The studio page fills the height the page gives its element.
+        element.mount.style.height = element.view === "studio-page" ? "100%" : "";
+    }
     group.dialogs.dir = direction( lang );
 
     if ( group.error ) {
@@ -188,7 +200,7 @@ let keys = 0;
 /** `<live-stream name="show:42" view="player">`: a stream, or one of its parts. */
 class StreamElement extends HTMLElement {
     static readonly tag: string = "live-stream";
-    static readonly observedAttributes = [ "name", "view", "title", "cover", "url", "login-url", "studio-url", "chat", "height", "sticky" ];
+    static readonly observedAttributes = [ "name", "view", "title", "cover", "url", "login-url", "studio-url", "back-url", "chat", "height", "sticky" ];
     readonly key = "s" + ++keys;
     /** Where its part draws: React's, so only React empties it. */
     mount = document.createElement( "div" );
@@ -204,6 +216,17 @@ class StreamElement extends HTMLElement {
         return {
             ...( Number.isFinite( height ) && height > 0 ? { height } : {} ),
             ...( this.hasAttribute( "sticky" ) ? { sticky: true } : {} ),
+            ...( this.view === "studio-page" ? { page: this.studioLinks() } : {} ),
+        };
+    }
+
+    /** The studio page's links: back (`back-url`), and the page where viewers watch (`url`), whole, to share. */
+    private studioLinks(): StudioPageOptions {
+        const back = this.getAttribute( "back-url" );
+        const page = this.getAttribute( "url" );
+        return {
+            ...( back ? { back } : {} ),
+            ...( page ? { page: new URL( page, document.baseURI ).href } : {} ),
         };
     }
 

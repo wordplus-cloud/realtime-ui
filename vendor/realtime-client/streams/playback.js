@@ -17,6 +17,14 @@ const TOO_SLOW_SOUND = 0.05;
 const SAMPLE_MS = 1000;
 const FIRST_FRAME_SAMPLE_MS = 250;
 const EVENTS_KEPT = 30;
+// A picture's freezes count for the hold on arrivals only while it moves, at MOVING_FPS or more on average over the last
+// MOVING_SPAN_MS (a shared screen at MOVING_SCREEN_FPS: it shows a new frame only when something on it changes, and its
+// still moments would pass for freezes), and once it has played in sight and not held back for ACTIVE_MS: a picture
+// coming back into sight, or the page coming back to the front, reports the gap it was away as a freeze.
+const MOVING_SPAN_MS = 10000;
+const MOVING_FPS = 5;
+const MOVING_SCREEN_FPS = 20;
+const ACTIVE_MS = 5000;
 export const num = (v) => Number(v) || 0;
 const QUALITIES = ['low', 'medium', 'high'];
 // The layers a picture's sender sends, the best first, each size once.
@@ -64,6 +72,7 @@ export class PlaybackMonitor {
         this.timer = null;
         this.sampling = false;
         this.before = new WeakMap();
+        this.motion = new WeakMap();
         this.video = null;
         this.audio = null;
         this.transport = null;
@@ -80,9 +89,13 @@ export class PlaybackMonitor {
         this.slow = null;
         // Told once a picture shows nothing new while it should, too much for the connection (TOO_SLOW_MS).
         this.onTooSlow = null;
+        // Told each look, and each thing that happens.
+        this.onLook = null;
+        this.onNote = null;
     }
     note(kind, detail) {
-        this.events.push({ at: this.now(), kind, ...(detail ? { detail } : {}) });
+        const event = { at: this.now(), kind, ...(detail ? { detail } : {}) };
+        this.events.push(event);
         if (this.events.length > EVENTS_KEPT)
             this.events.splice(0, this.events.length - EVENTS_KEPT);
         if (kind === 'error')
@@ -91,6 +104,7 @@ export class PlaybackMonitor {
             this.session.reconnects++;
         if (kind === 'rejoined')
             this.session.rejoins++;
+        this.onNote?.(event);
     }
     // Joining a room: the first since the session began starts the clock of how long the picture takes.
     joining() {
@@ -162,6 +176,8 @@ export class PlaybackMonitor {
         let transport = null;
         const local = room.localParticipant;
         const around = { concealed: 0, samples: 0, mine: String(local?.connectionQuality ?? '') };
+        const sight = globalThis.document?.visibilityState !== 'hidden';
+        const look = { watching: false, freezes: 0, frozenMs: 0, lost: 0, got: 0, nacks: 0 };
         for (const participant of room.remoteParticipants.values()) {
             const sender = String(participant.connectionQuality ?? '');
             for (const publication of participant.trackPublications.values()) {
@@ -186,6 +202,8 @@ export class PlaybackMonitor {
                 const delta = (key) => before ? now[key] - before[key] : 0;
                 const kbps = seconds > 0 ? Math.max(0, Math.round(delta('bytes') * 8 / seconds / 1000)) : 0;
                 const lost = delta('lost'), got = delta('received');
+                look.lost += Math.max(0, lost);
+                look.got += Math.max(0, got);
                 const lossPct = lost > 0 && lost + got > 0 ? Math.round(lost / (lost + got) * 1000) / 10 : 0;
                 const emitted = delta('emitted');
                 const bufferMs = emitted > 0 ? Math.round(delta('bufferDelay') / emitted * 1000) : 0;
@@ -210,6 +228,13 @@ export class PlaybackMonitor {
                     const paused = track.streamState === 'paused';
                     if (!main || width * height > main.video.width * main.video.height)
                         main = { video, frames: now.frames, should, lost, got, paused, sender };
+                    look.nacks += Math.max(0, delta('nacks'));
+                    const active = sight && !publication.isMuted && remote.isEnabled !== false && !paused;
+                    if (this.moving(track, at, now.frames, active, String(publication.source) === 'screen_share')) {
+                        look.watching = true;
+                        look.freezes += Math.max(0, delta('freezes'));
+                        look.frozenMs += Math.max(0, Math.round(delta('frozen') * 1000));
+                    }
                 }
                 else if (publication.kind === 'audio') {
                     const samples = delta('samples');
@@ -228,6 +253,23 @@ export class PlaybackMonitor {
         this.audio = sound;
         this.transport = transport;
         this.follow(main, at, around);
+        this.onLook?.({ at, ...look, height: main?.video.height ?? 0 });
+    }
+    // Whether a picture's freezes count now (MOVING_FPS, ACTIVE_MS): it plays in sight and not held back, has for
+    // ACTIVE_MS, and moved enough over the last MOVING_SPAN_MS. Keeps its frames decoded for the next look.
+    moving(track, at, frames, active, screen) {
+        const motion = this.motion.get(track) ?? { frames: [], activeSince: null };
+        this.motion.set(track, motion);
+        motion.activeSince = active ? motion.activeSince ?? at : null;
+        motion.frames.push({ at, frames });
+        while (motion.frames.length > 2 && at - motion.frames[1].at >= MOVING_SPAN_MS)
+            motion.frames.shift();
+        if (motion.activeSince === null || at - motion.activeSince < ACTIVE_MS)
+            return false;
+        const first = motion.frames[0];
+        if (at - first.at < MOVING_SPAN_MS / 2)
+            return false;
+        return (frames - first.frames) / (at - first.at) * 1000 >= (screen ? MOVING_SCREEN_FPS : MOVING_FPS);
     }
     // The first frame, and the main picture stalling and coming back. Without a picture nothing stalls; before its first
     // frame it is starting.
@@ -308,7 +350,10 @@ export class PlaybackMonitor {
             bufferDelay: num(inbound.jitterBufferDelay),
             emitted: num(inbound.jitterBufferEmittedCount),
             concealed: num(inbound.concealedSamples),
-            samples: num(inbound.totalSamplesReceived)
+            samples: num(inbound.totalSamplesReceived),
+            freezes: num(inbound.freezeCount),
+            frozen: num(inbound.totalFreezesDuration),
+            nacks: num(inbound.nackCount)
         };
     }
 }

@@ -139,8 +139,10 @@ if ( engineInputs.length ) throw new Error( `realtime-ui-streams.min.js takes in
 // camera's frames, and the studio set up a host's preview before their site is connected and said when OBS stopped
 // sending, in the eight languages (760.7 KB in all). The one for calls was 800,000 until a call could show in the page
 // (<call-spot>) and in its chat (<chat-room to call>), with the chat's bar for the other person (10 KB more, 805 KB in
-// all).
-const BUDGETS = { 'realtime-ui.min.js': 820_000, 'realtime-ui-streams.min.js': 780_000 };
+// all), and 820,000 until a spot could join its meeting with the camera and microphone off or as `join-with` says, and
+// the call screen said Turn sound on where the browser held the others' sound back, in the eight languages (2.2 KB
+// more, 821 KB in all).
+const BUDGETS = { 'realtime-ui.min.js': 840_000, 'realtime-ui-streams.min.js': 780_000 };
 for ( const [ file, most ] of Object.entries( BUDGETS ) ) {
     const size = statSync( join( root, 'dist', file ) ).size;
     if ( size > most ) throw new Error( `dist/${ file } is ${ size } bytes, over its ${ most }. Nothing more was built.` );

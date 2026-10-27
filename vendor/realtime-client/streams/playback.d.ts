@@ -1,5 +1,6 @@
 import type { Room, Track, TrackPublication } from "@wordplus/rtc-client";
 import type { AudioIn, LayerQuality, MediaServer, PictureLayer, PlaybackEvent, PlaybackEventKind, PlaybackSession, PlaybackStats, TransportIn, VideoIn } from "./playback-types.js";
+import type { HoldLook } from "./hold.js";
 export type { AudioIn, LayerQuality, MediaServer, PictureLayer, PlaybackEvent, PlaybackEventKind, PlaybackSession, PlaybackStats, TransportIn, VideoIn };
 export type Stat = Record<string, unknown> & {
     type?: string;
@@ -8,6 +9,10 @@ export type Stat = Record<string, unknown> & {
 export type StatsTrack = Track & {
     getRTCStatsReport?: () => Promise<RTCStatsReport | undefined>;
 };
+export interface PlayLook extends HoldLook {
+    got: number;
+    height: number;
+}
 export declare const num: (v: unknown) => number;
 export declare function layersOf(publication: TrackPublication | undefined): PictureLayer[];
 export declare function choosableLayers(layers: PictureLayer[]): PictureLayer[];
@@ -22,6 +27,7 @@ export declare class PlaybackMonitor {
     private timer;
     private sampling;
     private before;
+    private motion;
     private video;
     private audio;
     private transport;
@@ -32,6 +38,8 @@ export declare class PlaybackMonitor {
     private stalledSince;
     private slow;
     onTooSlow: (() => void) | null;
+    onLook: ((look: PlayLook) => void) | null;
+    onNote: ((event: PlaybackEvent) => void) | null;
     constructor(onStalled: (stalled: boolean) => void, now?: () => number);
     note(kind: PlaybackEventKind, detail?: string): void;
     joining(): void;
@@ -40,6 +48,7 @@ export declare class PlaybackMonitor {
     snapshot(): PlaybackStats;
     private schedule;
     sample(room: Room): Promise<void>;
+    private moving;
     private follow;
     private followSlow;
     private resume;

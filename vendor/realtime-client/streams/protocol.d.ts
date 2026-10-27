@@ -147,6 +147,10 @@ export interface Corner {
 export declare const LAYOUTS: readonly ["grid", "speaker", "spotlight"];
 export declare const TIMEOUT_MIN_S = 60;
 export declare const TIMEOUT_MAX_S: number;
+export declare const TRACE_LINE_MAX = 300;
+export declare const TRACE_BATCH_MAX = 50;
+export declare const TRACE_EVERY_MS = 5000;
+export declare const TRACE_SESSION_MAX = 1000;
 export interface Hello {
     stream: StreamState;
     you: You;

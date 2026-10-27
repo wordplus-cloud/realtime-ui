@@ -1211,6 +1211,14 @@
             display: none;
         }
 
+        // A camera with nothing of theirs arriving that never showed a
+        // frame here (stalled.tsx): the avatar over its empty picture,
+        // under "Reconnecting...", as on a tile away.
+        &.bm-call-pictureless:has(.bm-media-container video)::before {
+            display: block;
+            z-index: 2;
+        }
+
         &.bm-active-speaker {
             border-color: rgba(var(--bm-color-accent), 0.9);
         }
@@ -2003,23 +2011,18 @@
     text-align: start;
   }
 
-  // A dot in the accent, a ring breathing out of it.
-  .bm-call-optimizing-pulse {
-    position: relative;
+  // A faint ring with an arc turning on it, as the call's busy controls spin.
+  .bm-call-optimizing-spinner {
     flex: none;
-    width: 8px;
-    height: 8px;
-    &:not(#\9) { border-radius: var(--bm-radius-circle); }
-    background: rgba(var(--bm-color-accent), 1);
+    width: 16px;
+    height: 16px;
+    fill: none;
+    stroke-width: 2.4;
+    stroke-linecap: round;
+    animation: bm-call-optimizing-spin 0.9s linear infinite;
 
-    &::after {
-      content: '';
-      position: absolute;
-      inset: 0;
-      border-radius: inherit;
-      background: inherit;
-      animation: bm-call-optimizing-breathe 1.6s cubic-bezier(0.2, 0.6, 0.3, 1) infinite;
-    }
+    circle { stroke: rgba(var(--bm-call-fg), 0.25); }
+    path { stroke: rgba(var(--bm-call-fg), 1); }
   }
 
   // The call between two people: the whole stage, a larger chip. Over the
@@ -2037,16 +2040,15 @@
       font-size: var(--bm-font-size-sm);
     }
 
-    .bm-call-optimizing-pulse {
-      width: 10px;
-      height: 10px;
+    .bm-call-optimizing-spinner {
+      width: 18px;
+      height: 18px;
     }
   }
 }
 
-@keyframes bm-call-optimizing-breathe {
-  0%   { transform: scale(1); opacity: 0.7; }
-  100% { transform: scale(2.8); opacity: 0; }
+@keyframes bm-call-optimizing-spin {
+  to { transform: rotate(360deg); }
 }
 
 @keyframes bm-call-optimizing-out {
@@ -2059,6 +2061,46 @@
   .bm-call-wrap .bm-call-optimizing.bm-call-optimizing--leaving {
     animation: none;
 
-    .bm-call-optimizing-pulse::after { animation: none; opacity: 0; }
+    .bm-call-optimizing-spinner { animation: none; }
   }
+}
+
+// A picture that stopped arriving while its sender is still in the call
+// (stalled.tsx): its last frame stays, blurred and dimmed as the optimizing
+// placeholder's still is, so it doesn't pass for live, under "Video
+// interrupted" (the paused notice's chip, .bm-call-stalled) or the tile's
+// "Reconnecting...". It comes back sharp with its next frame.
+.bm-call-wrap video.bm-call-video-stalled {
+  filter: blur(16px) brightness(0.62) saturate(1.15);
+}
+
+// A camera that never showed a frame here has no last frame to blur: their
+// face over the empty picture with the notice under it, nothing dimmed, as
+// there is nothing to dim (on a tile the size the tile's own avatar takes,
+// on the stage of a call between two its 100px one).
+.bm-call-wrap .bm-call-paused.bm-call-stalled-faced {
+  flex-direction: column;
+  gap: 12px;
+  background: transparent;
+}
+
+.bm-call-wrap .bm-call-stalled-face {
+  flex: none;
+  width: min(38%, 96px);
+  aspect-ratio: 1;
+  background-size: cover;
+  background-position: center;
+  &:not(#\9) { border-radius: var(--bm-radius-avatar); }
+}
+
+// Their sound stopped too: the face alone on the stage, "The other side lost
+// connection" over it.
+.bm-call-wrap .bm-call-stalled-face-main {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
 }

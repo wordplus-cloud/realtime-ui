@@ -26,6 +26,7 @@
  * does it there: +3 ms held). A browser that gives no reading (Firefox, or tracks of two streams) leaves the pair to
  * the caller's own rule (syncPair answers null).
  */
+import { type CallSettings } from "./room-publish.js";
 /** A receiver as a look needs it: its hold, which a browser without the setting lacks, and its stats. */
 export interface SyncReceiver {
     jitterBufferTarget?: number | null;
@@ -48,6 +49,11 @@ export declare const LIP_SYNC: {
     /** The most a hold is set to, ms: jitterBufferTarget's 4 s. */
     max: number;
 };
+/**
+ * 1.0.53: LIP_SYNC as the node's settings give it (lipsync.toleranceMs, lipsync.samples, lipsync.gain,
+ * lipsync.maxStepMs, playout.maxHoldMs): live, read at every look.
+ */
+export declare function lipSyncNumbers(settings?: CallSettings | null): typeof LIP_SYNC;
 /** Each pair's readings since its holds last moved, by its picture's receiver. */
 export type LipSyncState = WeakMap<SyncReceiver, {
     lags: number[];
@@ -70,4 +76,4 @@ export declare function closeAudioOutput(): void;
  * meeting, neither under base (the call's own hold) nor over LIP_SYNC.max. The lag read, or null when the browser
  * can't tell or can't hold: the caller's own rule then holds the pair.
  */
-export declare function syncPair(pair: SyncPair, state: LipSyncState, base: number, soundDelay?: number): Promise<number | null>;
+export declare function syncPair(pair: SyncPair, state: LipSyncState, base: number, soundDelay?: number, n?: typeof LIP_SYNC): Promise<number | null>;

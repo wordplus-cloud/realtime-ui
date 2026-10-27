@@ -184,7 +184,7 @@ describe( 'the player', () => {
             audio: { codec: 'opus', kbps: 32, lossPct: 0, jitterMs: 4, bufferMs: 1000, concealedPct: 0.1 },
             transport: { protocol: 'udp', relayed: true, relayProtocol: 'tls', rttMs: 140 },
             session: { startupMs: 1200, watchedMs: 65_000, stalls: 2, stalledMs: 3100, reconnects: 1, rejoins: 0, errors: 0 },
-            events: [ { at: Date.now() - 1000, kind: 'joined', detail: 'wss://bhs.rtc.example' }, { at: Date.now(), kind: 'stalled' } ]
+            events: [ { at: Date.now() - 1000, kind: 'joined', detail: 'wss://bhs.rtc.example' }, { at: Date.now(), kind: 'stalled' }, { at: Date.now(), kind: 'hold', detail: '2000' } ]
         } );
         render( <EasyStreamApp client={ asClient } /> );
 
@@ -203,6 +203,8 @@ describe( 'the player', () => {
         expect( row( 'Picture in' ) ).toBe( '1.2 s' );
         expect( row( 'Stalls' ) ).toBe( '2, 3.1 s in all' );
         expect( panel.querySelector( '.estream-stats__events' )?.textContent ).toContain( 'Picture stopped' );
+        // The viewer's buffer moving with its connection: its new length.
+        expect( panel.querySelector( '.estream-stats__events' )?.textContent ).toMatch( /Buffer\W*2 s/ );
 
         await act( async () => { fireEvent.click( screen.getByRole( 'button', { name: 'Copy' } ) ); } );
         const copied = JSON.parse( writeText.mock.calls[0]![0] );

@@ -36,3 +36,11 @@ export const LAYOUTS = ['grid', 'speaker', 'spotlight'];
 // A timeout lasts from a minute to a day.
 export const TIMEOUT_MIN_S = 60;
 export const TIMEOUT_MAX_S = 24 * 3600;
+// A player's account of how the stream plays for it, `trace { lines }`, which the cloud keeps beside the media servers'
+// record of the stream's room: numbers and moments only, never a name, an address or a word of the chat. Each line at
+// most TRACE_LINE_MAX characters, TRACE_BATCH_MAX a batch, a batch every TRACE_EVERY_MS at most, and TRACE_SESSION_MAX
+// lines a player in all. Answered `{ ok }`; a cloud before it answers nothing, and a player waits for no answer.
+export const TRACE_LINE_MAX = 300;
+export const TRACE_BATCH_MAX = 50;
+export const TRACE_EVERY_MS = 5000;
+export const TRACE_SESSION_MAX = 1000;

@@ -1,7 +1,7 @@
 {
   "name": "@wordplus/realtime-client",
-  "version": "1.0.46",
-  "description": "The realtime client at 0c3207f, as this package builds against it (scripts/client.mjs).",
+  "version": "1.0.59",
+  "description": "The realtime client at 9a39fec, as this package builds against it (scripts/client.mjs).",
   "private": true,
   "type": "module",
   "exports": {

@@ -107,7 +107,8 @@ export function StudioPage( props : { options : StudioPageOptions, chat : boolea
     const [ page, setPage ] = useState( props.options.page ?? '' );
     const now = useNow( 30000 );
     const id = useId();
-    const asking = state.hands.length;
+    // Hands count only while live, as the Guests tab lists them: an ended stream's last hands are no one's to invite.
+    const asking = live ? state.hands.length : 0;
     const stream = state.stream;
     // No chat tab while the page has no chat to reach (a host setting up before the site is connected).
     const chat = props.chat && chatReached( state );

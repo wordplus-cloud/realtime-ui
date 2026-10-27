@@ -7,6 +7,7 @@ import CallsApp from '../src/sdk/calls-app.tsx';
 import { translator } from '../src/inc/translations.ts';
 import type { SdkCall, SdkCalls, SdkGroupCall, SdkIncoming, SdkPerson, SdkRemoteTrack } from '../src/sdk/types.ts';
 import { fakeRoom, fakeRooms } from './fake-rooms.ts';
+import { remoteTrack } from '../src/sdk/tracks.ts';
 
 // The SDK's calls as the screens read them, by shape: events fired by hand.
 class Emitter {
@@ -188,6 +189,31 @@ describe( 'the SDK\'s calls on Better Messages\' screens', () => {
         await act( async () => { fireEvent.click( container.querySelector( '.bm-call-buttons .bm-cancel' )! ); } );
         expect( placed.ended ).toBe( true );
         expect( container.querySelector( '.realtime-call-window' ) ).toBeNull();
+    } );
+
+    it( 'asks before the page is left while a call is on, and not once it is over', async () => {
+        // A reload or a closed tab took the user out of a meeting with no word.
+        const calls = fakeCalls();
+        const placed = fakeCall( { state: 'connected' } );
+        calls.start.mockResolvedValue( placed );
+        const controller = new CallsController( calls );
+        const { container } = render( <CallsApp controller={ controller } /> );
+        // This screen's own listener: the calls other tests leave on keep theirs on the same window.
+        const added = vi.spyOn( window, 'addEventListener' );
+        const removed = vi.spyOn( window, 'removeEventListener' );
+        const listeners = () => added.mock.calls.filter( ( [ type ] ) => type === 'beforeunload' ).map( ( [ , listener ] ) => listener as EventListener );
+
+        expect( listeners() ).toEqual( [] );
+        await act( async () => controller.place( 'support:34:42', 34, 'video', { name: 'Ann' } ) );
+        expect( listeners() ).toHaveLength( 1 );
+        const leaving = new Event( 'beforeunload', { cancelable: true } );
+        listeners()[ 0 ]( leaving );
+        expect( leaving.defaultPrevented ).toBe( true );
+
+        await act( async () => { fireEvent.click( container.querySelector( '.bm-call-buttons .bm-cancel' )! ); } );
+        expect( removed ).toHaveBeenCalledWith( 'beforeunload', listeners()[ 0 ] );
+        added.mockRestore();
+        removed.mockRestore();
     } );
 
     it( 'shows a group call\'s people in the grid, and goes on as one when the call becomes it', async () => {
@@ -389,6 +415,113 @@ describe( 'a call in the page, in a spot of its own', () => {
         expect( container.querySelector( '.realtime-call-home .realtime-call-window' ) ).toBe( window );
         expect( placed.ended ).toBe( false );
     } );
+
+    it( 'CallSpot join: its group call joined as the spot comes onto the page, and not again once left', async () => {
+        const { CallScreen, CallSpot } = await import( '../src/react.tsx' );
+        const calls = fakeCalls();
+        const group = Object.assign( new Emitter(), { state: 'connected', people: () => [], setTrack: vi.fn( async () => {} ), leave: vi.fn(), decline: vi.fn() } );
+        calls.group.mockResolvedValue( group );
+        const rt = { calls: async () => calls };
+        const Page = ( { words }: { words: string } ) => <>
+            <CallScreen rt={ rt } />
+            <CallSpot rt={ rt } call="meeting:daily" join="video"><p>{ words }</p></CallSpot>
+            <CallSpot rt={ rt } call="meeting:{id}" join="video" />
+        </>;
+        const { container, rerender } = render( <Page words="The daily meeting" /> );
+        await act( async () => {} );
+        // The pattern's spot joins nothing: it names no one call.
+        expect( calls.group.mock.calls ).toEqual( [ [ 'meeting:daily', { type: 'video' } ] ] );
+        const spot = container.querySelector( '.realtime-call-spot' )!;
+        expect( spot.getAttribute( 'data-call' ) ).toBe( 'meeting:daily' );
+        // In with the camera and the microphone off: the browser asked for neither.
+        expect( navigator.mediaDevices.getUserMedia ).not.toHaveBeenCalled();
+        expect( group.setTrack ).not.toHaveBeenCalled();
+
+        // Left: its children again, and the page renders on without joining it again.
+        await act( async () => fireEvent.click( spot.querySelector( '.bm-exit-room' )! ) );
+        expect( group.leave ).toHaveBeenCalled();
+        rerender( <Page words="Nobody is in the meeting" /> );
+        await act( async () => {} );
+        expect( spot.textContent ).toBe( 'Nobody is in the meeting' );
+        expect( calls.group ).toHaveBeenCalledTimes( 1 );
+    } );
+
+    it( 'says Turn sound on while the browser holds the others\' sound back, and plays it on the next click anywhere', async () => {
+        // A page that joined by itself, with no click on it and its microphone off, may not play sound: the voices
+        // waited in silence, a click on the page started nothing, and nothing said why (2026-10-27).
+        let allowed = false;
+        const play = vi.spyOn( HTMLMediaElement.prototype, 'play' ).mockImplementation( () =>
+            allowed ? Promise.resolve() : Promise.reject( Object.assign( new Error( 'no gesture yet' ), { name: 'NotAllowedError' } ) ) );
+        const calls = fakeCalls();
+        const ann = { identity: 'user_34', user: 34, info: { name: 'Ann' }, camera: remote(), microphone: remote(), screen: null, screenAudio: null, speaking: false };
+        const group = Object.assign( new Emitter(), { state: 'connected', people: () => [ ann ], setTrack: vi.fn( async () => {} ), leave: vi.fn(), decline: vi.fn() } );
+        calls.group.mockResolvedValue( group );
+        const controller = new CallsController( calls );
+        const { container } = render( <CallsApp controller={ controller } /> );
+
+        await act( async () => controller.join( 'meeting:daily', 'video', 'Daily meeting', { microphone: false, camera: false } ) );
+        expect( container.querySelector( '.realtime-call-sound' ) ).toBeNull();
+        // Ann's voice, attached as her tile attaches it (jsdom lays out no tiles: the grid measures nothing here).
+        const voice = document.createElement( 'audio' );
+        container.querySelector( '.realtime-call-window' )!.append( voice );
+        await act( async () => { remoteTrack( ann.microphone )!.attach( voice ); } );
+        expect( container.querySelector( '.realtime-call-sound' )?.textContent ).toBe( 'Turn sound on' );
+
+        // A click anywhere on the page is the leave the browser waits for: the sound plays, and the button goes.
+        allowed = true;
+        await act( async () => { fireEvent.pointerDown( document.body ); } );
+        await act( async () => {} );
+        expect( container.querySelector( '.realtime-call-sound' ) ).toBeNull();
+        expect( play.mock.calls.length ).toBeGreaterThan( 1 );
+        play.mockRestore();
+        await act( async () => fireEvent.click( container.querySelector( '.bm-exit-room' )! ) );
+    } );
+
+    it( 'CallSpot joinWith turns on what it names as it joins, and the button turns on both', async () => {
+        const { CallScreen, CallSpot, GroupCallButton } = await import( '../src/react.tsx' );
+        const calls = fakeCalls();
+        const group = Object.assign( new Emitter(), { state: 'connected', people: () => [], setTrack: vi.fn( async () => {} ), leave: vi.fn(), decline: vi.fn() } );
+        calls.group.mockResolvedValue( group );
+        const rt = { calls: async () => calls };
+        const asked = () => vi.mocked( navigator.mediaDevices.getUserMedia ).mock.calls.map( ( [ what ] ) => Object.keys( what! ).sort().join( ' ' ) );
+
+        // The microphone and the camera, asked for once, as a click asks for them.
+        const { container, unmount } = render( <><CallScreen rt={ rt } /><CallSpot rt={ rt } call="meeting:daily" join="video" joinWith="microphone camera" /></> );
+        await act( async () => {} );
+        expect( asked() ).toEqual( [ 'audio video' ] );
+        await act( async () => fireEvent.click( container.querySelector( '.bm-exit-room' )! ) );
+        unmount();
+
+        // The microphone alone, on a video call: the camera stays off.
+        const second = render( <><CallScreen rt={ rt } /><CallSpot rt={ rt } call="meeting:daily" join="video" joinWith="microphone" /></> );
+        await act( async () => {} );
+        expect( asked() ).toEqual( [ 'audio video', 'audio' ] );
+        await act( async () => fireEvent.click( second.container.querySelector( '.bm-exit-room' )! ) );
+        second.unmount();
+
+        // A click on the meeting's button turns on both, as before: whoever clicks means to come in on camera.
+        const third = render( <><CallScreen rt={ rt } /><GroupCallButton rt={ rt } room="meeting:daily" type="video">Join</GroupCallButton></> );
+        await act( async () => {} );
+        await act( async () => fireEvent.click( third.getByText( 'Join' ) ) );
+        expect( asked() ).toEqual( [ 'audio video', 'audio', 'audio video' ] );
+    } );
+
+    it( 'joins a group call once while it is being joined: a second click, or a second spot, asks nothing more', async () => {
+        const calls = fakeCalls();
+        const group = Object.assign( new Emitter(), { state: 'connected', people: () => [], setTrack: vi.fn( async () => {} ), leave: vi.fn(), decline: vi.fn() } );
+        let answer: ( value: unknown ) => void = () => {};
+        calls.group.mockReturnValue( new Promise( ( resolve ) => { answer = resolve; } ) );
+        const controller = new CallsController( calls );
+        render( <CallsApp controller={ controller } /> );
+        const first = controller.join( 'meeting:daily', 'video', 'Daily' );
+        const second = controller.join( 'meeting:daily', 'video', 'Daily' );
+        await act( async () => {
+            answer( group );
+            await Promise.all( [ first, second ] );
+        } );
+        expect( calls.group ).toHaveBeenCalledTimes( 1 );
+        expect( controller.snapshot().showing?.kind ).toBe( 'group' );
+    } );
 } );
 
 describe( 'a chat that holds its call', () => {
@@ -564,7 +697,7 @@ describe( 'a host in a group call', () => {
 
     it( 'gets the moderator controls the cloud takes, each asked of the app through group.moderate()', async () => {
         // The rule's admin: Better Messages' controls on the others' tiles, but none the cloud has no act for: no pin, no
-        // microphone turned on for someone, no room muted or locked for everyone.
+        // microphone turned on for someone, no room muted or locked for everyone, and no switch to broadcast mode.
         const calls = fakeCalls();
         const group = meeting( { publish: true, subscribe: true, admin: true } );
         calls.group.mockResolvedValue( group );
@@ -574,7 +707,7 @@ describe( 'a host in a group call', () => {
 
         expect( labels( container, 'user_42' ) ).toEqual( [ 'Kick User', 'Block Broadcast' ] );
         expect( labels( container, 'user_43' ) ).toEqual( [ 'Kick User', 'Allow Broadcast' ] );
-        expect( container.querySelectorAll( '.bm-mute-all, .bm-unmute-all, .bm-lock-room, .bm-unlock-room' ) ).toHaveLength( 0 );
+        expect( container.querySelectorAll( '.bm-mute-all, .bm-unmute-all, .bm-lock-room, .bm-unlock-room, .bm-set-broadcast-mode, .bm-set-participatory-mode' ) ).toHaveLength( 0 );
 
         const click = async ( key: string, label: string ) => act( async () => {
             fireEvent.click( container.querySelector( `[data-key="${ key }"] [aria-label="${ label }"]` )! );

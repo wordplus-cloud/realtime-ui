@@ -11,7 +11,7 @@ export { RemoteMediaTrack } from "./remote-track.js";
 export { SfuReporter } from "./sfu-report.js";
 export { probeCodecCaps, roomPublishCodec } from "./codecs.js";
 // How a camera and a screen go out into a room: Better Messages', the SDK's group calls and Easy Stream's
-export { cameraCodecFor, screenCodecFor, roomCallCodec, roomCallChoice, hardwareFromCaps, backupFor, cameraPublish, cameraMaxHeight, fitCameraTrack, fasterCameraMode, CAMERA_MIN_FPS, screenPublish, screenVideoMode, applyScreenVideoMode, roomPixelDensity, SCREEN_ENCODING, SCREEN_CONTENT_HINT, SCREEN_CONTENT_HINT_SVC, SCREEN_SCALABILITY_MODE_SVC, SCREEN_DEGRADATION, SCREEN_DEGRADATION_VIDEO, DEFAULT_CAMERA_POLICY, DEFAULT_SCREEN_POLICY } from "./room-publish.js";
+export { cameraCodecFor, screenCodecFor, screenCodecOrder, roomCallCodec, roomCallChoice, hardwareFromCaps, backupFor, cameraPublish, cameraMaxHeight, fitCameraTrack, fasterCameraMode, CAMERA_MIN_FPS, screenPublish, screenVideoMode, directScreenMode, applyScreenVideoMode, roomPixelDensity, SCREEN_ENCODING, SCREEN_CONTENT_HINT, DIRECT_SCREEN_CONTENT_HINT, SCREEN_SCALABILITY_MODE_SVC, SCREEN_DEGRADATION, SCREEN_DEGRADATION_VIDEO, DEFAULT_CAMERA_POLICY, DEFAULT_SCREEN_POLICY } from "./room-publish.js";
 // A camera's hardware encoder that drops frames, remembered so the next camera goes out in software
 export { droppedHardwareCodecs, rememberDroppedHardware, HARDWARE_DROPS_KEY } from "./room-publish.js";
 export { watchCameraEncoder, dropsFrames, cpuHeld, readingsFor, hardwareReading, readEncoder, layerEncoders } from "./encoder-watch.js";
@@ -30,6 +30,13 @@ export { CameraSwitchGuard, CameraOptimizing, switchCameraCodec, nextCameraChoic
 export { setCallPlatform, defaultPlatform } from "./platform.js";
 // Lip sync in a room: each picture with its own sound, as the browser plays them (Better Messages' calls)
 export { syncPair, playoutLag, audioOutputDelay, closeAudioOutput, LIP_SYNC } from "./lip-sync.js";
+// The node's settings (1.0.53, @wordplus/rtc-client 1.0.23's Room.meshSettings): the policy they make, each number by
+// them, the live keys a product applies, and a camera re-published for an applyNow revision
+export { callPolicy, settingNumber, settingFlag, settingWord, screenEncoding, applyScreenSettings, micPublish, screenAudioPublish, micCapture, cameraCapture, screenCapture, connectGiveUpMs, cameraPublishChanged, screenPublishChanged, applyNowDelayMs } from "./room-publish.js";
+export { checkNumbers } from "./camera-check.js";
+export { watchNumbers } from "./encoder-watch.js";
+export { lipSyncNumbers } from "./lip-sync.js";
+export { roomSettings, roomPolicy, applyViewSettings } from "./room-settings.js";
 function transportOverride() {
     try {
         const value = window.localStorage.getItem('bm_call_transport');

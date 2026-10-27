@@ -6,10 +6,33 @@ import { CHECK_PATH, INGEST_IDENTITY, JOIN_PATH, LIVE_PATH, REACTION_EMOJI } fro
 import { avatarIn, issuerOf } from "./grant.js";
 import { pageMedia } from "./media.js";
 import { chosenLayer, layersOf, PlaybackMonitor } from "./playback.js";
+import { TROUBLE_WINDOW_MS, ViewerHold, VIEWER_HOLDS_MS } from "./hold.js";
+import { StreamTrace } from "./trace.js";
 import { SendingReader } from "./sending.js";
-import { backupFor, CHROMIUM_H264_ENCODE, cameraCodecFor, hardwareFromCaps, roomCallChoice, screenCodecFor, screenPublish, SCREEN_CONTENT_HINT, SCREEN_DEGRADATION } from "../calls/room-publish.js";
+import { backupFor, CHROMIUM_H264_ENCODE, cameraCodecFor, cameraRules, fitCameraTrack, hardwareFromCaps, roomCallChoice, screenCodecFor, screenPublish, SCREEN_CONTENT_HINT, SCREEN_DEGRADATION } from "../calls/room-publish.js";
+import { checkedCameraChoice, meshCameraReport, reportMeshCamera } from "../calls/camera-check.js";
 import { probeCodecCaps } from "../calls/codecs.js";
 import { watchCameraEncoder } from "../calls/encoder-watch.js";
+import { roomPolicy, roomSettings } from "../calls/room-settings.js";
+// A stream's picture goes out in sizes in every codec, for small players and slow connections, as the industry's
+// defaults have it: H.264 and VP8 in simulcast, VP9 as SVC, since one size can't suit a stream many people watch.
+// Its screen in H.264 from every device, its hardware encoder's or the
+// browser's own in software, and VP8 only from a browser that sends no H.264 (Firefox): never VP9, which Chrome sends a
+// screen in one size only, and which in several held a scrolled page to 7-10 frames a second at its coarsest, whatever
+// the bitrate, with no media server between (2026-10-24, on a Mac).
+const STREAM_SCREEN_POLICY = { screen: ['h264', 'vp8'] };
+// A stream's camera, in the order its check measures it ("testing the performance of H264, if that is fine we keeping it
+// for best compatibility across viewers devices, if that is not fine we testing VP9 then, and if VP9 not fine,
+// switching to VP8"): H.264 in hardware or software, VP9 as three sizes in one stream, VP8 last and never measured.
+const STREAM_CAMERA_ORDER = ['h264', 'vp9', 'vp8'];
+// The node's codec policy for a stream's camera check (checkCamera()): its switches and numbers as they are, and the
+// machines its camera rules name (by default Windows and Linux), each taking the stream's order in place of its own.
+// Null with no policy: nothing is checked.
+export function streamCameraPolicy(policy) {
+    if (!policy)
+        return null;
+    return { ...policy, rules: cameraRules(policy).map((rule) => ({ ...rule, camera: [...STREAM_CAMERA_ORDER] })) };
+}
 const PROBES = { h264: 'video/H264;profile-level-id=42e01f;packetization-mode=1', h265: 'video/H265' };
 export async function cameraCodec(nav = globalThis.navigator, options = {}) {
     const agent = nav?.userAgent ?? '';
@@ -62,12 +85,14 @@ function screenCapture(quality) {
         resolution: quality === '1080p' ? { width: 1920, height: 1080, frameRate: 30 } : { width: 1280, height: 720, frameRate: 30 }
     };
 }
-// How a shared screen goes out, as a group call's does (calls/room-publish.ts): in its codec (chosenCodecs(): the
-// hardware's H.264 where there is one, else VP8), its picture marked motion (SCREEN_CONTENT_HINT, set as it is shared) and
+// How a shared screen goes out, marked motion as a group call's is (SCREEN_CONTENT_HINT, set as it is shared) and
 // keeping its size when short of bandwidth or CPU (SCREEN_DEGRADATION), so smooth where it can be and sharp where it
-// can't. In H.264 or H.265 from 1280 by 640, in three pictures for viewers' different screens and connections, as the
-// camera's sizes go (screenLayers()); in VP8 whole only, one picture, as Chrome encodes VP8 simulcast of a screen at a
-// few frames a second (screenPublish). Its sound goes in stereo at 128 kbps, where a microphone's speech goes mono at 48.
+// can't: in its codec (chosenCodecs(), STREAM_SCREEN_POLICY: H.264 from every device, VP8 from a browser without it), from
+// 1280 by 640 in three pictures for viewers' different screens and connections, as the camera's sizes go
+// (screenLayers()). VP8 too, which a group call sends whole (screenPublish), as Chrome encodes VP8 simulcast of a moving
+// screen at a few frames a second: a stream's viewers need the sizes more. A screen in VP9 or AV1 (only by the
+// embedder's cameraCodec) goes in its one layer. Its sound goes in stereo at 128 kbps, where a microphone's speech goes
+// mono at 48.
 function screenPublishing(lk, track, quality, codec) {
     const top = quality === '1080p' ? 3000000 : 2000000;
     let settings = {};
@@ -77,15 +102,16 @@ function screenPublishing(lk, track, quality, codec) {
     catch (e) {
         // A track that says nothing of its size goes whole.
     }
-    const layers = screenPublish(settings.width ?? 0, settings.height ?? 0, codec).simulcast
-        ? screenLayers(settings.width ?? 0, settings.height ?? 0, quality)
-        : [];
+    const sized = codec === 'h264' || codec === 'h265' || codec === 'vp8';
+    const layers = sized ? screenLayers(settings.width ?? 0, settings.height ?? 0, quality) : [];
+    const { scalabilityMode } = screenPublish(settings.width ?? 0, settings.height ?? 0, codec);
     return {
         videoCodec: codec,
         screenShareEncoding: { maxBitrate: top, maxFramerate: 30 },
         degradationPreference: SCREEN_DEGRADATION,
         audioPreset: { maxBitrate: 128000 },
         forceStereo: true,
+        ...(scalabilityMode ? { scalabilityMode } : {}),
         ...(layers.length > 0
             ? { simulcast: true, screenShareSimulcastLayers: layers.map((l) => new lk.VideoPreset(l.width, l.height, l.bitrate, l.fps)) }
             : { simulcast: false })
@@ -168,12 +194,16 @@ const HIDDEN_LOW_SIDE = 360;
 // then plays late, a jolt each time (seen at about 1% lost on the way to Frankfurt, on stock LiveKit as on the mesh).
 // On stage, where people talk to each other, 150 ms covers a 50 ms round trip
 // (WordPlus Mesh's TestJitterBufferUnderLoss: 1% lost over a 50 ms round trip played 50 ± 21 ms between frames, 50 ± 6
-// at 150 ms). A viewer holds a second, which a live stream can spare: each lost packet then has time for several tries,
-// not one. A viewer in Ukraine of a stream through Canada's node (140 ms away, about 7% lost on the way down at 2.5
-// Mbit/s, the host's upload clean) dropped 73 and 112 frames and froze 5-6 times in 30 s at 300 ms, and dropped none
-// and never froze at 1000, decoding 29 frames a second of 29.
-const VIEWER_JITTER_BUFFER_MS = 1000;
+// at 150 ms). A viewer holds a second to begin with, which a live stream can spare: each lost packet then has time for
+// several tries, not one. A viewer in Ukraine of a stream through Canada's node (140 ms away, about 7% lost on the way
+// down at 2.5 Mbit/s, the host's upload clean) dropped 73 and 112 frames and froze 5-6 times in 30 s at 300 ms, and
+// dropped none and never froze at 1000, decoding 29 frames a second of 29. A viewer whose picture keeps freezing while
+// packets go missing holds longer, two seconds, then three, and comes back down once it plays smoothly (hold.ts).
 const STAGE_JITTER_BUFFER_MS = 150;
+// A line of how the stream played goes to the trace this often while watching, when anything went wrong meanwhile:
+// freezes, stops, 1% or more lost, a hold above the first.
+const TRACE_SUMMARY_MS = 5 * 60000;
+const TRACE_LOSS_PCT = 1;
 // OBS's key frames counted over this long (keyframeSeconds()): OBS makes one at its interval alone, never when a
 // viewer asks, so a viewer coming in, back to the page from another, or to another size of the picture waits for the
 // next. OBS's Keyframe Interval left at 0 (auto, and Simple output mode has no other) gave one every 8.2 s at 30 fps.
@@ -288,6 +318,8 @@ function helloExtras(hello) {
 function peakOf(cloud, watching, seen) {
     return typeof cloud === 'number' ? Math.max(cloud, watching) : Math.max(seen, watching);
 }
+// A length in ms as the trace says it: "1.6 s".
+const secondsOf = (ms) => ((Number(ms) || 0) / 1000).toFixed(1) + ' s';
 function healthOf(quality) {
     switch (String(quality)) {
         case 'excellent':
@@ -401,6 +433,11 @@ export class EasyStreamClient {
         // How the stream plays here (playbackStats()), and the pixel density adaptive stream sizes pictures by in the room
         // joined, which a viewer's chosen quality raises (capQuality).
         this.playback = new PlaybackMonitor((stalled) => this.set({ stalled }));
+        // A viewer's hold on arrivals, by how its connection carries the stream (hold.ts), and this player's account of how
+        // the stream plays, to the cloud (trace.ts), with what its next summary line counts (TRACE_SUMMARY_MS).
+        this.viewerHold = new ViewerHold();
+        this.trace = new StreamTrace((lines) => this.send('trace', { lines }));
+        this.played = { since: 0, freezes: 0, frozenMs: 0, lost: 0, got: 0, stalls: 0, stalledMs: 0, height: 0 };
         // What a host sends, in detail (sendingDetail()).
         this.sending = new SendingReader();
         this.pixelDensity = 1;
@@ -417,10 +454,12 @@ export class EasyStreamClient {
         // OBS's key frames decoded here, for keyframeSeconds(): the track they came on, the count at the last look, and
         // the looks it had grown at, the last KEYFRAME_WINDOW_MS of them.
         this.keyframes = null;
-        // This browser's codecs for a camera and a screen, asked once the room is joined, as a group call's are
-        // (calls/room-publish.ts): the first of the media server's policy this browser sends (the mesh's, rtc-client's
-        // meshCodecPolicy), by default H.264 where this device encodes it in hardware and VP8 otherwise, H.265 and
-        // Chromium's Baseline only on the mesh, VP8 behind any codec but VP8 for a viewer that decodes none of it.
+        // This browser's codecs for a camera and a screen, asked once the room is joined (pickCodecs()): the camera's
+        // measured as it goes live where the node checks cameras (checkCamera()), else as a group call's was before its
+        // check, the first of the media server's policy this browser sends (the mesh's, rtc-client's meshCodecPolicy), by
+        // default H.264 where this device encodes it in hardware and VP8 otherwise; VP8 behind any codec but VP8 for a
+        // viewer that decodes none of it. The screen's in H.264 (STREAM_SCREEN_POLICY). Asked again for a camera opened
+        // after it.
         this.codecChoice = null;
         // The camera sent, watched for a hardware encoder dropping its frames (calls/encoder-watch.ts): once seen, this
         // browser remembers it, and its next camera goes out in software. The watch follows the track's sender (a full
@@ -432,6 +471,8 @@ export class EasyStreamClient {
         this.video = options.video ?? true;
         this.state = { ...this.state, canShareScreen: Boolean(options.createLocalScreenTracks) || canShareScreen() };
         this.playback.onTooSlow = () => this.pictureTooSlow();
+        this.playback.onLook = (look) => this.looked(look);
+        this.playback.onNote = (event) => this.traceEvent(event);
     }
     // Something on the page shows the picture now (a player added beside a chat): video comes as it would have.
     wantVideo() {
@@ -478,6 +519,9 @@ export class EasyStreamClient {
     }
     // Leaves everything: media, devices and the chat socket.
     stop() {
+        if (!this.stopped)
+            this.summarize(true);
+        this.trace.stop();
         this.disconnectMedia();
         this.stopLocalTracks();
         this.stopScreenTracks();
@@ -1616,8 +1660,8 @@ export class EasyStreamClient {
         return this.hiddenKept && !this.handheld
             && !!smallest && smallest.height > 0 && Math.min(smallest.width, smallest.height) <= HIDDEN_LOW_SIDE;
     }
-    // A track's jitter buffer at VIEWER_JITTER_BUFFER_MS for a viewer, STAGE_JITTER_BUFFER_MS on stage; a browser
-    // without the setting keeps its own.
+    // A track's jitter buffer at the viewer's hold (hold.ts), STAGE_JITTER_BUFFER_MS on stage; a browser without the
+    // setting keeps its own.
     holdArrivals(track) {
         const receiver = track.receiver;
         if (!receiver || !('jitterBufferTarget' in receiver))
@@ -1660,8 +1704,106 @@ export class EasyStreamClient {
     encoderOf({ key, path }) {
         return { url: this.options.cloud.replace(/\/$/, '') + path, key };
     }
+    // A viewer off stage, whose hold follows its connection.
+    watchingOnly() {
+        return this.state.you?.role === 'viewer' && !this.state.onStage;
+    }
     ownHold() {
-        return this.state.you?.role === 'viewer' && !this.state.onStage ? VIEWER_JITTER_BUFFER_MS : STAGE_JITTER_BUFFER_MS;
+        return this.watchingOnly() ? this.viewerHold.ms : STAGE_JITTER_BUFFER_MS;
+    }
+    // A look at how the stream plays (playback.ts): counted for the trace's next summary, and for a viewer off stage,
+    // its hold on arrivals following it (hold.ts).
+    looked(look) {
+        this.countPlayed(look);
+        if (!this.watchingOnly())
+            return;
+        const change = this.viewerHold.look(look);
+        if (change)
+            this.holdMoved(change);
+    }
+    // The viewer's hold moved: everything it receives held as long now (each sound then follows its picture,
+    // soundFollowsPicture()), said in the statistics and the trace.
+    holdMoved(change) {
+        for (const participant of this.room?.remoteParticipants.values() ?? []) {
+            for (const publication of participant.trackPublications.values()) {
+                if (publication.track)
+                    this.holdArrivals(publication.track);
+            }
+        }
+        this.playback.note('hold', String(change.to));
+        const why = change.up
+            ? `froze ${change.freezes}x ${secondsOf(change.frozenMs ?? 0)} in ${TROUBLE_WINDOW_MS / 1000} s, ${change.lost} packets lost, ${change.nacks} asked again`
+            : `${Math.round((change.cleanMs ?? 0) / 60000)} min without trouble`;
+        this.trace.add(`hold ${change.from} -> ${change.to} ms: ${why}`);
+    }
+    // What happened, as a line of the trace (trace.ts). The hold's own line says why it moved (holdMoved()), and joining
+    // says nothing the join doesn't.
+    traceEvent(event) {
+        const detail = event.detail ? ' ' + event.detail : '';
+        switch (event.kind) {
+            case 'joining':
+            case 'hold':
+                return;
+            case 'joined': {
+                const server = this.playback.snapshot().server;
+                const node = (server?.node ?? '?') + (server?.region ? ' (' + server.region + ')' : '');
+                this.trace.add(`joined${detail} as ${this.state.you?.role ?? '?'}${this.state.onStage ? ' on stage' : ''}, node ${node}, hold ${this.ownHold()} ms`);
+                return;
+            }
+            case 'first-frame': {
+                const video = this.playback.snapshot().video;
+                this.trace.add(`first picture in ${secondsOf(Number(event.detail))}` + (video ? `, ${video.codec ?? '?'} ${video.height}p` : ''));
+                return;
+            }
+            case 'stalled':
+                this.trace.add('picture stopped');
+                return;
+            case 'resumed':
+                this.trace.add(`picture back after ${secondsOf(Number(event.detail))}`);
+                return;
+            default:
+                this.trace.add(event.kind + detail);
+        }
+    }
+    // A look counted for the trace's summary, which goes every TRACE_SUMMARY_MS.
+    countPlayed(look) {
+        const p = this.played;
+        if (p.since === 0) {
+            const session = this.playback.snapshot().session;
+            this.played = { ...p, since: look.at, stalls: session.stalls, stalledMs: session.stalledMs };
+        }
+        this.played.freezes += look.freezes;
+        this.played.frozenMs += look.frozenMs;
+        this.played.lost += look.lost;
+        this.played.got += look.got;
+        if (look.height > 0)
+            this.played.height = look.height;
+        if (look.at - this.played.since >= TRACE_SUMMARY_MS)
+            this.summarize(false, look.at);
+    }
+    // How the stream played since the last summary, as a line of the trace when anything went wrong in it: freezes,
+    // stops, TRACE_LOSS_PCT or more lost, a viewer's hold above the first. `last`: as the player stops.
+    summarize(last, at = Date.now()) {
+        const p = this.played;
+        if (p.since === 0)
+            return;
+        const stats = this.playback.snapshot();
+        const stalls = stats.session.stalls - p.stalls, stalledMs = stats.session.stalledMs - p.stalledMs;
+        const packets = p.lost + p.got;
+        const lossPct = packets > 0 ? Math.round(p.lost / packets * 1000) / 10 : 0;
+        const held = this.watchingOnly() ? this.viewerHold.ms : 0;
+        if (p.freezes > 0 || stalls > 0 || lossPct >= TRACE_LOSS_PCT || held > VIEWER_HOLDS_MS[0]) {
+            const parts = [
+                p.height > 0 ? p.height + 'p' : null,
+                p.freezes > 0 ? `froze ${p.freezes}x ${secondsOf(p.frozenMs)}` : null,
+                stalls > 0 ? `stopped ${stalls}x ${secondsOf(stalledMs)}` : null,
+                `lost ${lossPct}% (${p.lost} of ${packets})`,
+                held > 0 ? `hold ${held} ms` : null,
+                stats.transport?.rttMs ? `round trip ${stats.transport.rttMs} ms` : null
+            ].filter(Boolean);
+            this.trace.add(`${last ? 'played until now' : 'played'} ${((at - p.since) / 60000).toFixed(1)} min: ${parts.join(', ')}`);
+        }
+        this.played = { since: last ? 0 : at, freezes: 0, frozenMs: 0, lost: 0, got: 0, stalls: stats.session.stalls, stalledMs: stats.session.stalledMs, height: p.height };
     }
     // Sound follows picture in this room while it is the one joined (SYNC_TICK_MS).
     followPictures(room) {
@@ -1835,6 +1977,9 @@ export class EasyStreamClient {
             audio: microphone ? this.microphoneOptions() : false,
             video: camera ? this.cameraOptions(lk) : false
         });
+        // A new camera's codec is asked again as it goes out (checkCamera()).
+        if (camera)
+            this.codecChoice = null;
         this.set({ devices: { camera, microphone } });
         this.refreshTiles();
     }
@@ -2065,8 +2210,9 @@ export class EasyStreamClient {
     // at 2.5), so its full size asks for less; VP8 keeps its bitrate (at 1.8 Mbit/s it scored 2.5 lower), and backs
     // any other codec. VP9 and AV1 go as one SVC stream of three sizes, each half the one above (L3T3_KEY), on about 70%
     // and 60% of VP8's bits (calls/room-publish.ts, cameraPublish()), the two lower layers then the VP8 behind's.
+    // A camera its check brought down to 720 lines goes out as a 720p stream's does.
     cameraPublishing(lk, codecs) {
-        const full = this.state.sendQuality === '1080p';
+        const full = this.state.sendQuality === '1080p' && (!codecs.height || codecs.height > 720);
         const tops = {
             vp8: full ? 4500000 : 2500000,
             h264: full ? 3500000 : 1800000,
@@ -2093,25 +2239,65 @@ export class EasyStreamClient {
     watchCamera(publication) {
         this.cameraWatch?.();
         const track = publication?.track;
-        this.cameraWatch = track?.sender ? watchCameraEncoder(() => track.sender, { onDrops: () => { this.codecChoice = null; } }) : null;
+        // the node's numbers for the watch as they are at each look (rtc-client 1.0.23)
+        const room = this.room;
+        this.cameraWatch = track?.sender
+            ? watchCameraEncoder(() => track.sender, { settings: () => roomSettings(room), onDrops: () => { this.codecChoice = null; } })
+            : null;
     }
     chosenCodecs(room) {
-        this.codecChoice ?? (this.codecChoice = this.pickCodecs(room).catch(() => ({ camera: 'vp8', screen: 'vp8', backup: null })));
+        this.codecChoice ?? (this.codecChoice = this.pickCodecs(room).catch(() => ({ camera: 'vp8', screen: 'vp8', backup: null, height: 0 })));
         return this.codecChoice;
     }
     async pickCodecs(room) {
         if (this.options.cameraCodec) {
             const codec = await this.options.cameraCodec();
-            return { camera: codec, screen: codec, backup: backupFor(codec) };
+            return { camera: codec, screen: codec, backup: backupFor(codec), height: 0 };
         }
         const agent = globalThis.navigator?.userAgent ?? '';
+        // the media server's policy: from its settings where its node sends them (rtc-client 1.0.23), else its codec policy
         const options = {
             h265: !!this.seatUrl && !!this.lk?.isMeshServer?.(this.seatUrl),
-            policy: room.meshCodecPolicy ?? null
+            policy: roomPolicy(room)
         };
         const caps = await (this.options.codecCaps ?? probeCodecCaps)().catch(() => null);
-        const camera = roomCallChoice(caps, agent, options);
-        return { camera: camera.codec, screen: screenCodecFor(agent, hardwareFromCaps(caps), options), backup: camera.backup };
+        const camera = await this.checkCamera(room, caps, agent, options);
+        // the screen in the stream's own order, unless the node's settings set screen.codecs (a rule for live streams):
+        // then the server's, as a group call's goes
+        const node = roomSettings(room);
+        const screenPolicy = node?.has('screen.codecs') ? { screen: node.get('screen.codecs') } : STREAM_SCREEN_POLICY;
+        const screen = screenCodecFor(agent, hardwareFromCaps(caps), { ...options, policy: screenPolicy });
+        const source = camera.source ?? 'rule';
+        this.trace.add(`codecs: camera ${camera.codec}${camera.hardware ? ' hardware' : ''} by ${source}${camera.height ? ' at ' + camera.height + 'p' : ''}, screen ${screen}`);
+        return { camera: camera.codec, screen, backup: camera.backup, height: camera.height ?? 0 };
+    }
+    // The camera's codec as the stream goes live, H.264 first: measured by the calls' camera check (calls/camera-check.ts:
+    // a clone of the camera through the browser's real encoder, in a loopback inside the page) where the node checks
+    // cameras (its codec policy's `check`), on the machines its camera rules name, in the stream's order
+    // (streamCameraPolicy()). Each verdict
+    // is this browser's record for a while, so a later Go live reads it instead of measuring. What it found goes to the
+    // mesh with the camera, as a call's does. A camera measured able only at fewer lines than it gives (VP9 at 720, H.264
+    // in software) is brought down to them before it goes out, the lines it then has the choice's `height`; any other
+    // camera goes out at the size it has (0). No camera, no check, or a check that fails: the codec as before
+    // (roomCallChoice()).
+    async checkCamera(room, caps, agent, options) {
+        const before = () => ({ ...roomCallChoice(caps, agent, options), height: 0 });
+        const track = this.localTrack('video')?.mediaStreamTrack;
+        if (!track || options.policy?.check !== true)
+            return before();
+        const stop = () => this.stopped || track.readyState === 'ended' || this.localTrack('video')?.mediaStreamTrack !== track;
+        let choice;
+        try {
+            choice = await (this.options.cameraCheck ?? checkedCameraChoice)(track, caps, agent, { ...options, policy: streamCameraPolicy(options.policy), stop });
+        }
+        catch {
+            return before();
+        }
+        reportMeshCamera(room, meshCameraReport(choice));
+        if (choice.source === 'default' || !choice.height || stop())
+            return { ...choice, height: 0 };
+        const height = await fitCameraTrack(track, choice.codec, choice.hardware, choice.height).catch(() => 0);
+        return { ...choice, height: height || choice.height };
     }
     // Every open track not out yet, a shared screen's too: a second call publishes nothing twice.
     async publishUnpublished(room) {
@@ -2253,6 +2439,8 @@ export class EasyStreamClient {
             if (!added)
                 return;
             this.localTracks.push(added);
+            if (device === 'camera')
+                this.codecChoice = null;
         }
         const devices = { ...this.state.devices, [device]: on };
         this.set({ devices });
