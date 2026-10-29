@@ -21,7 +21,7 @@ import { useLayoutEffect, useRef, RefObject } from "react";
 // Entering children have no previous rect and are skipped, which leaves their
 // own mount animation alone. Callers that also animate `transform` on the same
 // element must confine that to the first render of a child, for the same
-// reason group-audio-grid-item drops .bm-call-tile-entering once it has
+// reason group-audio-grid-item drops .wplus-call-tile-entering once it has
 // played: this runs on every commit, and two animations driving transform at
 // once produce exactly the jitter it is here to avoid.
 export default function useFlipReorder(

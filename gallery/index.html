@@ -7,15 +7,15 @@
     <link rel="stylesheet" href="ui.css">
     <style>
         /* The gallery's own page: the shots on the theme's ground, each labelled. */
-        body { margin: 0; background: rgba(var(--bm-color-bg-secondary), 1); color: rgba(var(--bm-color-text-primary), 1);
+        body { margin: 0; background: rgba(var(--wplus-color-bg-secondary), 1); color: rgba(var(--wplus-color-text-primary), 1);
                font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
         .gallery { display: flex; flex-direction: column; gap: 28px; padding: 24px 16px 48px; }
         .gallery-shot { width: 100%; }
-        .gallery-shot h2 { margin: 0 0 10px; font-size: 13px; font-weight: 600; color: rgba(var(--bm-color-text-secondary), 1); }
-        .gallery-frame { display: flex; flex-direction: column; gap: 12px; padding: 16px; border-radius: 12px; background: rgba(var(--bm-color-bg), 1);
-                         border: 1px solid rgba(var(--bm-color-border), 1); }
+        .gallery-shot h2 { margin: 0 0 10px; font-size: 13px; font-weight: 600; color: rgba(var(--wplus-color-text-secondary), 1); }
+        .gallery-frame { display: flex; flex-direction: column; gap: 12px; padding: 16px; border-radius: 12px; background: rgba(var(--wplus-color-bg), 1);
+                         border: 1px solid rgba(var(--wplus-color-border), 1); }
         .gallery-row { display: flex; flex-wrap: wrap; align-items: center; gap: 16px; }
-        .gallery-call { position: relative; height: 420px; border-radius: 12px; overflow: hidden; background: rgba(var(--bm-call-canvas), 1); }
+        .gallery-call { position: relative; height: 420px; border-radius: 12px; overflow: hidden; background: rgba(var(--wplus-call-canvas), 1); }
         .gallery-call[data-layout="audio"] { height: 360px; }
         .gallery-chat { height: 640px; border-radius: 10px; }
         /* The whole conversation in view at a phone's width too, rather than scrolled under its sticky day. */
@@ -23,7 +23,7 @@
         .gallery-short { height: 220px; border-radius: 10px; }
         .gallery-composer { height: auto; }
         .gallery-online { height: 260px; display: flex; }
-        .gallery-online .bm-chat-online { width: 100%; border-radius: 10px; border: 1px solid rgba(var(--bm-color-border), 1); }
+        .gallery-online .wplus-chat-online { width: 100%; border-radius: 10px; border: 1px solid rgba(var(--wplus-color-border), 1); }
     </style>
 </head>
 <body>

@@ -12,7 +12,7 @@ import { mergeRefs } from "react-merge-refs";
 // padding. Nothing in the messenger may rely on the <button> element.
 //
 // So Btn renders a <span role="button">. No theme styles bare spans by
-// element name, and the class it carries (.bm-btn) restores the box model a
+// element name, and the class it carries (.wplus-btn) restores the box model a
 // <button> gave for free. Everything a native button does for us is
 // reimplemented here, once:
 //
@@ -93,7 +93,7 @@ const Btn = forwardRef<HTMLElement, BtnProps>( function Btn( {
         <Tag
             { ...rest }
             ref={ mergeRefs( [ own, ref ] ) }
-            className={ "bm-btn" + ( className ? " " + className : "" ) }
+            className={ "wplus-btn" + ( className ? " " + className : "" ) }
             role={ role }
             tabIndex={ disabled ? -1 : ( tabIndex ?? 0 ) }
             aria-disabled={ disabled ? true : undefined }

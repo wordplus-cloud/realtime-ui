@@ -22,8 +22,8 @@ export function FallbackAvatar( props: UserAvatarProps ) {
         { user?.avatar
             ? <img src={ user.avatar } className={ "avatar avatar-" + props.size } width={ props.size } height={ props.size }
                    alt={ sprintf( _x( 'Profile picture of %s', 'Messages List - Avatar Alt', 'bp-better-messages' ), user.name ) } />
-            : <div className="bm-placeholder-wrapper" style={{ position: "relative", width: props.size, height: props.size, borderRadius: "var(--bm-radius-avatar)", overflow: "hidden" }}>
-                <div className="bm-placeholder" />
+            : <div className="wplus-placeholder-wrapper" style={{ position: "relative", width: props.size, height: props.size, borderRadius: "var(--wplus-radius-avatar)", overflow: "hidden" }}>
+                <div className="wplus-placeholder" />
             </div> }
     </span>;
 }

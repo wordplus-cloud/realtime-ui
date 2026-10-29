@@ -48,8 +48,8 @@ import { flushSync } from "react-dom";
 // conversation is one.
 
 interface Props {
-    // The dock's own class — .bm-call-buttons (1:1) or
-    // .bm-group-call-controls-buttons (rooms). Both carry the same dock
+    // The dock's own class — .wplus-call-buttons (1:1) or
+    // .wplus-group-call-controls-buttons (rooms). Both carry the same dock
     // styling; the class stays with the call site so the stylesheet and the
     // specs keep reading the markup 2.0 emitted.
     className : string;
@@ -58,7 +58,7 @@ interface Props {
     pinned?   : number;
     // The More button, drawn while anything is folded: `sheet` is the open
     // sheet (null while closed), placed inside it, and `toggle` opens and
-    // closes it. The button carries the class .bm-call-more, by which a press
+    // closes it. The button carries the class .wplus-call-more, by which a press
     // on it, or in its sheet, is told from a press outside that closes it.
     more      : ( props : { open : boolean; toggle : () => void; sheet : ReactNode } ) => ReactNode;
     children  : ReactNode;
@@ -94,7 +94,7 @@ type DockButton = ReactElement<{
     "aria-label"? : string;
 }>;
 
-// An item is a <Tooltip content="Mute All"><span className="bm-mute-all">,
+// An item is a <Tooltip content="Mute All"><span className="wplus-mute-all">,
 // whose tooltip's copy is the label the sheet spells out and whose span is the
 // button itself; or the span alone, labelled by its own aria-label.
 function itemParts( el: ReactElement ): { label: string; button: DockButton } {
@@ -159,7 +159,7 @@ export default function FoldingDock( { className, pinned = 0, more, children }: 
     // Keyed by position in the WHOLE row, so moving a button between the row
     // and the sheet is a move and not a remount.
     const keyed = ( list: ReactElement[], from: number ) =>
-        list.map( ( el, i ) => cloneElement( el, { key: `bm-dock-${ from + i }` } ) );
+        list.map( ( el, i ) => cloneElement( el, { key: `wplus-dock-${ from + i }` } ) );
 
     // Re-open the row whenever its contents change, so the next pass starts
     // from every button inline and can also GIVE BACK a button the row has
@@ -263,7 +263,7 @@ export default function FoldingDock( { className, pinned = 0, more, children }: 
         // itself, which is the "act, then put it away" the dock wants.)
         const onDown = ( e: PointerEvent ) => {
             const target = e.target;
-            if ( target instanceof Element && target.closest( ".bm-call-more" ) ) return;
+            if ( target instanceof Element && target.closest( ".wplus-call-more" ) ) return;
             setOpen( false );
         };
         const onKey = ( e: KeyboardEvent ) => {
@@ -279,10 +279,10 @@ export default function FoldingDock( { className, pinned = 0, more, children }: 
     }, [ open ] );
 
     const rows = open
-        ? <div className="bm-call-dock-sheet" role="menu">
+        ? <div className="wplus-call-dock-sheet" role="menu">
             { sheet.map( ( el, i ) => {
                 const { label, button } = itemParts( el );
-                const cls = [ button.props.className, "bm-call-dock-sheet__row" ]
+                const cls = [ button.props.className, "wplus-call-dock-sheet__row" ]
                     .filter( Boolean ).join( " " );
 
                 // The button itself becomes the row: it keeps its handler and
@@ -291,10 +291,10 @@ export default function FoldingDock( { className, pinned = 0, more, children }: 
                 // no tooltip of its own.
                 return cloneElement(
                     button,
-                    { key: `bm-dock-sheet-${ i }`, className: cls, role: "menuitem", "data-bm-tip": undefined } as Partial<DockButton[ "props" ]>,
+                    { key: `wplus-dock-sheet-${ i }`, className: cls, role: "menuitem", "data-wplus-tip": undefined } as Partial<DockButton[ "props" ]>,
                     ...React.Children.toArray( button.props.children ),
                     label
-                        ? <span key="bm-dock-label" className="bm-call-dock-sheet__label">{ label }</span>
+                        ? <span key="wplus-dock-label" className="wplus-call-dock-sheet__label">{ label }</span>
                         : null,
                 );
             } ) }

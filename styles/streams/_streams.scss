@@ -1456,7 +1456,7 @@
 
 // A Better Messages room in the player's full screen is used where it is: Better Messages' Tap to open messages, which
 // it lays over a room on a phone, would take the room out of the full screen to the page's body, where nobody sees it.
-.estream-theme--full .estream-bm-room .bm-tap-to-open:not(#\9) {
+.estream-theme--full .estream-bm-room .wplus-tap-to-open:not(#\9) {
     display: none;
 }
 
@@ -3325,13 +3325,13 @@ select.estream-input {
         height: 7px;
         border-radius: 50%;
         background: #e0322b;
-        box-shadow: 0 0 0 2px rgba(var(--bm-color-chat-bg, 255, 255, 255), 1);
+        box-shadow: 0 0 0 2px rgba(var(--wplus-color-chat-bg, 255, 255, 255), 1);
     }
 }
 
 // The banner over the messages: Live, the stream's title, how many watch.
 .estream-bm-banner {
-    .bm-group-call-in-progress-info {
+    .wplus-group-call-in-progress-info {
         flex-wrap: wrap;
         justify-content: center;
     }
@@ -3369,7 +3369,7 @@ select.estream-input {
     inset: 0;
     background: transparent;
 
-    > .bm-group-call-container {
+    > .wplus-group-call-container {
         position: absolute;
         inset: 0;
     }
@@ -3380,7 +3380,7 @@ select.estream-input {
     }
 
     // The call's bar under the picture, flat: Better Messages fades it in with a gradient (none here).
-    .bm-group-call-controls-v2 {
+    .wplus-group-call-controls-v2 {
         background: none;
     }
 
@@ -3413,22 +3413,22 @@ select.estream-input {
     // over a picture too much for the connection.
     button.estream-slow__button:not(#\9) {
         padding: 8px 16px !important;
-        border-radius: var(--bm-radius-button, 8px) !important;
-        background: rgba(var(--bm-color-accent, 37, 99, 235), 1) !important;
+        border-radius: var(--wplus-radius-button, 8px) !important;
+        background: rgba(var(--wplus-color-accent, 37, 99, 235), 1) !important;
         color: #fff !important;
         font-size: 14px !important;
         line-height: 20px;
         white-space: nowrap;
 
         &:hover {
-            background: rgba(var(--bm-color-accent, 37, 99, 235), 0.9) !important;
+            background: rgba(var(--wplus-color-accent, 37, 99, 235), 0.9) !important;
         }
     }
 
     button.estream-unmute:not(#\9) {
         padding: 10px 18px !important;
-        border-radius: var(--bm-radius-button, 8px) !important;
-        background: rgba(var(--bm-color-accent, 37, 99, 235), 1) !important;
+        border-radius: var(--wplus-radius-button, 8px) !important;
+        background: rgba(var(--wplus-color-accent, 37, 99, 235), 1) !important;
         color: #fff !important;
         font-size: 14px !important;
         line-height: 20px;
@@ -3436,7 +3436,7 @@ select.estream-input {
         box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3) !important;
 
         &:hover {
-            background: rgba(var(--bm-color-accent, 37, 99, 235), 0.9) !important;
+            background: rgba(var(--wplus-color-accent, 37, 99, 235), 0.9) !important;
         }
     }
 
@@ -3447,7 +3447,7 @@ select.estream-input {
 
     // Over each tile, as over a call's tile: the name in a pill at the bottom start, the microphone off in a red disc
     // at the bottom end (Better Messages' _call-stage.scss).
-    .bm-group-call-input-video-inner-info {
+    .wplus-group-call-input-video-inner-info {
         position: absolute;
         inset-inline: 0;
         bottom: 0;
@@ -3458,7 +3458,7 @@ select.estream-input {
         pointer-events: none;
     }
 
-    .bm-info-name {
+    .wplus-info-name {
         display: inline-flex;
         align-items: center;
         min-width: 0;
@@ -3475,7 +3475,7 @@ select.estream-input {
         text-overflow: ellipsis;
     }
 
-    .bm-caller-status {
+    .wplus-caller-status {
         position: absolute;
         z-index: 2;
         bottom: 8px;
@@ -3483,14 +3483,14 @@ select.estream-input {
         display: flex;
     }
 
-    .bm-mic-disabled {
+    .wplus-mic-disabled {
         display: inline-flex;
         align-items: center;
         justify-content: center;
         width: 24px;
         height: 24px;
         border-radius: 50%;
-        background: rgba(var(--bm-color-recording, 239, 68, 68), 0.92);
+        background: rgba(var(--wplus-color-recording, 239, 68, 68), 0.92);
         color: #fff;
         line-height: 0;
 
@@ -3501,20 +3501,20 @@ select.estream-input {
     }
 
     // A sheet's button while its sheet is open, as a latched extra of the call's.
-    .bm-group-call-controls-buttons > .bm-configure-call[data-active],
-    .bm-group-call-controls-buttons > .estream-bm-react[data-active] {
-        background: rgba(var(--bm-color-accent), 1);
-        color: rgba(var(--bm-color-text-on-accent), 1);
+    .wplus-group-call-controls-buttons > .wplus-configure-call[data-active],
+    .wplus-group-call-controls-buttons > .estream-bm-react[data-active] {
+        background: rgba(var(--wplus-color-accent), 1);
+        color: rgba(var(--wplus-color-text-on-accent), 1);
     }
 
     // The viewer's sheet: the volume over the quality, one column as wide as a device's picker.
-    .bm-call-settings.estream-bm-watch {
+    .wplus-call-settings.estream-bm-watch {
         flex-direction: column;
         flex-wrap: nowrap;
         align-items: stretch;
         width: min(240px, calc(100% - 28px));
 
-        > .bm-call-setting {
+        > .wplus-call-setting {
             flex: none;
             max-width: none;
         }
@@ -3528,7 +3528,7 @@ select.estream-input {
     }
 
     // The reactions, a row of emoji over the dock.
-    .bm-call-settings.estream-bm-reactions {
+    .wplus-call-settings.estream-bm-reactions {
         gap: 2px;
         padding: 6px;
     }
@@ -3594,12 +3594,12 @@ select.estream-input {
     }
 
     // The settings sheet's rows from the left, so a field alone on its row (the speakers) sits under the first.
-    .bm-group-call-controls-v2 .bm-call-settings {
+    .wplus-group-call-controls-v2 .wplus-call-settings {
         justify-content: flex-start;
     }
 
     // The host's statistics across the settings sheet, over the devices: each figure's name, then the figure.
-    .bm-call-settings > .estream-bm-statistics {
+    .wplus-call-settings > .estream-bm-statistics {
         flex: 1 1 100%;
         max-width: none;
     }
@@ -3645,7 +3645,7 @@ select.estream-input {
     }
 
     // A control that can't act yet (Go live before a preview).
-    .bm-group-call-controls-buttons > [aria-disabled="true"] {
+    .wplus-group-call-controls-buttons > [aria-disabled="true"] {
         opacity: 0.45;
         cursor: default;
     }
@@ -3670,7 +3670,7 @@ select.estream-input {
     min-height: 320px;
     height: var(--estream-chat-height, 480px);
 
-    > .bm-chat-wrap {
+    > .wplus-chat-wrap {
         flex: 1;
         height: auto !important;
         min-height: 0;
@@ -3689,7 +3689,7 @@ select.estream-input {
 
 // In full screen the room meets the screen's edges square, as the light chat does there: none of Better Messages'
 // card frame, which it raises with an id's weight (`:not(#\9)`), the column's own line parting it from the picture.
-.estream-theme--full .estream-bm-room .bm-card--thread-embed:not(#\9) {
+.estream-theme--full .estream-bm-room .wplus-card--thread-embed:not(#\9) {
     border: 0;
     border-radius: 0;
     box-shadow: none;
@@ -3733,7 +3733,7 @@ select.estream-input {
 
     // In the studio's Chat tab the room fills the panel edge to edge, as the light chat does: none of Better Messages'
     // card frame, which it raises with an id's weight (`:not(#\9)`).
-    .bm-card--thread-embed:not(#\9) {
+    .wplus-card--thread-embed:not(#\9) {
         border: 0;
         border-radius: 0;
         box-shadow: none;

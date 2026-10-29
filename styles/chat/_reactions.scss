@@ -8,14 +8,14 @@
 // wrap past ~300px) with the messenger surface language.
 //
 // The strip is portalled onto <body> (or the shadow root its trigger is
-// in): everything under .bm-reaction-strip-anchor must style without a
-// .bm-wrap ancestor (tokens live on :root, or :host, so var() usage is safe).
+// in): everything under .wplus-reaction-strip-anchor must style without a
+// .wplus-wrap ancestor (tokens live on :root, or :host, so var() usage is safe).
 //
 // Source: src/components/chat/reactions.tsx, and Better Messages'
 // message-reactions.tsx (its set, emoji images and API), which imports this
 // file into its stylesheet.
 
-.bm-reactions {
+.wplus-reactions {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
@@ -23,15 +23,15 @@
     margin-top: 4px;
 }
 
-.bm-reaction-pill {
+.wplus-reaction-pill {
     height: 24px;
     // Even, so a pill with no count (a single pick) is the emoji centred.
     // The count carries the 2px more it wants at its own end.
     padding: 0 7px;
-    border: 1px solid rgba(var(--bm-color-border-subtle), 1);
-    background: rgba(var(--bm-color-bg-elevated), 1);
-    color: rgba(var(--bm-color-text-secondary), 1);
-    &:not(#\9) { border-radius: var(--bm-radius-pill); }
+    border: 1px solid rgba(var(--wplus-color-border-subtle), 1);
+    background: rgba(var(--wplus-color-bg-elevated), 1);
+    color: rgba(var(--wplus-color-text-secondary), 1);
+    &:not(#\9) { border-radius: var(--wplus-radius-pill); }
     font-size: 11.5px;
     font-weight: 600;
     font-family: inherit;
@@ -43,7 +43,7 @@
     transition: background 0.12s ease, transform 0.12s ease;
 
     &:hover {
-        background: rgba(var(--bm-color-bg-hover), 1);
+        background: rgba(var(--wplus-color-bg-hover), 1);
     }
 
     &:active {
@@ -59,12 +59,12 @@
     }
 
     &[data-reacted-by-me="1"] {
-        border-color: rgba(var(--bm-color-accent), 1);
-        background: rgba(var(--bm-color-accent-subtle), 1);
-        color: rgba(var(--bm-color-accent-hover), 1);
+        border-color: rgba(var(--wplus-color-accent), 1);
+        background: rgba(var(--wplus-color-accent-subtle), 1);
+        color: rgba(var(--wplus-color-accent-hover), 1);
 
         &:hover {
-            background: rgba(var(--bm-color-accent-subtle), 1);
+            background: rgba(var(--wplus-color-accent-subtle), 1);
         }
     }
 
@@ -73,14 +73,14 @@
         align-items: center;
         line-height: 1;
 
-        .bm-emoji-img {
+        .wplus-emoji-img {
             display: block !important;
         }
     }
 
     &__count {
         margin-inline-end: 2px;
-        font-family: var(--bm-font-family-mono);
+        font-family: var(--wplus-font-family-mono);
         font-variant-numeric: tabular-nums;
     }
 }
@@ -98,44 +98,44 @@
 // the text flow when it moves here, which is the one thing to know about
 // this layout: adding the first reaction to a message whose last line was
 // only wrapped by the meta's reserved width lets that line close up again.
-.bm-msg-bubble .bm-reactions {
+.wplus-msg-bubble .wplus-reactions {
     margin-top: 6px;
 }
 
-.bm-msg-bubble .bm-reaction-pill {
+.wplus-msg-bubble .wplus-reaction-pill {
     border: 0;
-    background: rgba(var(--bm-color-accent), 0.1);
-    color: rgba(var(--bm-color-accent-hover), 1);
+    background: rgba(var(--wplus-color-accent), 0.1);
+    color: rgba(var(--wplus-color-accent-hover), 1);
 
     &:hover {
-        background: rgba(var(--bm-color-accent), 0.18);
+        background: rgba(var(--wplus-color-accent), 0.18);
     }
 
     &[data-reacted-by-me="1"] {
-        background: rgba(var(--bm-color-accent), 1);
-        color: rgba(var(--bm-color-bubble-self-text), 1);
+        background: rgba(var(--wplus-color-accent), 1);
+        color: rgba(var(--wplus-color-bubble-self-text), 1);
 
         &:hover {
-            background: rgba(var(--bm-color-accent-hover), 1);
+            background: rgba(var(--wplus-color-accent-hover), 1);
         }
     }
 }
 
 // Sender-keyed, not side-keyed — the accent bubble can sit on either side.
-.bm-msg-stack[data-bubble="filled"][data-is-me="1"] .bm-msg-body .bm-msg-bubble .bm-reaction-pill {
-    background: rgba(var(--bm-color-bubble-self-text), 0.2);
-    color: rgba(var(--bm-color-bubble-self-text), 1);
+.wplus-msg-stack[data-bubble="filled"][data-is-me="1"] .wplus-msg-body .wplus-msg-bubble .wplus-reaction-pill {
+    background: rgba(var(--wplus-color-bubble-self-text), 0.2);
+    color: rgba(var(--wplus-color-bubble-self-text), 1);
 
     &:hover {
-        background: rgba(var(--bm-color-bubble-self-text), 0.3);
+        background: rgba(var(--wplus-color-bubble-self-text), 0.3);
     }
 
     &[data-reacted-by-me="1"] {
-        background: rgba(var(--bm-color-bubble-self-text), 1);
-        color: rgba(var(--bm-color-accent), 1);
+        background: rgba(var(--wplus-color-bubble-self-text), 1);
+        color: rgba(var(--wplus-color-accent), 1);
 
         &:hover {
-            background: rgba(var(--bm-color-bubble-self-text), 0.9);
+            background: rgba(var(--wplus-color-bubble-self-text), 0.9);
         }
     }
 }
@@ -145,7 +145,7 @@
 // corner. Fronts the user's current reaction (or the last emoji of the
 // admin's set). Hovering it opens the strip; the trigger hides while
 // the strip is open since the strip grows over its spot.
-.bm-reaction-trigger {
+.wplus-reaction-trigger {
     position: absolute;
     bottom: -8px;
     inset-inline-end: -8px;
@@ -155,17 +155,17 @@
     padding: 0;
     display: grid;
     place-items: center;
-    border: 1px solid rgba(var(--bm-color-border-subtle), 1);
-    background: rgba(var(--bm-color-bg-elevated), 1);
-    &:not(#\9) { border-radius: var(--bm-radius-circle); }
-    box-shadow: var(--bm-shadow-sm);
+    border: 1px solid rgba(var(--wplus-color-border-subtle), 1);
+    background: rgba(var(--wplus-color-bg-elevated), 1);
+    &:not(#\9) { border-radius: var(--wplus-radius-circle); }
+    box-shadow: var(--wplus-shadow-sm);
     cursor: pointer;
     line-height: 0;
     opacity: 0;
     transform: scale(0.85);
     transition: opacity 0.18s cubic-bezier(0.2, 0, 0, 1), transform 0.18s cubic-bezier(0.2, 0, 0, 1), box-shadow 0.18s ease;
 
-    .bm-emoji-img {
+    .wplus-emoji-img {
         display: block !important;
     }
 }
@@ -175,9 +175,9 @@
 // then leaves it at opacity 0, which is worse than not mounting it at all.
 // Any value: "open" is the whole cluster, "reactions" the trigger alone, which
 // is what a tap still opens with "Tap a message to show its actions" off.
-.bm-msg-body:hover .bm-reaction-trigger,
-.bm-msg-body[data-actions] .bm-reaction-trigger,
-.bm-reaction-trigger:focus-visible {
+.wplus-msg-body:hover .wplus-reaction-trigger,
+.wplus-msg-body[data-actions] .wplus-reaction-trigger,
+.wplus-reaction-trigger:focus-visible {
     opacity: 1;
     transform: scale(1);
 
@@ -192,13 +192,13 @@
     }
 }
 
-.bm-reaction-trigger:hover {
+.wplus-reaction-trigger:hover {
     opacity: 1;
     transform: scale(1.08);
-    box-shadow: var(--bm-shadow-md);
+    box-shadow: var(--wplus-shadow-md);
 }
 
-.bm-reaction-trigger.bm-hidden {
+.wplus-reaction-trigger.wplus-hidden {
     opacity: 0 !important;
     pointer-events: none;
 }
@@ -211,20 +211,20 @@
 // It stays invisible until it has been placed, so no frame can paint at
 // the wrong spot, and [data-open] is only set the frame after — which is
 // what the transition below runs from.
-.bm-reaction-strip-anchor {
+.wplus-reaction-strip-anchor {
     position: fixed;
-    z-index: var(--bm-z-tooltip);
+    z-index: var(--wplus-z-tooltip);
 }
 
-.bm-reaction-strip {
+.wplus-reaction-strip {
     display: grid;
     grid-template-columns: repeat(var(--columns, 1), 1fr);
     gap: 2px;
     padding: 5px;
-    background: rgba(var(--bm-color-bg-elevated), 1);
-    border: 1px solid rgba(var(--bm-color-border-subtle), 1);
-    &:not(#\9) { border-radius: var(--bm-radius-lg); }
-    box-shadow: var(--bm-shadow-popover);
+    background: rgba(var(--wplus-color-bg-elevated), 1);
+    border: 1px solid rgba(var(--wplus-color-border-subtle), 1);
+    &:not(#\9) { border-radius: var(--wplus-radius-lg); }
+    box-shadow: var(--wplus-shadow-popover);
     // Out of the trigger's corner, which the strip opens on top of.
     transform-origin: bottom right;
 
@@ -234,14 +234,14 @@
     transform: scale(0.85);
     transition: opacity 0.12s cubic-bezier(0.2, 0, 0, 1), transform 0.12s cubic-bezier(0.2, 0, 0, 1);
 
-    .bm-reaction-strip-anchor[data-open="1"] & {
+    .wplus-reaction-strip-anchor[data-open="1"] & {
         opacity: 1;
         transform: scale(1);
         transition-duration: 0.18s;
     }
 
-    .bm-reaction-strip-anchor[data-columns="1"] & {
-        &:not(#\9) { border-radius: var(--bm-radius-pill); }
+    .wplus-reaction-strip-anchor[data-columns="1"] & {
+        &:not(#\9) { border-radius: var(--wplus-radius-pill); }
     }
 
     &__item {
@@ -252,7 +252,7 @@
         display: grid;
         place-items: center;
         background: transparent;
-        &:not(#\9) { border-radius: var(--bm-radius-circle); }
+        &:not(#\9) { border-radius: var(--wplus-radius-circle); }
         cursor: pointer;
         line-height: 0;
         transition: background 0.15s cubic-bezier(0.2, 0, 0, 1);
@@ -260,26 +260,26 @@
         // The zoom lives on the emoji, not the cell — a scaled cell
         // background grew past its box and collided with the selected
         // neighbor's ring.
-        .bm-emoji-img {
+        .wplus-emoji-img {
             display: block !important;
             transition: transform 0.15s cubic-bezier(0.2, 0, 0, 1);
         }
 
         &:hover {
-            background: rgba(var(--bm-color-bg-hover), 1);
+            background: rgba(var(--wplus-color-bg-hover), 1);
 
-            .bm-emoji-img {
+            .wplus-emoji-img {
                 transform: scale(1.15);
             }
         }
 
-        &:active .bm-emoji-img {
+        &:active .wplus-emoji-img {
             transform: scale(1.02);
         }
 
         &[data-mine="1"] {
-            background: rgba(var(--bm-color-accent-subtle), 1);
-            box-shadow: inset 0 0 0 1.5px rgba(var(--bm-color-accent), 1);
+            background: rgba(var(--wplus-color-accent-subtle), 1);
+            box-shadow: inset 0 0 0 1.5px rgba(var(--wplus-color-accent), 1);
         }
     }
 }

@@ -83,7 +83,7 @@ export default function Tooltip( { label, ariaLabel, side = "auto", delay = 0, c
     const show = ( el: Element | null ) => {
         if ( ! el || ! active ) return;
         shown.current = el;
-        host().whenShared( "tooltips", () => sharedTooltips()?.show( el, tooltipContent( label ), { side, delay, className: "bm-tooltip" } ) );
+        host().whenShared( "tooltips", () => sharedTooltips()?.show( el, tooltipContent( label ), { side, delay, className: "wplus-tooltip" } ) );
     };
 
     const hide = () => {

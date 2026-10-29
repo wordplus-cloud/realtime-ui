@@ -2,7 +2,7 @@ import React, { createRef } from 'react';
 import { act, cleanup, fireEvent, render } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { configureUi, setUiUsers } from '../src/index.ts';
-import { CallScreen, type CallParticipant } from '../src/calls.ts';
+import { CallScreen, PersonPanel, type CallParticipant } from '../src/calls.ts';
 import { CallContext } from '../src/components/calls/context.ts';
 import GroupVideoGridItem from '../src/components/calls/group-video-grid-item.tsx';
 import { PAUSED_NOTICE_MS } from '../src/inc/hooks/held.ts';
@@ -24,11 +24,11 @@ describe( 'the private call', () => {
         const call = fakeCall( { action: 'outgoing_call' } );
         const { container } = wrapped( call, 'private' );
 
-        expect( container.querySelector( '.bm-call-wrap .bm-private-call' ) ).not.toBeNull();
-        expect( container.querySelector( '.bm-placeholder-outgoing-text' )?.textContent ).toBe( 'Calling...' );
-        expect( container.querySelector<HTMLImageElement>( '.bm-call-animation img.avatar-100' )?.src ).toBe( 'https://example.com/ann.png' );
+        expect( container.querySelector( '.wplus-call-wrap .wplus-private-call' ) ).not.toBeNull();
+        expect( container.querySelector( '.wplus-placeholder-outgoing-text' )?.textContent ).toBe( 'Calling...' );
+        expect( container.querySelector<HTMLImageElement>( '.wplus-call-animation img.avatar-100' )?.src ).toBe( 'https://example.com/ann.png' );
 
-        fireEvent.click( container.querySelector( '.bm-cancel' )! );
+        fireEvent.click( container.querySelector( '.wplus-cancel' )! );
         expect( call.calls ).toEqual( [ 'endCall "abort"' ] );
     } );
 
@@ -36,9 +36,9 @@ describe( 'the private call', () => {
         const call = fakeCall( { action: 'incoming_call' } );
         const { container } = wrapped( call, 'private' );
 
-        expect( container.querySelector( '.bm-placeholder-incoming-text' )?.textContent ).toBe( 'Incoming Call' );
-        fireEvent.click( container.querySelector( '.bm-answer' )! );
-        fireEvent.click( container.querySelector( '.bm-cancel' )! );
+        expect( container.querySelector( '.wplus-placeholder-incoming-text' )?.textContent ).toBe( 'Incoming Call' );
+        fireEvent.click( container.querySelector( '.wplus-answer' )! );
+        fireEvent.click( container.querySelector( '.wplus-cancel' )! );
         expect( call.calls ).toEqual( [ 'answerCall', 'endCall "reject"' ] );
     } );
 
@@ -53,11 +53,11 @@ describe( 'the private call', () => {
 
         expect( container.querySelector( 'video.video1' ) ).not.toBeNull();
         expect( video.attached ).toContain( container.querySelector( 'video.video1' ) );
-        expect( container.querySelector( '.bm-disable-mic' ) ).not.toBeNull();
-        expect( container.querySelector( '.bm-enable-video' ) ).not.toBeNull();
+        expect( container.querySelector( '.wplus-disable-mic' ) ).not.toBeNull();
+        expect( container.querySelector( '.wplus-enable-video' ) ).not.toBeNull();
 
-        fireEvent.click( container.querySelector( '.bm-disable-mic' )! );
-        fireEvent.click( container.querySelector( '.bm-cancel' )! );
+        fireEvent.click( container.querySelector( '.wplus-disable-mic' )! );
+        fireEvent.click( container.querySelector( '.wplus-cancel' )! );
         expect( call.calls ).toEqual( [ 'disableMic', 'endCall' ] );
     } );
 
@@ -67,13 +67,13 @@ describe( 'the private call', () => {
         } );
         const { container } = wrapped( call, 'private' );
 
-        expect( container.querySelector( '.bm-timer' )?.textContent ).toBe( '01:05' );
-        expect( container.querySelector( '.bm-placeholder-no-source-message' )?.textContent ).toContain( 'The microphone and camera not enabled at the other side' );
+        expect( container.querySelector( '.wplus-timer' )?.textContent ).toBe( '01:05' );
+        expect( container.querySelector( '.wplus-placeholder-no-source-message' )?.textContent ).toContain( 'The microphone and camera not enabled at the other side' );
     } );
 
     it( 'swaps the icons where the host asks it to', () => {
         const { container } = wrapped( fakeCall( { iconsReverted: true, myMicrophoneTrack: fakeTrack() } ), 'private' );
-        expect( container.querySelector( '.bm-disable-mic svg' ) ).not.toBeNull();
+        expect( container.querySelector( '.wplus-disable-mic svg' ) ).not.toBeNull();
     } );
 } );
 
@@ -87,38 +87,94 @@ describe( 'the group calls', () => {
     it( 'draw a video tile each, a speaker ringed in the accent colour, and the dock', () => {
         const { container } = wrapped( fakeCall( { participants: three() } ), 'group-video' );
 
-        expect( container.querySelector( '.bm-call-wrap.bm-call-wrap-group .bm-group-call-container' ) ).not.toBeNull();
-        expect( container.querySelector( '.bm-group-call-controls-buttons .bm-exit-room' ) ).not.toBeNull();
-        expect( container.querySelector( '.bm-connection-status, .bm-group-call-controls-v2' ) ).not.toBeNull();
+        expect( container.querySelector( '.wplus-call-wrap.wplus-call-wrap-group .wplus-group-call-container' ) ).not.toBeNull();
+        expect( container.querySelector( '.wplus-group-call-controls-buttons .wplus-exit-room' ) ).not.toBeNull();
+        expect( container.querySelector( '.wplus-connection-status, .wplus-group-call-controls-v2' ) ).not.toBeNull();
     } );
 
     it( 'draw an audio row each, with names from the host', async () => {
         const { container } = wrapped( fakeCall( { participants: three() } ), 'group-audio' );
         await act( async () => {} );
 
-        const rows = [ ...container.querySelectorAll( '.bm-group-call-input-audio' ) ];
+        const rows = [ ...container.querySelectorAll( '.wplus-group-call-input-audio' ) ];
         expect( rows.map( ( row ) => row.getAttribute( 'data-key' ) ).sort() ).toEqual( [ 'me', 'user_34', 'user_43' ] );
-        expect( container.querySelector( '[data-key="user_34"] .bm-uname' )?.textContent ).toBe( 'Ann' );
-        expect( container.querySelector( '[data-key="me"] .bm-uname' )?.textContent ).toBe( 'Ben' );
-        expect( ( container.querySelector( '[data-key="user_34"] .bm-group-call-input-audio-inner' ) as HTMLElement ).style.boxShadow ).toContain( 'rgba(33,117,155' );
+        expect( container.querySelector( '[data-key="user_34"] .wplus-uname' )?.textContent ).toBe( 'Ann' );
+        expect( container.querySelector( '[data-key="me"] .wplus-uname' )?.textContent ).toBe( 'Ben' );
+        expect( ( container.querySelector( '[data-key="user_34"] .wplus-group-call-input-audio-inner' ) as HTMLElement ).style.boxShadow ).toContain( 'rgba(33,117,155' );
     } );
 
-    it( 'let a moderator mute everyone, lock the room and kick, through the call\'s moderate()', async () => {
+    it( 'let a moderator mute everyone, lock the room and remove someone, through the call\'s moderate()', async () => {
         const call = fakeCall( { participants: three(), adminMode: true } );
         const { container } = wrapped( call, 'group-audio' );
         await act( async () => {} );
-        // A call that lists no acts, as Better Messages' calls, takes every one: switching to broadcast mode among them.
-        expect( container.querySelector( '.bm-set-broadcast-mode' ) ).not.toBeNull();
 
-        await act( async () => { fireEvent.click( container.querySelector( '.bm-mute-all' )! ); } );
-        await act( async () => { fireEvent.click( container.querySelector( '.bm-lock-room' )! ); } );
-        await act( async () => { fireEvent.click( container.querySelector( '[data-key="user_43"] .bm-admin-controls span' )! ); } );
+        // The room's rules are in Host Controls' panel, spelled out.
+        await act( async () => { fireEvent.click( container.querySelector( '.wplus-host-controls' )! ); } );
+        const room = container.querySelector( '.wplus-call-moderation-room' )!;
+        expect( [ ...room.querySelectorAll( '.wplus-call-moderation-label' ) ].map( ( l ) => l.textContent ) ).toEqual( [ 'Mute Everyone', 'Lock Room', 'Broadcast Mode', 'Sound for Raised Hands', 'Join Alerts' ] );
+        expect( room.querySelector( '.wplus-room-mute' )?.getAttribute( 'aria-checked' ) ).toBe( 'false' );
+
+        await act( async () => { fireEvent.click( container.querySelector( '.wplus-room-mute' )! ); } );
+        await act( async () => { fireEvent.click( container.querySelector( '.wplus-room-lock' )! ); } );
+
+        // A person's actions, from the ⋯ on their row.
+        await act( async () => { fireEvent.click( container.querySelector( '[data-key="user_43"] .wplus-manage-participant' )! ); } );
+        const person = container.querySelector( '.wplus-call-moderation-person' )!;
+        expect( person.querySelector( '.wplus-call-moderation-title' )?.textContent ).toBe( 'User user_43' );
+        expect( [ ...person.querySelectorAll( '.wplus-call-moderation-label' ) ].map( ( l ) => l.textContent ) ).toEqual( [ 'Mute Microphone', 'Demote to Viewer', 'Remove from Call' ] );
+        expect( container.querySelector( '[data-key="user_43"] .wplus-moderating' ) ).not.toBeNull();
+        await act( async () => { fireEvent.click( person.querySelector( '.wplus-remove-participant' )! ); } );
 
         expect( call.calls ).toEqual( [
-            'moderate {"act":"mute_all","type":"video"}',
+            // Everyone's microphone but the moderator's own, by whose it is.
+            'moderate {"act":"mute_all","type":"video","identities":["user_34","user_43"]}',
             'moderate {"act":"lock_room","type":"video"}',
             'moderate {"act":"remove_participant","identity":"user_43","type":"audio"}',
         ] );
+    } );
+
+    it( 'say a microphone a moderator muted: locked on the tile and on the muted person\'s own dock', async () => {
+        const participants = three();
+        participants.set( 'user_43', participant( 'user_43', { micMuted: true } ) );
+        const host = wrapped( fakeCall( { participants, adminMode: true, roomMuted: true } ), 'group-audio' );
+        await act( async () => {} );
+
+        expect( host.container.querySelector( '[data-key="user_43"] .wplus-mic-locked-chip' )?.getAttribute( 'aria-label' ) ).toBe( 'Muted by a moderator' );
+        expect( host.container.querySelector( '[data-key="user_34"] .wplus-mic-locked-chip' ) ).toBeNull();
+        // Everyone muted shows on Host Controls, and its switch is on.
+        expect( host.container.querySelector( '.wplus-host-controls' )?.getAttribute( 'data-ruled' ) ).toBe( '1' );
+        await act( async () => { fireEvent.click( host.container.querySelector( '.wplus-host-controls' )! ); } );
+        expect( host.container.querySelector( '.wplus-room-mute' )?.getAttribute( 'aria-checked' ) ).toBe( 'true' );
+        await act( async () => { fireEvent.click( host.container.querySelector( '[data-key="user_43"] .wplus-manage-participant' )! ); } );
+        expect( host.container.querySelector( '.wplus-call-moderation-state' )?.textContent ).toBe( 'Muted by a moderator' );
+        expect( host.container.querySelector( '.wplus-allow-unmute' )?.getAttribute( 'aria-label' ) ).toBe( 'Allow Microphone' );
+        host.unmount();
+
+        const muted = wrapped( fakeCall( { participants: three(), myMicMuted: true } ), 'group-video' );
+        expect( muted.container.querySelector( '.wplus-enable-mic, .wplus-disable-mic' ) ).toBeNull();
+        expect( muted.container.querySelector( '.wplus-mic-locked' )?.getAttribute( 'aria-label' ) ).toBe( 'A moderator muted your microphone.' );
+        await act( async () => { fireEvent.click( muted.container.querySelector( '.wplus-mic-locked' )! ); } );
+        expect( muted.container.querySelector( '.wplus-group-call-status' )?.textContent ).toBe( 'A moderator muted your microphone.' );
+    } );
+
+    it( 'say on a video call what stopping someone does: their camera and microphone, and let back on', async () => {
+        // The person's menu itself: the video grid lays its tiles out by its measured size, which the test's page hasn't.
+        const labels = ( participants: Map<string, CallParticipant>, type: 'audio' | 'video' ) => {
+            const call = fakeCall( { participants, adminMode: true } );
+            const { container, unmount } = render( <CallContext.Provider value={ call }>
+                <PersonPanel stage={ createRef<HTMLElement>() } tileKey="user_43" type={ type } close={ () => {} } />
+            </CallContext.Provider> );
+            const found = [ ...container.querySelectorAll( '.wplus-call-moderation-row' ) ].map( ( row ) => row.getAttribute( 'aria-label' ) );
+            unmount();
+            return found;
+        };
+        const blocked = three();
+        blocked.set( 'user_43', participant( 'user_43', { canPublish: false } ) );
+
+        expect( labels( three(), 'video' ) ).toEqual( [ 'Pin Participant', 'Mute Microphone', 'Stop Camera & Mic', 'Remove from Call' ] );
+        expect( labels( blocked, 'video' ) ).toEqual( [ 'Pin Participant', 'Allow Camera & Mic', 'Remove from Call' ] );
+        // An audio call has no camera to name.
+        expect( labels( three(), 'audio' ) ).toEqual( [ 'Mute Microphone', 'Demote to Viewer', 'Remove from Call' ] );
     } );
 
     it( 'spin a moderator\'s control while its request is out, and turn a second click away', async () => {
@@ -127,28 +183,81 @@ describe( 'the group calls', () => {
         const call = fakeCall( { participants: three(), adminMode: true, moderate: ( request ) => ( asked.push( request ), new Promise( ( resolve ) => { answer = resolve; } ) ) } );
         const { container } = wrapped( call, 'group-video' );
         await act( async () => {} );
+        await act( async () => { fireEvent.click( container.querySelector( '.wplus-host-controls' )! ); } );
 
-        await act( async () => { fireEvent.click( container.querySelector( '.bm-mute-all' )! ); } );
-        await act( async () => { fireEvent.click( container.querySelector( '.bm-mute-all' )! ); } );
+        await act( async () => { fireEvent.click( container.querySelector( '.wplus-room-mute' )! ); } );
+        await act( async () => { fireEvent.click( container.querySelector( '.wplus-room-mute' )! ); } );
         expect( asked ).toHaveLength( 1 );
-        expect( container.querySelector( '.bm-mute-all' )?.getAttribute( 'data-busy' ) ).toBe( '1' );
-        expect( container.querySelector( '.bm-mute-all .bm-svg-animate' ) ).not.toBeNull();
+        expect( container.querySelector( '.wplus-room-mute' )?.getAttribute( 'data-busy' ) ).toBe( '1' );
+        expect( container.querySelector( '.wplus-room-mute .wplus-svg-animate' ) ).not.toBeNull();
 
         await act( async () => { answer( true ); } );
-        expect( container.querySelector( '.bm-mute-all, .bm-unmute-all' )?.getAttribute( 'data-busy' ) ).toBeNull();
+        expect( container.querySelector( '.wplus-room-mute' )?.getAttribute( 'data-busy' ) ).toBeNull();
     } );
 
     it( 'offer Show Chat and Hide Chat in the dock only where the call has a chat beside it', async () => {
         const { container, unmount } = wrapped( fakeCall( { participants: three() } ), 'group-video' );
-        expect( container.querySelector( '.bm-toggle-chat' ) ).toBeNull();
+        expect( container.querySelector( '.wplus-toggle-chat' ) ).toBeNull();
         unmount();
 
         const toggled: unknown[] = [];
         const call = fakeCall( { participants: three(), chatShown: true, chatToggle: ( next ) => void toggled.push( typeof next === 'function' ? next( true ) : next ) } );
         const shown = wrapped( call, 'group-video' ).container;
-        expect( shown.querySelector( '.bm-toggle-chat' )?.getAttribute( 'data-active' ) ).toBe( '1' );
-        fireEvent.click( shown.querySelector( '.bm-toggle-chat' )! );
+        expect( shown.querySelector( '.wplus-toggle-chat' )?.getAttribute( 'data-active' ) ).toBe( '1' );
+        fireEvent.click( shown.querySelector( '.wplus-toggle-chat' )! );
         expect( toggled ).toEqual( [ false ] );
+    } );
+
+    it( 'expand to the browser window first, from there to the whole screen, and collapse back', async () => {
+        const asked: string[] = [];
+        const call = fakeCall( {
+            participants: three(), fullScreenAvailable: true,
+            enableFullScreen: () => void asked.push( 'screen' ), disableFullScreen: () => void asked.push( 'leave screen' ),
+            chatShown: true, chatToggle: () => {},
+        } );
+        const { container, rerender } = wrapped( call, 'group-video' );
+        const wrap = () => container.querySelector( '.wplus-call-wrap' )!;
+
+        // On the page: Expand, and the chat beside the call can be shown and hidden.
+        expect( container.querySelector( '.wplus-fs-enable' )?.getAttribute( 'aria-label' ) ).toBe( 'Expand' );
+        expect( container.querySelector( '.wplus-toggle-chat' ) ).not.toBeNull();
+        await act( async () => { fireEvent.click( container.querySelector( '.wplus-fs-enable' )! ); } );
+
+        // Filling the window: the page under it held still, the chat out of reach, Collapse and Full Screen.
+        expect( wrap().classList.contains( 'wplus-call-wrap--window' ) ).toBe( true );
+        expect( document.documentElement.classList.contains( 'wplus-call-windowed' ) ).toBe( true );
+        expect( container.querySelector( '.wplus-toggle-chat' ) ).toBeNull();
+        expect( container.querySelector( '.wplus-fs-collapse' )?.getAttribute( 'aria-label' ) ).toBe( 'Collapse' );
+        await act( async () => { fireEvent.click( container.querySelector( '.wplus-fs-screen' )! ); } );
+        expect( asked ).toEqual( [ 'screen' ] );
+
+        // The whole screen: one way out, which leaves the window too.
+        rerender( <CallScreen call={ { ...call, fullScreenEnabled: true, wrapper: createRef<HTMLDivElement>() as never } } layout="group-video" /> );
+        expect( container.querySelectorAll( '.wplus-fs-collapse, .wplus-fs-screen, .wplus-fs-enable' ) ).toHaveLength( 0 );
+        await act( async () => { fireEvent.click( container.querySelector( '.wplus-fs-disable' )! ); } );
+        expect( asked ).toEqual( [ 'screen', 'leave screen' ] );
+        rerender( <CallScreen call={ { ...call, fullScreenEnabled: false, wrapper: createRef<HTMLDivElement>() as never } } layout="group-video" /> );
+        expect( wrap().classList.contains( 'wplus-call-wrap--window' ) ).toBe( false );
+        expect( document.documentElement.classList.contains( 'wplus-call-windowed' ) ).toBe( false );
+
+        // Escape in a dialog the app draws over the call is the dialog's, and anywhere else collapses the call.
+        await act( async () => { fireEvent.click( container.querySelector( '.wplus-fs-enable' )! ); } );
+        const dialog = document.createElement( 'div' );
+        dialog.setAttribute( 'role', 'alertdialog' );
+        dialog.innerHTML = '<button>Cancel</button>';
+        wrap().appendChild( dialog );
+        await act( async () => { fireEvent.keyDown( dialog.querySelector( 'button' )!, { key: 'Escape' } ); } );
+        expect( wrap().classList.contains( 'wplus-call-wrap--window' ) ).toBe( true );
+        dialog.remove();
+        await act( async () => { fireEvent.keyDown( document, { key: 'Escape' } ); } );
+        expect( wrap().classList.contains( 'wplus-call-wrap--window' ) ).toBe( false );
+    } );
+
+    it( 'name everyone on their tile, over their picture too', () => {
+        const { container } = render( <CallContext.Provider value={ fakeCall() }>
+            <GroupVideoGridItem unique_key="user_34" participant={ participant( 'user_34', { video: fakeTrack() } ) } width={ 50 } height={ 50 } x={ 0 } y={ 0 } />
+        </CallContext.Provider> );
+        expect( container.querySelector( '.wplus-group-call-input-video-inner-info .wplus-caller-name' )?.textContent ).toBe( 'Ann' );
     } );
 
     it( 'keep a tile through its reconnect, marked Reconnecting...', async () => {
@@ -158,8 +267,8 @@ describe( 'the group calls', () => {
         const { container } = wrapped( fakeCall( { participants } ), 'group-audio' );
         await act( async () => {} );
 
-        expect( container.querySelector( '[data-key="user_43"] .bm-call-reconnecting' )?.textContent ).toBe( 'Reconnecting...' );
-        expect( container.querySelector( '[data-key="user_34"] .bm-call-reconnecting' ) ).toBeNull();
+        expect( container.querySelector( '[data-key="user_43"] .wplus-call-reconnecting' )?.textContent ).toBe( 'Reconnecting...' );
+        expect( container.querySelector( '[data-key="user_34"] .wplus-call-reconnecting' ) ).toBeNull();
     } );
 
     it( 'show a moderation error as the host shows errors', async () => {
@@ -168,7 +277,8 @@ describe( 'the group calls', () => {
         const call = fakeCall( { participants: three(), adminMode: true, moderate: async () => { throw new Error( 'refused' ); } } );
         const { container } = wrapped( call, 'group-video' );
 
-        await act( async () => { fireEvent.click( container.querySelector( '.bm-mute-all' )! ); } );
+        await act( async () => { fireEvent.click( container.querySelector( '.wplus-host-controls' )! ); } );
+        await act( async () => { fireEvent.click( container.querySelector( '.wplus-room-mute' )! ); } );
         expect( ( shown[ 0 ] as Error ).message ).toBe( 'refused' );
     } );
 
@@ -203,13 +313,13 @@ describe( 'a picture the media server paused for this page\'s download', () => {
         const { container, rerender } = render( screen( fakeCall( { participants: two( true ) } ), 'private' ) );
 
         act( () => { vi.advanceTimersByTime( PAUSED_NOTICE_MS - 100 ); } );
-        expect( container.querySelector( '.bm-call-paused' ) ).toBeNull();
+        expect( container.querySelector( '.wplus-call-paused' ) ).toBeNull();
         act( () => { vi.advanceTimersByTime( 200 ); } );
-        expect( container.querySelector( '.bm-main-video .bm-call-paused-main' )?.textContent )
+        expect( container.querySelector( '.wplus-main-video .wplus-call-paused-main' )?.textContent )
             .toBe( 'Paused: weak connectionYour connection cannot carry this video right now. The sound goes on and the video comes back by itself.' );
 
         rerender( screen( fakeCall( { participants: two( false ) } ), 'private' ) );
-        expect( container.querySelector( '.bm-call-paused' ) ).toBeNull();
+        expect( container.querySelector( '.wplus-call-paused' ) ).toBeNull();
     } );
 
     it( 'is said on the tile, over its last frame, never on the user\'s own', () => {
@@ -224,10 +334,10 @@ describe( 'a picture the media server paused for this page\'s download', () => {
         const away = tile( 'user_44', { videoPaused: true, reconnecting: true } );
         act( () => { vi.advanceTimersByTime( PAUSED_NOTICE_MS ); } );
 
-        expect( paused.querySelector( '.bm-call-paused .bm-call-paused-notice' )?.textContent ).toBe( 'Paused: weak connection' );
-        expect( sharing.querySelector( '.bm-call-paused' ) ).not.toBeNull();
-        expect( own.querySelector( '.bm-call-paused' ) ).toBeNull();
-        expect( away.querySelector( '.bm-call-paused' ) ).toBeNull();
+        expect( paused.querySelector( '.wplus-call-paused .wplus-call-paused-notice' )?.textContent ).toBe( 'Paused: weak connection' );
+        expect( sharing.querySelector( '.wplus-call-paused' ) ).not.toBeNull();
+        expect( own.querySelector( '.wplus-call-paused' ) ).toBeNull();
+        expect( away.querySelector( '.wplus-call-paused' ) ).toBeNull();
     } );
 
     it( 'is said for the whole group call when every picture it gets is paused, and not while one still comes', () => {
@@ -238,15 +348,15 @@ describe( 'a picture the media server paused for this page\'s download', () => {
         };
         const { container, rerender } = render( screen( fakeCall( { participants: three( false ) } ), 'group-video' ) );
         act( () => { vi.advanceTimersByTime( PAUSED_NOTICE_MS ); } );
-        expect( container.querySelector( '.bm-group-call-status' ) ).toBeNull();
+        expect( container.querySelector( '.wplus-group-call-status' ) ).toBeNull();
 
         rerender( screen( fakeCall( { participants: three( true ) } ), 'group-video' ) );
         act( () => { vi.advanceTimersByTime( PAUSED_NOTICE_MS ); } );
-        expect( container.querySelector( '.bm-group-call-status' )?.textContent ).toBe( 'Your connection is weak: videos are paused, sound continues.' );
+        expect( container.querySelector( '.wplus-group-call-status' )?.textContent ).toBe( 'Your connection is weak: videos are paused, sound continues.' );
 
         // What the call has to say itself comes first.
         rerender( screen( fakeCall( { participants: three( true ), statusMessage: 'Connecting...' } ), 'group-video' ) );
-        expect( container.querySelector( '.bm-group-call-status' )?.textContent ).toBe( 'Connecting...' );
+        expect( container.querySelector( '.wplus-group-call-status' )?.textContent ).toBe( 'Connecting...' );
     } );
 } );
 
@@ -258,7 +368,7 @@ describe( 'a camera moving to another codec during the call', () => {
         <CallContext.Provider value={ fakeCall( { optimizingMaxMs } ) }>
             <GroupVideoGridItem unique_key={ key } participant={ participant( key, extra ) } width={ 50 } height={ 50 } x={ 0 } y={ 0 } />
         </CallContext.Provider>;
-    const notice = ( container: HTMLElement ) => container.querySelector( '.bm-call-optimizing' );
+    const notice = ( container: HTMLElement ) => container.querySelector( '.wplus-call-optimizing' );
 
     it( 'says "Optimizing video quality..." on their tile, for a screen reader too, until their new picture\'s first frame is drawn', () => {
         // Marked: their camera is taken out of the room, so the tile has no video for a moment.
@@ -266,20 +376,20 @@ describe( 'a camera moving to another codec during the call', () => {
         expect( notice( container )?.textContent ).toBe( 'Optimizing video quality...' );
         expect( notice( container )?.getAttribute( 'role' ) ).toBe( 'status' );
         // a ring with an arc turning on it, as the busy controls spin, hidden from a screen reader
-        expect( notice( container )?.querySelector( 'svg.bm-call-optimizing-spinner[aria-hidden="true"] circle + path' ) ).not.toBeNull();
+        expect( notice( container )?.querySelector( 'svg.wplus-call-optimizing-spinner[aria-hidden="true"] circle + path' ) ).not.toBeNull();
 
         // The pause it stands in for isn't said beside it.
         act( () => { vi.advanceTimersByTime( PAUSED_NOTICE_MS + 100 ); } );
-        expect( container.querySelector( '.bm-call-paused' ) ).toBeNull();
+        expect( container.querySelector( '.wplus-call-paused' ) ).toBeNull();
 
         // Ready, and the new picture is there: it stays until a frame of it is drawn, then fades out and goes.
         rerender( tile( 'user_34', { videoOptimizing: false, video: fakeTrack() } ) );
         act( () => { vi.advanceTimersByTime( 1000 ); } );
         expect( notice( container ) ).not.toBeNull();
-        expect( notice( container )?.classList.contains( 'bm-call-optimizing--leaving' ) ).toBe( false );
+        expect( notice( container )?.classList.contains( 'wplus-call-optimizing--leaving' ) ).toBe( false );
 
         act( () => { fireEvent.loadedData( container.querySelector( 'video' )! ); } );
-        expect( notice( container )?.classList.contains( 'bm-call-optimizing--leaving' ) ).toBe( true );
+        expect( notice( container )?.classList.contains( 'wplus-call-optimizing--leaving' ) ).toBe( true );
         act( () => { vi.advanceTimersByTime( OPTIMIZING_FADE_MS ); } );
         expect( notice( container ) ).toBeNull();
     } );
@@ -287,9 +397,9 @@ describe( 'a camera moving to another codec during the call', () => {
     it( 'goes 10 s after it came, whether "ready" never came or the new picture never drew', () => {
         const marked = render( tile( 'user_34', { videoOptimizing: true } ) );
         act( () => { vi.advanceTimersByTime( OPTIMIZING_MAX_MS - 100 ); } );
-        expect( notice( marked.container )?.classList.contains( 'bm-call-optimizing--leaving' ) ).toBe( false );
+        expect( notice( marked.container )?.classList.contains( 'wplus-call-optimizing--leaving' ) ).toBe( false );
         act( () => { vi.advanceTimersByTime( 100 ); } );
-        expect( notice( marked.container )?.classList.contains( 'bm-call-optimizing--leaving' ) ).toBe( true );
+        expect( notice( marked.container )?.classList.contains( 'wplus-call-optimizing--leaving' ) ).toBe( true );
         act( () => { vi.advanceTimersByTime( OPTIMIZING_FADE_MS ); } );
         expect( notice( marked.container ) ).toBeNull();
         // Still marked, it doesn't come back: only a new "optimizing" brings it.
@@ -310,7 +420,7 @@ describe( 'a camera moving to another codec during the call', () => {
         // the node's failsafe where the call gives one (its policy's tune.failsafeS)
         const four = render( tile( 'user_34', { videoOptimizing: true }, 4000 ) );
         act( () => { vi.advanceTimersByTime( 3999 ); } );
-        expect( notice( four.container )?.classList.contains( 'bm-call-optimizing--leaving' ) ).toBe( false );
+        expect( notice( four.container )?.classList.contains( 'wplus-call-optimizing--leaving' ) ).toBe( false );
         act( () => { vi.advanceTimersByTime( 1 ); } );
         act( () => { vi.advanceTimersByTime( OPTIMIZING_FADE_MS ); } );
         expect( notice( four.container ) ).toBeNull();
@@ -335,24 +445,24 @@ describe( 'a camera moving to another codec during the call', () => {
         const { container } = render( <CallScreen call={ { ...fakeCall( { participants: two } ), wrapper: createRef<HTMLDivElement>() as never } } layout="private" /> );
         act( () => { vi.advanceTimersByTime( PAUSED_NOTICE_MS + 100 ); } );
 
-        const main = container.querySelector( '.bm-main-video .bm-call-optimizing.bm-call-optimizing-main' ) as HTMLElement;
+        const main = container.querySelector( '.wplus-main-video .wplus-call-optimizing.wplus-call-optimizing-main' ) as HTMLElement;
         expect( main?.textContent ).toBe( 'Optimizing video quality...' );
-        expect( ( main.querySelector( '.bm-call-optimizing-backdrop' ) as HTMLElement ).style.backgroundImage ).toContain( 'ann.png' );
-        expect( container.querySelector( '.bm-call-paused' ) ).toBeNull();
+        expect( ( main.querySelector( '.wplus-call-optimizing-backdrop' ) as HTMLElement ).style.backgroundImage ).toContain( 'ann.png' );
+        expect( container.querySelector( '.wplus-call-paused' ) ).toBeNull();
     } );
 
     it( 'never covers a screen they share: not on their tile, not on the stage, and their paused screen is still said', () => {
         const sharing = render( tile( 'user_34', { videoOptimizing: true, video: fakeTrack(), screen: fakeTrack(), screenPaused: true } ) );
         expect( notice( sharing.container ) ).toBeNull();
         act( () => { vi.advanceTimersByTime( PAUSED_NOTICE_MS + 100 ); } );
-        expect( sharing.container.querySelector( '.bm-call-paused' ) ).not.toBeNull();
+        expect( sharing.container.querySelector( '.wplus-call-paused' ) ).not.toBeNull();
 
         const two = new Map<string, CallParticipant>( [
             [ 'me', participant( 'me' ) ],
             [ 'user_34', participant( 'user_34', { videoOptimizing: true, video: fakeTrack(), screen: fakeTrack() } ) ],
         ] );
         const stage = render( <CallScreen call={ { ...fakeCall( { participants: two } ), wrapper: createRef<HTMLDivElement>() as never } } layout="private" /> );
-        expect( stage.container.querySelector( '.bm-main-video video.video2' ) ).not.toBeNull();
+        expect( stage.container.querySelector( '.wplus-main-video video.video2' ) ).not.toBeNull();
         expect( notice( stage.container ) ).toBeNull();
     } );
 
@@ -372,7 +482,7 @@ describe( 'second review B3: a moving camera\'s tile keeps its place in the grid
         vi.useFakeTimers();
         // a call 900 wide and 700 high, its dock 60
         vi.spyOn( Element.prototype, 'getBoundingClientRect' ).mockImplementation( function( this: Element ){
-            const height = this.classList?.contains( 'bm-group-call-controls-v2' ) ? 60 : 700;
+            const height = this.classList?.contains( 'wplus-group-call-controls-v2' ) ? 60 : 700;
             return { width: 900, height, top: 0, left: 0, right: 900, bottom: height, x: 0, y: 0, toJSON(){} } as DOMRect;
         } );
     } );
@@ -389,7 +499,7 @@ describe( 'second review B3: a moving camera\'s tile keeps its place in the grid
         [ 'user_45', participant( 'user_45', { video: fakeTrack() } ) ],
     ] );
     const screen = ( mover: Partial<CallParticipant> ) => <CallScreen call={ { ...fakeCall( { participants: people( mover ) } ), wrapper: createRef<HTMLDivElement>() as never } } layout="group-video" />;
-    const order = ( container: HTMLElement ) => [ ...container.querySelectorAll<HTMLElement>( '.bm-group-call-input-video[data-key]' ) ]
+    const order = ( container: HTMLElement ) => [ ...container.querySelectorAll<HTMLElement>( '.wplus-group-call-input-video[data-key]' ) ]
         .sort( ( a, b ) => parseFloat( a.style.top ) - parseFloat( b.style.top ) || parseFloat( a.style.left ) - parseFloat( b.style.left ) )
         .map( ( el ) => el.getAttribute( 'data-key' ) );
 
@@ -419,20 +529,20 @@ describe( 'the camera checked before it goes out', () => {
             const call = fakeCall( { cameraChecking: true, participants: new Map( [ [ 'me', participant( 'me' ) ] ] ) } );
             const { container, rerender } = render( <CallScreen call={ { ...call, wrapper: createRef<HTMLDivElement>() as never } } layout={ layout } /> );
 
-            const camera = container.querySelector( '.bm-enable-video' )!;
+            const camera = container.querySelector( '.wplus-enable-video' )!;
             expect( camera.getAttribute( 'data-busy' ) ).toBe( '1' );
-            expect( camera.querySelector( '.bm-svg-animate' ) ).not.toBeNull();
+            expect( camera.querySelector( '.wplus-svg-animate' ) ).not.toBeNull();
 
             const done = { ...call, cameraChecking: false };
             rerender( <CallScreen call={ { ...done, wrapper: createRef<HTMLDivElement>() as never } } layout={ layout } /> );
-            expect( container.querySelector( '.bm-enable-video' )?.getAttribute( 'data-busy' ) ).toBeNull();
-            expect( container.querySelector( '.bm-enable-video .bm-svg-animate' ) ).toBeNull();
+            expect( container.querySelector( '.wplus-enable-video' )?.getAttribute( 'data-busy' ) ).toBeNull();
+            expect( container.querySelector( '.wplus-enable-video .wplus-svg-animate' ) ).toBeNull();
         } );
 
         it( `lets the camera be turned off in the ${ layout } call while it is checked: the person wins at once`, () => {
             const call = fakeCall( { cameraChecking: true, myCameraTrack: fakeTrack(), participants: new Map( [ [ 'me', participant( 'me' ) ] ] ) } );
             const { container } = render( <CallScreen call={ { ...call, wrapper: createRef<HTMLDivElement>() as never } } layout={ layout } /> );
-            const camera = container.querySelector( '.bm-disable-video' )!;
+            const camera = container.querySelector( '.wplus-disable-video' )!;
             expect( camera.getAttribute( 'data-busy' ) ).toBe( '1' );
             fireEvent.click( camera );
             expect( call.calls ).toEqual( [ 'disableCamera' ] );
@@ -444,11 +554,11 @@ describe( 'the private call\'s controls on a touch', () => {
     it( 'take no press from the tap that brings them back, and their own taps as before (Better Messages ticket 10500 sweep)', () => {
         const call = fakeCall();
         const { container } = wrapped( call, 'private' );
-        const end = container.querySelector( '.bm-cancel' )!;
-        const mic = container.querySelector( '.bm-enable-mic' )!;
+        const end = container.querySelector( '.wplus-cancel' )!;
+        const mic = container.querySelector( '.wplus-enable-mic' )!;
 
         // Hidden, the controls take no touch: it lands on the picture, and the click on the button shown at once.
-        fireEvent.touchStart( container.querySelector( '.bm-private-call' )! );
+        fireEvent.touchStart( container.querySelector( '.wplus-private-call' )! );
         fireEvent.click( end );
         expect( call.calls, 'a tap meant to show the controls ended the call' ).toEqual( [] );
 
@@ -468,36 +578,36 @@ describe( 'someone whose media stopped arriving while they are still in the call
             <GroupVideoGridItem unique_key={ key } participant={ participant( key, extra ) } width={ 50 } height={ 50 } x={ 0 } y={ 0 } />
         </CallContext.Provider> ).container;
     const blurred = ( container: HTMLElement, kind: 'camera' | 'screen' ) =>
-        container.querySelector( 'video[datatype="' + kind + '"], .bm-small-video video' )?.classList.contains( 'bm-call-video-stalled' );
+        container.querySelector( 'video[datatype="' + kind + '"], .wplus-small-video video' )?.classList.contains( 'wplus-call-video-stalled' );
 
     it( 'blurs a stopped camera\'s last frame on their tile and says "Video interrupted", and "Reconnecting..." when their sound stopped too', () => {
         const camera = tile( 'user_34', { video: fakeTrack(), audio: fakeTrack(), stalled: 'video' } );
-        expect( camera.querySelector( '.bm-call-stalled .bm-call-paused-notice' )?.textContent ).toBe( 'Video interrupted' );
+        expect( camera.querySelector( '.wplus-call-stalled .wplus-call-paused-notice' )?.textContent ).toBe( 'Video interrupted' );
         expect( blurred( camera, 'camera' ) ).toBe( true );
-        expect( camera.querySelector( '.bm-call-reconnecting' ) ).toBeNull();
+        expect( camera.querySelector( '.wplus-call-reconnecting' ) ).toBeNull();
 
         const everything = tile( 'user_43', { video: fakeTrack(), audio: fakeTrack(), stalled: 'all' } );
-        expect( everything.querySelector( '.bm-call-reconnecting' )?.textContent ).toBe( 'Reconnecting...' );
-        expect( everything.querySelector( '.bm-call-stalled' ) ).toBeNull();
+        expect( everything.querySelector( '.wplus-call-reconnecting' )?.textContent ).toBe( 'Reconnecting...' );
+        expect( everything.querySelector( '.wplus-call-stalled' ) ).toBeNull();
         expect( blurred( everything, 'camera' ) ).toBe( true );
 
         const flowing = tile( 'user_44', { video: fakeTrack(), audio: fakeTrack(), stalled: null } );
-        expect( flowing.querySelector( '.bm-call-stalled, .bm-call-reconnecting, .bm-call-video-stalled' ) ).toBeNull();
+        expect( flowing.querySelector( '.wplus-call-stalled, .wplus-call-reconnecting, .wplus-call-video-stalled' ) ).toBeNull();
 
         // never the user's own
         const own = tile( 'me', { video: fakeTrack(), stalled: 'all' } );
-        expect( own.querySelector( '.bm-call-stalled, .bm-call-reconnecting, .bm-call-video-stalled' ) ).toBeNull();
+        expect( own.querySelector( '.wplus-call-stalled, .wplus-call-reconnecting, .wplus-call-video-stalled' ) ).toBeNull();
     } );
 
     it( 'never says a shared screen is interrupted, still for as long as nothing on it moves, but blurs it when nothing of theirs arrives', () => {
         const camera = tile( 'user_34', { video: fakeTrack(), screen: fakeTrack(), stalled: 'video' } );
-        expect( camera.querySelector( '.bm-call-stalled' ) ).toBeNull();
-        expect( camera.querySelector( 'video[datatype="screen"]' )?.classList.contains( 'bm-call-video-stalled' ) ).toBe( false );
-        expect( camera.querySelector( '.bm-small-video video' )?.classList.contains( 'bm-call-video-stalled' ) ).toBe( true );
+        expect( camera.querySelector( '.wplus-call-stalled' ) ).toBeNull();
+        expect( camera.querySelector( 'video[datatype="screen"]' )?.classList.contains( 'wplus-call-video-stalled' ) ).toBe( false );
+        expect( camera.querySelector( '.wplus-small-video video' )?.classList.contains( 'wplus-call-video-stalled' ) ).toBe( true );
 
         const everything = tile( 'user_43', { screen: fakeTrack(), stalled: 'all' } );
-        expect( everything.querySelector( 'video[datatype="screen"]' )?.classList.contains( 'bm-call-video-stalled' ) ).toBe( true );
-        expect( everything.querySelector( '.bm-call-reconnecting' ) ).not.toBeNull();
+        expect( everything.querySelector( 'video[datatype="screen"]' )?.classList.contains( 'wplus-call-video-stalled' ) ).toBe( true );
+        expect( everything.querySelector( '.wplus-call-reconnecting' ) ).not.toBeNull();
     } );
 
     it( 'leaves a camera the call says why it holds (paused for the download, moving codec) to that notice', () => {
@@ -505,12 +615,12 @@ describe( 'someone whose media stopped arriving while they are still in the call
         try {
             const paused = tile( 'user_34', { video: fakeTrack(), videoPaused: true, stalled: 'video' } );
             act( () => { vi.advanceTimersByTime( PAUSED_NOTICE_MS ); } );
-            expect( paused.querySelector( '.bm-call-paused-notice' )?.textContent ).toBe( 'Paused: weak connection' );
-            expect( paused.querySelector( '.bm-call-stalled' ) ).toBeNull();
+            expect( paused.querySelector( '.wplus-call-paused-notice' )?.textContent ).toBe( 'Paused: weak connection' );
+            expect( paused.querySelector( '.wplus-call-stalled' ) ).toBeNull();
 
             const moving = tile( 'user_43', { video: fakeTrack(), videoOptimizing: true, stalled: 'video' } );
-            expect( moving.querySelector( '.bm-call-optimizing' ) ).not.toBeNull();
-            expect( moving.querySelector( '.bm-call-stalled' ) ).toBeNull();
+            expect( moving.querySelector( '.wplus-call-optimizing' ) ).not.toBeNull();
+            expect( moving.querySelector( '.wplus-call-stalled' ) ).toBeNull();
         } finally {
             vi.useRealTimers();
         }
@@ -522,11 +632,11 @@ describe( 'someone whose media stopped arriving while they are still in the call
             [ 'user_34', participant( 'user_34', { audio: fakeTrack(), stalled } ) ],
         ] );
         const { container, rerender } = wrapped( fakeCall( { participants: people( 'all' ) } ), 'group-audio' );
-        expect( container.querySelector( '[data-key="user_34"] .bm-call-reconnecting' )?.textContent ).toBe( 'Reconnecting...' );
-        expect( container.querySelector( '[data-key="me"] .bm-call-reconnecting' ) ).toBeNull();
+        expect( container.querySelector( '[data-key="user_34"] .wplus-call-reconnecting' )?.textContent ).toBe( 'Reconnecting...' );
+        expect( container.querySelector( '[data-key="me"] .wplus-call-reconnecting' ) ).toBeNull();
 
         rerender( <CallScreen call={ { ...fakeCall( { participants: people( null ) } ), wrapper: createRef<HTMLDivElement>() as never } } layout="group-audio" /> );
-        expect( container.querySelector( '.bm-call-reconnecting' ) ).toBeNull();
+        expect( container.querySelector( '.wplus-call-reconnecting' ) ).toBeNull();
     } );
 
     it( 'in a call between two, says "Video interrupted" and why over the blurred stage, and "The other side lost connection" when nothing arrives', () => {
@@ -538,18 +648,18 @@ describe( 'someone whose media stopped arriving while they are still in the call
             <CallScreen call={ { ...fakeCall( { participants: two( stalled ) } ), wrapper: createRef<HTMLDivElement>() as never } } layout="private" />;
         const { container, rerender } = render( screen( 'video' ) );
 
-        expect( container.querySelector( '.bm-main-video .bm-call-stalled.bm-call-paused-main' )?.textContent )
+        expect( container.querySelector( '.wplus-main-video .wplus-call-stalled.wplus-call-paused-main' )?.textContent )
             .toBe( 'Video interruptedTheir video stopped arriving. It comes back by itself.' );
-        expect( container.querySelector( '.bm-main-video video.video1' )?.classList.contains( 'bm-call-video-stalled' ) ).toBe( true );
-        expect( container.querySelector( '.bm-placeholder-participant-lost-message' ) ).toBeNull();
+        expect( container.querySelector( '.wplus-main-video video.video1' )?.classList.contains( 'wplus-call-video-stalled' ) ).toBe( true );
+        expect( container.querySelector( '.wplus-placeholder-participant-lost-message' ) ).toBeNull();
 
         rerender( screen( 'all' ) );
-        expect( container.querySelector( '.bm-placeholder-participant-lost-message' )?.textContent ).toBe( 'The other side lost connection' );
-        expect( container.querySelector( '.bm-call-stalled' ) ).toBeNull();
-        expect( container.querySelector( '.bm-main-video video.video1' )?.classList.contains( 'bm-call-video-stalled' ) ).toBe( true );
+        expect( container.querySelector( '.wplus-placeholder-participant-lost-message' )?.textContent ).toBe( 'The other side lost connection' );
+        expect( container.querySelector( '.wplus-call-stalled' ) ).toBeNull();
+        expect( container.querySelector( '.wplus-main-video video.video1' )?.classList.contains( 'wplus-call-video-stalled' ) ).toBe( true );
 
         rerender( screen( null ) );
-        expect( container.querySelector( '.bm-call-stalled, .bm-placeholder-participant-lost-message, .bm-call-video-stalled' ) ).toBeNull();
+        expect( container.querySelector( '.wplus-call-stalled, .wplus-placeholder-participant-lost-message, .wplus-call-video-stalled' ) ).toBeNull();
     } );
 
     describe( 'a camera that never showed a frame here', () => {
@@ -559,21 +669,21 @@ describe( 'someone whose media stopped arriving while they are still in the call
 
         it( 'shows their face on their tile, above "Video interrupted", or under "Reconnecting...", where a last frame would be blurred', () => {
             const empty = tile( 'user_34', { video: fakeTrack(), audio: fakeTrack(), avatar: 'https://example.com/ann.png', stalled: 'video' } );
-            expect( empty.querySelector<HTMLElement>( '.bm-call-stalled.bm-call-stalled-faced .bm-call-stalled-face' )?.style.backgroundImage ).toContain( 'https://example.com/ann.png' );
-            expect( empty.querySelector( '.bm-call-stalled .bm-call-paused-notice' )?.textContent ).toBe( 'Video interrupted' );
+            expect( empty.querySelector<HTMLElement>( '.wplus-call-stalled.wplus-call-stalled-faced .wplus-call-stalled-face' )?.style.backgroundImage ).toContain( 'https://example.com/ann.png' );
+            expect( empty.querySelector( '.wplus-call-stalled .wplus-call-paused-notice' )?.textContent ).toBe( 'Video interrupted' );
 
             const away = tile( 'user_43', { video: fakeTrack(), avatar: 'https://example.com/cara.png', stalled: 'all' } );
-            const inner = away.querySelector<HTMLElement>( '.bm-group-call-input-video-inner' );
-            expect( inner?.classList.contains( 'bm-call-pictureless' ) ).toBe( true );
+            const inner = away.querySelector<HTMLElement>( '.wplus-group-call-input-video-inner' );
+            expect( inner?.classList.contains( 'wplus-call-pictureless' ) ).toBe( true );
             expect( inner?.style.backgroundImage ).toContain( 'https://example.com/cara.png' );
-            expect( away.querySelector( '.bm-call-reconnecting' ) ).not.toBeNull();
+            expect( away.querySelector( '.wplus-call-reconnecting' ) ).not.toBeNull();
 
             drawn();
             const frozen = tile( 'user_44', { video: fakeTrack(), audio: fakeTrack(), stalled: 'video' } );
-            expect( frozen.querySelector( '.bm-call-stalled' ) ).not.toBeNull();
-            expect( frozen.querySelector( '.bm-call-stalled-faced, .bm-call-stalled-face' ) ).toBeNull();
+            expect( frozen.querySelector( '.wplus-call-stalled' ) ).not.toBeNull();
+            expect( frozen.querySelector( '.wplus-call-stalled-faced, .wplus-call-stalled-face' ) ).toBeNull();
             const frozenAway = tile( 'user_45', { video: fakeTrack(), stalled: 'all' } );
-            expect( frozenAway.querySelector( '.bm-call-pictureless' ) ).toBeNull();
+            expect( frozenAway.querySelector( '.wplus-call-pictureless' ) ).toBeNull();
         } );
 
         it( 'shows their face on the stage of a call between two, and only there', () => {
@@ -585,17 +695,32 @@ describe( 'someone whose media stopped arriving while they are still in the call
                 <CallScreen call={ { ...fakeCall( { participants: two( stalled ) } ), wrapper: createRef<HTMLDivElement>() as never } } layout="private" />;
             const { container, rerender } = render( screen( 'video' ) );
 
-            expect( container.querySelector<HTMLImageElement>( '.bm-main-video .bm-call-stalled-faced .bm-call-animation img' )?.src ).toBe( 'https://example.com/ann.png' );
+            expect( container.querySelector<HTMLImageElement>( '.wplus-main-video .wplus-call-stalled-faced .wplus-call-animation img' )?.src ).toBe( 'https://example.com/ann.png' );
 
             rerender( screen( 'all' ) );
-            expect( container.querySelector<HTMLImageElement>( '.bm-main-video .bm-call-stalled-face-main img' )?.src ).toBe( 'https://example.com/ann.png' );
-            expect( container.querySelector( '.bm-placeholder-participant-lost-message' ) ).not.toBeNull();
+            expect( container.querySelector<HTMLImageElement>( '.wplus-main-video .wplus-call-stalled-face-main img' )?.src ).toBe( 'https://example.com/ann.png' );
+            expect( container.querySelector( '.wplus-placeholder-participant-lost-message' ) ).not.toBeNull();
 
             drawn();
             rerender( screen( 'video' ) );
-            expect( container.querySelector( '.bm-call-stalled' ) ).not.toBeNull();
-            expect( container.querySelector( '.bm-call-stalled-faced, .bm-call-stalled-face-main' ) ).toBeNull();
+            expect( container.querySelector( '.wplus-call-stalled' ) ).not.toBeNull();
+            expect( container.querySelector( '.wplus-call-stalled-faced, .wplus-call-stalled-face-main' ) ).toBeNull();
         } );
+    } );
+} );
+
+describe( 'what a group call may send', () => {
+    const settle = () => act( async () => { await new Promise( ( resolve ) => setTimeout( resolve, 0 ) ); } );
+
+    it( 'leaves what is on to the call until it is joined, and turns it off once the call says it may not be sent', async () => {
+        const call = fakeCall( { canPublish: false, connectionState: 'connecting', myCameraTrack: fakeTrack(), myCameraTrackRef: { current: fakeTrack() } } );
+        const { rerender } = wrapped( call, 'group-video' );
+        await settle();
+        expect( call.calls ).toEqual( [] );
+
+        rerender( <CallScreen call={ { ...call, connectionState: 'connected', wrapper: createRef<HTMLDivElement>() as never } } layout="group-video" /> );
+        await settle();
+        expect( call.calls ).toEqual( [ 'disableCamera' ] );
     } );
 } );
 
@@ -604,6 +729,6 @@ describe( 'the host', () => {
         configureUi( { translate: ( text, context ) => context === 'Private Call Screen' ? '[' + text + ']' : text } );
         const { container } = wrapped( fakeCall( { action: 'outgoing_call' } ), 'private' );
 
-        expect( container.querySelector( '.bm-placeholder-outgoing-text' )?.textContent ).toBe( '[Calling...]' );
+        expect( container.querySelector( '.wplus-placeholder-outgoing-text' )?.textContent ).toBe( '[Calling...]' );
     } );
 } );

@@ -58,14 +58,14 @@ const show = ( state : Partial<EasyStreamState>, names : PartName[], extra : { o
 };
 
 // A stream's Better Messages chat room, as Better Messages' placeholder for it comes from the page.
-const ROOM = '<div class="bm-chat-wrap" style="height: 600px" data-thread-id="16778" data-chat-id="14014" data-full-screen="0"></div>';
+const ROOM = '<div class="wplus-chat-wrap" style="height: 600px" data-thread-id="16778" data-chat-id="14014" data-full-screen="0"></div>';
 
 describe( 'a stream\'s Better Messages chat room', () => {
     it( 'takes the light chat\'s place in the chat part, Better Messages\' placeholder as it came, and goes with the part', () => {
         ( document as any ).fullscreenEnabled = true;
         const { at, rendered } = show( live(), [ 'player', 'chat' ], { room: ROOM } );
 
-        const room = at( 'chat' ).querySelector( '.estream-part--chat > .estream-bm-room > .bm-chat-wrap' );
+        const room = at( 'chat' ).querySelector( '.estream-part--chat > .estream-bm-room > .wplus-chat-wrap' );
         expect( room?.getAttribute( 'data-thread-id' ) ).toBe( '16778' );
         expect( room?.getAttribute( 'data-chat-id' ) ).toBe( '14014' );
         expect( within( at( 'chat' ) ).queryByText( 'Hello there' ) ).toBeNull();
@@ -74,12 +74,12 @@ describe( 'a stream\'s Better Messages chat room', () => {
         // On the page with the player, a part of its own, the player hides and shows it, the same room kept unseen.
         fireEvent.click( within( at( 'player' ) ).getByLabelText( 'Hide chat' ) );
         expect( at( 'chat' ).hasAttribute( 'data-estream-chat-hidden' ) ).toBe( true );
-        expect( at( 'chat' ).querySelector( '.bm-chat-wrap' ) ).toBe( room );
+        expect( at( 'chat' ).querySelector( '.wplus-chat-wrap' ) ).toBe( room );
         fireEvent.click( within( at( 'player' ) ).getByLabelText( 'Show chat' ) );
         expect( at( 'chat' ).hasAttribute( 'data-estream-chat-hidden' ) ).toBe( false );
 
         rendered.unmount();
-        expect( document.querySelector( '.bm-chat-wrap' ) ).toBeNull();
+        expect( document.querySelector( '.wplus-chat-wrap' ) ).toBeNull();
     } );
 
     it( 'is shown and hidden from the player beside it in a ready layout, one block, kept mounted while hidden', () => {
@@ -91,93 +91,93 @@ describe( 'a stream\'s Better Messages chat room', () => {
         layout.querySelector( '.estream-layout__side' )!.append( at( 'chat' ) );
         const fake = fakeClient( live() );
         render( <EasyStreamParts client={ fake.asClient } parts={ parts } dialogs={ dialogs } title="Friday Q&A" room={ ROOM } manage={ false } /> );
-        const room = at( 'chat' ).querySelector( '.bm-chat-wrap' );
+        const room = at( 'chat' ).querySelector( '.wplus-chat-wrap' );
 
         fireEvent.click( within( at( 'player' ) ).getByLabelText( 'Hide chat' ) );
         expect( layout.classList.contains( 'estream-layout--no-chat' ) ).toBe( true );
         // Hidden by the layout, not taken down: the same room, for when it shows again.
-        expect( at( 'chat' ).querySelector( '.bm-chat-wrap' ) ).toBe( room );
+        expect( at( 'chat' ).querySelector( '.wplus-chat-wrap' ) ).toBe( room );
 
         fireEvent.click( within( at( 'player' ) ).getByLabelText( 'Show chat' ) );
         expect( layout.classList.contains( 'estream-layout--no-chat' ) ).toBe( false );
-        expect( at( 'chat' ).querySelector( '.bm-chat-wrap' ) ).toBe( room );
+        expect( at( 'chat' ).querySelector( '.wplus-chat-wrap' ) ).toBe( room );
     } );
 
     it( 'is taken into the player\'s full screen, the same room, dark there, and given back to its part as it ends', async () => {
         ( document as any ).fullscreenEnabled = true;
-        document.body.classList.add( 'bm-messages-light' );
+        document.body.classList.add( 'wplus-messages-light' );
         const { at } = show( live(), [ 'player', 'chat' ], { room: ROOM } );
         // The room as Better Messages mounted it, with what was typed in it.
-        const room = at( 'chat' ).querySelector( '.bm-chat-wrap' ) as HTMLElement;
-        room.classList.add( 'bm-initialized' );
+        const room = at( 'chat' ).querySelector( '.wplus-chat-wrap' ) as HTMLElement;
+        room.classList.add( 'wplus-initialized' );
         room.innerHTML = '<textarea>half a message</textarea>';
         const root = at( 'player' ).querySelector( '.estream-theme' )!;
 
         ( document as any ).fullscreenElement = root;
         await act( async () => { document.dispatchEvent( new Event( 'fullscreenchange' ) ); } );
         // The very element, not a copy, beside the picture: one room on the page.
-        expect( root.querySelector( '.estream-app__side > .estream-bm-room > .bm-chat-wrap' ) ).toBe( room );
-        expect( document.querySelectorAll( '.bm-chat-wrap' ) ).toHaveLength( 1 );
+        expect( root.querySelector( '.estream-app__side > .estream-bm-room > .wplus-chat-wrap' ) ).toBe( room );
+        expect( document.querySelectorAll( '.wplus-chat-wrap' ) ).toHaveLength( 1 );
         expect( room.querySelector( 'textarea' )?.value ).toBe( 'half a message' );
-        expect( document.body.classList.contains( 'bm-messages-dark' ) ).toBe( true );
+        expect( document.body.classList.contains( 'wplus-messages-dark' ) ).toBe( true );
         // With the button and the key for it, as the light chat has.
         fireEvent.click( within( at( 'player' ) ).getByLabelText( 'Hide chat' ) );
-        expect( at( 'chat' ).querySelector( '.estream-part--chat > .estream-bm-room > .bm-chat-wrap' ) ).toBe( room );
+        expect( at( 'chat' ).querySelector( '.estream-part--chat > .estream-bm-room > .wplus-chat-wrap' ) ).toBe( room );
         expect( root.querySelector( '.estream-bm-room' ) ).toBeNull();
         fireEvent.click( within( at( 'player' ) ).getByLabelText( 'Show chat' ) );
-        expect( root.querySelector( '.estream-bm-room > .bm-chat-wrap' ) ).toBe( room );
+        expect( root.querySelector( '.estream-bm-room > .wplus-chat-wrap' ) ).toBe( room );
 
         delete ( document as any ).fullscreenElement;
         await act( async () => { document.dispatchEvent( new Event( 'fullscreenchange' ) ); } );
-        expect( at( 'chat' ).querySelector( '.estream-part--chat > .estream-bm-room > .bm-chat-wrap' ) ).toBe( room );
-        expect( document.querySelectorAll( '.bm-chat-wrap' ) ).toHaveLength( 1 );
-        expect( document.body.classList.contains( 'bm-messages-light' ) ).toBe( true );
-        expect( document.body.classList.contains( 'bm-messages-dark' ) ).toBe( false );
+        expect( at( 'chat' ).querySelector( '.estream-part--chat > .estream-bm-room > .wplus-chat-wrap' ) ).toBe( room );
+        expect( document.querySelectorAll( '.wplus-chat-wrap' ) ).toHaveLength( 1 );
+        expect( document.body.classList.contains( 'wplus-messages-light' ) ).toBe( true );
+        expect( document.body.classList.contains( 'wplus-messages-dark' ) ).toBe( false );
         document.body.className = '';
     } );
 
     it( 'has a room of its own in the player\'s full screen where the page shows no chat part', async () => {
         ( document as any ).fullscreenEnabled = true;
         const { at } = show( live(), [ 'player' ], { room: ROOM } );
-        expect( document.querySelector( '.bm-chat-wrap' ) ).toBeNull();
+        expect( document.querySelector( '.wplus-chat-wrap' ) ).toBeNull();
         const root = at( 'player' ).querySelector( '.estream-theme' )!;
 
         ( document as any ).fullscreenElement = root;
         await act( async () => { document.dispatchEvent( new Event( 'fullscreenchange' ) ); } );
-        expect( root.querySelector( '.estream-app__side > .estream-bm-room > .bm-chat-wrap' )?.getAttribute( 'data-thread-id' ) ).toBe( '16778' );
+        expect( root.querySelector( '.estream-app__side > .estream-bm-room > .wplus-chat-wrap' )?.getAttribute( 'data-thread-id' ) ).toBe( '16778' );
 
         delete ( document as any ).fullscreenElement;
         await act( async () => { document.dispatchEvent( new Event( 'fullscreenchange' ) ); } );
-        expect( document.querySelector( '.bm-chat-wrap' ) ).toBeNull();
+        expect( document.querySelector( '.wplus-chat-wrap' ) ).toBeNull();
         document.body.className = '';
     } );
 
     it( 'sits beside the player in one piece, and in the studio page\'s chat tab', () => {
         const all = show( live(), [ 'all' ], { room: ROOM } );
-        expect( all.at( 'all' ).querySelector( '.estream-app__side > .estream-bm-room > .bm-chat-wrap' ) ).toBeTruthy();
+        expect( all.at( 'all' ).querySelector( '.estream-app__side > .estream-bm-room > .wplus-chat-wrap' ) ).toBeTruthy();
         expect( all.at( 'all' ).querySelector( '.estream-chat' ) ).toBeNull();
         cleanup();
         document.body.innerHTML = '';
 
         const studio = show( { you: host }, [ 'studio-page' ], { room: ROOM, options: { 'studio-page': { page: { back: '#/studio', page: '', createPage: '', nonce: 'n', settings: '' } } } } );
         expect( within( studio.at( 'studio-page' ) ).getByRole( 'tab', { name: 'Chat' } ).getAttribute( 'aria-selected' ) ).toBe( 'true' );
-        expect( studio.at( 'studio-page' ).querySelector( '.estream-bm-room > .bm-chat-wrap' ) ).toBeTruthy();
+        expect( studio.at( 'studio-page' ).querySelector( '.estream-bm-room > .wplus-chat-wrap' ) ).toBeTruthy();
     } );
 
     it( 'is dark in the player\'s full screen, as Better Messages is dark by its body class, and the page\'s own after', async () => {
         ( document as any ).fullscreenEnabled = true;
-        document.body.classList.add( 'bm-messages-light', 'site' );
+        document.body.classList.add( 'wplus-messages-light', 'site' );
         const all = show( live(), [ 'all' ], { room: ROOM } );
         const root = all.at( 'all' ).querySelector( '.estream-theme' )!;
 
         ( document as any ).fullscreenElement = root;
         await act( async () => { document.dispatchEvent( new Event( 'fullscreenchange' ) ); } );
         expect( root.className ).toContain( 'estream-theme--full' );
-        expect( [ ...document.body.classList ].sort() ).toEqual( [ 'bm-messages-dark', 'site' ] );
+        expect( [ ...document.body.classList ].sort() ).toEqual( [ 'site', 'wplus-messages-dark' ] );
 
         delete ( document as any ).fullscreenElement;
         await act( async () => { document.dispatchEvent( new Event( 'fullscreenchange' ) ); } );
-        expect( [ ...document.body.classList ].sort() ).toEqual( [ 'bm-messages-light', 'site' ] );
+        expect( [ ...document.body.classList ].sort() ).toEqual( [ 'site', 'wplus-messages-light' ] );
         document.body.className = '';
     } );
 } );
@@ -214,7 +214,7 @@ describe( 'the stream in a Better Messages conversation', () => {
 
         update( live( { you: viewer } ) );
         const button = within( at( 'room-button' ) ).getByRole( 'button', { name: 'Watch the live stream' } );
-        expect( button.className ).toContain( 'bm-icon-btn' );
+        expect( button.className ).toContain( 'wplus-icon-btn' );
         fireEvent.click( button );
         expect( room.open ).toHaveBeenCalledTimes( 1 );
 
@@ -235,7 +235,7 @@ describe( 'the stream in a Better Messages conversation', () => {
         const room = fakeRoom();
         const { at } = show( live( { you: viewer } ), [ 'room-banner' ], { chat: false, options: { 'room-banner': { room } } } );
 
-        const banner = at( 'room-banner' ).querySelector( '.bm-before-message-list > .bm-group-call-in-progress' )!;
+        const banner = at( 'room-banner' ).querySelector( '.wplus-before-message-list > .wplus-group-call-in-progress' )!;
         expect( banner.textContent ).toContain( 'Friday Q&A' );
         expect( banner.textContent ).toContain( '12 watching' );
         fireEvent.click( within( banner as HTMLElement ).getByRole( 'button', { name: 'Watch' } ) );
@@ -266,26 +266,26 @@ describe( 'the stream in a Better Messages conversation', () => {
         const { at, client } = show( live( { you: viewer, tiles: [ hostTile(), { ...hostTile( 'u:4.0a1b2c3d' ), name: 'Jordan', micMuted: true } ] } ), [ 'room-stage' ], { chat: false, options: { 'room-stage': { room } } } );
 
         const stage = at( 'room-stage' );
-        expect( stage.querySelector( '.estream-bm-stage .bm-group-call-container .estream-stage' ) ).toBeTruthy();
+        expect( stage.querySelector( '.estream-bm-stage .wplus-group-call-container .estream-stage' ) ).toBeTruthy();
         // The call's dock, not the player's bar; the time on air beside the Live badge instead.
-        const dock = stage.querySelector( '.bm-group-call-controls-v2 > .bm-group-call-controls-buttons' ) as HTMLElement;
+        const dock = stage.querySelector( '.wplus-group-call-controls-v2 > .wplus-group-call-controls-buttons' ) as HTMLElement;
         expect( dock ).toBeTruthy();
         expect( stage.querySelector( '.estream-bar' ) ).toBeNull();
         expect( within( stage ).getByLabelText( 'Time on air' ).textContent ).toBe( '1:05' );
         // Each tile says who it is and that the microphone is off as a call's does.
-        expect( [ ...stage.querySelectorAll( '.bm-info-name' ) ].map( ( n ) => n.textContent ) ).toEqual( [ 'Maya Lee', 'Jordan' ] );
-        expect( stage.querySelectorAll( '.bm-caller-status > .bm-mic-disabled' ) ).toHaveLength( 1 );
+        expect( [ ...stage.querySelectorAll( '.wplus-info-name' ) ].map( ( n ) => n.textContent ) ).toEqual( [ 'Maya Lee', 'Jordan' ] );
+        expect( stage.querySelectorAll( '.wplus-caller-status > .wplus-mic-disabled' ) ).toHaveLength( 1 );
         expect( stage.querySelector( '.estream-tile__muted' ) ).toBeNull();
 
         fireEvent.click( within( dock ).getByRole( 'button', { name: 'Mute' } ) );
         expect( within( dock ).getByRole( 'button', { name: 'Turn sound on' } ) ).toBeTruthy();
-        expect( within( dock ).getByRole( 'button', { name: 'Full screen' } ).className ).toBe( 'bm-fs-enable' );
+        expect( within( dock ).getByRole( 'button', { name: 'Full screen' } ).className ).toBe( 'wplus-fs-enable' );
         // Nobody asks to come on stage from the conversation.
         expect( within( dock ).queryByRole( 'button', { name: /stage/ } ) ).toBeNull();
 
         // The volume and the quality, in the call's settings sheet.
         fireEvent.click( within( dock ).getByRole( 'button', { name: 'Settings' } ) );
-        const sheet = stage.querySelector( '.bm-group-call-controls-v2 > .bm-call-settings' ) as HTMLElement;
+        const sheet = stage.querySelector( '.wplus-group-call-controls-v2 > .wplus-call-settings' ) as HTMLElement;
         fireEvent.change( within( sheet ).getByLabelText( 'Volume' ), { target: { value: '0.3' } } );
         expect( window.localStorage.getItem( 'wordplus-stream:volume' ) ).toBe( '0.3' );
         expect( within( dock ).getByRole( 'button', { name: 'Mute' } ) ).toBeTruthy();
@@ -298,7 +298,7 @@ describe( 'the stream in a Better Messages conversation', () => {
         fireEvent.click( within( sheet ).getByRole( 'button', { name: 'Hide statistics' } ) );
         expect( within( stage ).queryByRole( 'region', { name: 'Statistics' } ) ).toBeNull();
         fireEvent.click( within( dock ).getByRole( 'button', { name: 'Settings' } ) );
-        expect( stage.querySelector( '.bm-call-settings' ) ).toBeNull();
+        expect( stage.querySelector( '.wplus-call-settings' ) ).toBeNull();
 
         // Reactions, from their own sheet.
         fireEvent.click( within( dock ).getByRole( 'button', { name: 'Reactions' } ) );
@@ -313,11 +313,11 @@ describe( 'the stream in a Better Messages conversation', () => {
     it( 'shows and hides the conversation beside the stage from the dock, first, as a call\'s dock does', () => {
         const room = fakeRoom( true );
         const { at } = show( live( { you: viewer, tiles: [ hostTile() ] } ), [ 'room-stage' ], { chat: false, options: { 'room-stage': { room } } } );
-        const dock = at( 'room-stage' ).querySelector( '.bm-group-call-controls-buttons' ) as HTMLElement;
+        const dock = at( 'room-stage' ).querySelector( '.wplus-group-call-controls-buttons' ) as HTMLElement;
 
         // The call's own control, by its class and icon, and latched while the conversation shows.
         const hide = dock.firstElementChild as HTMLElement;
-        expect( [ hide.getAttribute( 'aria-label' ), hide.className, hide.getAttribute( 'data-active' ) ] ).toEqual( [ 'Hide chat', 'bm-toggle-chat', '1' ] );
+        expect( [ hide.getAttribute( 'aria-label' ), hide.className, hide.getAttribute( 'data-active' ) ] ).toEqual( [ 'Hide chat', 'wplus-toggle-chat', '1' ] );
         fireEvent.click( hide );
         expect( room.toggleChat ).toHaveBeenCalledTimes( 1 );
         const again = within( dock ).getByRole( 'button', { name: 'Show chat' } );
@@ -345,7 +345,7 @@ describe( 'the stream in a Better Messages conversation', () => {
         expect( person.querySelector( 'img' )?.getAttribute( 'src' ) ).toBe( 'https://cdn.example/maya.png' );
         expect( person.querySelector( '.estream-person__name' )?.textContent ).toBe( 'Maya Lee' );
         // Its name once: not over the picture as well.
-        expect( at( 'room-stage' ).querySelector( '.bm-info-name' ) ).toBeNull();
+        expect( at( 'room-stage' ).querySelector( '.wplus-info-name' ) ).toBeNull();
 
         fireEvent.error( person.querySelector( 'img' )! );
         expect( at( 'room-stage' ).querySelector( '.estream-person .estream-initials' )?.textContent ).toBe( 'ML' );
@@ -404,20 +404,20 @@ describe( 'the stream in a Better Messages conversation', () => {
         // The admin studio's numbers, where a call keeps its own: the connection and how many watch, then the
         // statistics in the settings sheet.
         await act( async () => {} );
-        const status = stage.querySelector( '.bm-group-call-controls-v2 > .bm-connection-control' ) as HTMLElement;
-        expect( status.querySelector( '.bm-connection-quality.bm-quality-good' )?.textContent ).toBe( 'Good connection' );
+        const status = stage.querySelector( '.wplus-group-call-controls-v2 > .wplus-connection-control' ) as HTMLElement;
+        expect( status.querySelector( '.wplus-connection-quality.wplus-quality-good' )?.textContent ).toBe( 'Good connection' );
         expect( within( status ).getByLabelText( '3 watching, peak 7' ) ).toBeTruthy();
         // The peak on the count itself, not only in its tooltip.
         expect( status.querySelector( '.estream-bm-watching__peak' )?.textContent ).toBe( '7' );
         fireEvent.click( within( stage ).getByRole( 'button', { name: 'Settings' } ) );
-        const figures = () => [ ...stage.querySelectorAll( '.bm-call-settings .estream-bm-figures > div' ) ].map( ( row ) => row.querySelector( 'dt' )!.textContent + ': ' + row.querySelector( 'dd' )!.textContent );
+        const figures = () => [ ...stage.querySelectorAll( '.wplus-call-settings .estream-bm-figures > div' ) ].map( ( row ) => row.querySelector( 'dt' )!.textContent + ': ' + row.querySelector( 'dd' )!.textContent );
         expect( figures() ).toEqual( [ 'Video: 720p · 30 fps · 2.4 Mbps', 'Watching at the peak: 7', 'Reactions: 4' ] );
         // Nobody has it on screen: the quality chosen, nothing of a pause, here or over the picture.
         client.sendingStats.mockImplementation( async () => ( { width: 0, height: 0, fps: 0, kbps: 0, limited: null, held: false, paused: true } as any ) );
         await act( async () => { await new Promise( ( r ) => setTimeout( r, 2100 ) ); } );
         expect( figures()[0] ).toBe( 'Video: 720p' );
         expect( stage.textContent ).not.toMatch( /paus/i );
-        expect( stage.querySelector( '.bm-group-call-status' ) ).toBeNull();
+        expect( stage.querySelector( '.wplus-group-call-status' ) ).toBeNull();
         fireEvent.click( within( stage ).getByRole( 'button', { name: 'Settings' } ) );
         // Live from here, it ends; it doesn't close.
         expect( within( stage ).queryByRole( 'button', { name: 'Close the live stream' } ) ).toBeNull();

@@ -20,11 +20,11 @@ it( 'stays out of a page without calls, and places a call from <call-button> onc
     await Promise.resolve();
     expect( calls.start ).toHaveBeenCalledTimes( 1 );
 
-    // {pair} is the page user and the one called, in order, as <online-list> names its calls.
+    // {pair} is the page user and the one called, the smaller number first, as <online-list> names its calls.
     document.body.insertAdjacentHTML( 'beforeend', '<call-button to="100" call="support:{pair}" type="video">Call</call-button>' );
     document.querySelectorAll( 'call-button' )[ 2 ].shadowRoot!.querySelector( 'button' )!.click();
     await Promise.resolve();
-    expect( calls.start ).toHaveBeenLastCalledWith( 'support:100:42', { to: 100, type: 'video' } );
+    expect( calls.start ).toHaveBeenLastCalledWith( 'support:42:100', { to: 100, type: 'video' } );
 
     // Users whose ids are text, as Clerk and Auth0 name them: called by that id, failing before as Number() of it.
     document.body.insertAdjacentHTML( 'beforeend', '<call-button to="user_ann" call="support:{pair}">Call</call-button><call-button to="auth0|5f7c" call="help:{pair}">Call</call-button>' );

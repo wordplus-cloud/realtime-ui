@@ -34,11 +34,11 @@ export interface PresenceDotProps {
     color?   : string;
 }
 
-export function PresenceDot( { presence, size = 10, ringColor = "rgba(var(--bm-color-surface), 1)", color }: PresenceDotProps ) {
+export function PresenceDot( { presence, size = 10, ringColor = "rgba(var(--wplus-color-surface), 1)", color }: PresenceDotProps ) {
     const p = presence || "offline";
     return (
         <span
-            className="bm-presence-dot"
+            className="wplus-presence-dot"
             aria-label={ `presence-${p}` }
             data-presence={ p }
             style={{
@@ -64,12 +64,12 @@ export interface AvatarProps {
     dotSize?    : number;
 }
 
-// Avatars take their radius from the design token (--bm-radius-avatar, which a site's avatar shape remaps): the shape
+// Avatars take their radius from the design token (--wplus-radius-avatar, which a site's avatar shape remaps): the shape
 // prop is an explicit override for one spot only, so every surface agrees on the shape by default.
 export const SHAPE_RADIUS: Record<AvatarShape, string> = {
-    circle:  "var(--bm-radius-circle)",
-    rounded: "var(--bm-radius-md)",
-    square:  "var(--bm-radius-xs)",
+    circle:  "var(--wplus-radius-circle)",
+    rounded: "var(--wplus-radius-md)",
+    square:  "var(--wplus-radius-xs)",
 };
 
 /** The picture for a user who has none of their own: the host's (Better Messages ships one). */
@@ -107,7 +107,7 @@ export function Avatar( { user, size = 36, shape, presence, presenceColor, prese
     if ( ! user ) return null;
     const dot = dotSize != null ? dotSize : Math.max( 6, Math.round( size * 0.28 ) );
     const radius = shape ? SHAPE_RADIUS[ shape ] : undefined;
-    const ring = presenceRing ?? "rgba(var(--bm-color-surface), 1)";
+    const ring = presenceRing ?? "rgba(var(--wplus-color-surface), 1)";
     const src = avatarSrc( user );
     // The user's name on hover, in the shared tooltip: the floater renders the name as markup (a site's badges), the
     // aria-label takes it flattened. An explicit `title` is the caller's own wording; "" opts out where the name is
@@ -115,14 +115,14 @@ export function Avatar( { user, size = 36, shape, presence, presenceColor, prese
     const ownTitle = title !== undefined;
     const tooltipLabel: React.ReactNode = ownTitle
         ? title
-        : ( user.name ? <span className="bm-uname">{ parse( host().nameHtml( user.name ) ) }</span> : "" );
+        : ( user.name ? <span className="wplus-uname">{ parse( host().nameHtml( user.name ) ) }</span> : "" );
     const tooltipAria = ownTitle ? title : plainName( user.name );
     const { extraClass, attributes } = avatarFilterExtras( user );
     const body = (
-        <span className={ "bm-avatar-wrap" + ( extraClass ? " " + extraClass : "" ) }
+        <span className={ "wplus-avatar-wrap" + ( extraClass ? " " + extraClass : "" ) }
               { ...attributes }>
             { src
-                ? <img className="bm-avatar bm-avatar-img avatar"
+                ? <img className="wplus-avatar wplus-avatar-img avatar"
                        src={ src } alt={ plainName( user.name ) }
                        width={ size } height={ size }
                        style={{
@@ -131,10 +131,10 @@ export function Avatar( { user, size = 36, shape, presence, presenceColor, prese
                            borderRadius: radius,
                        }} />
                 // No picture and no default: the blank of the avatar's shape.
-                : <span className="bm-avatar bm-avatar-img bm-avatar-blank" role="img" aria-label={ plainName( user.name ) }
+                : <span className="wplus-avatar wplus-avatar-img wplus-avatar-blank" role="img" aria-label={ plainName( user.name ) }
                         style={{ width: size, height: size, borderRadius: radius }} /> }
             { presence && presence !== "offline" && (
-                <span className="bm-presence-dot-wrap">
+                <span className="wplus-presence-dot-wrap">
                     <PresenceDot presence={ presence } size={ dot } ringColor={ ring } color={ presenceColor } />
                 </span>
             ) }
@@ -160,7 +160,7 @@ export function GroupAvatar( { users, size = 36, shape }: GroupAvatarProps ) {
     const rows = list.length <= 2 ? 1 : 2;
     const radius = shape ? SHAPE_RADIUS[ shape ] : undefined;
     return (
-        <span className="bm-group-avatar" style={{
+        <span className="wplus-group-avatar" style={{
             gridTemplateColumns: `repeat(${cols}, 1fr)`,
             gridTemplateRows:    `repeat(${rows}, 1fr)`,
             gap,
@@ -174,8 +174,8 @@ export function GroupAvatar( { users, size = 36, shape }: GroupAvatarProps ) {
                 const style = list.length === 3 && i === 0 ? { gridRow: "span 2" } : undefined;
                 const src = avatarSrc( u );
                 return src
-                    ? <img key={ avatarKey( u, i ) } src={ src } alt="" className="bm-group-avatar__tile" style={ style } />
-                    : <span key={ avatarKey( u, i ) } className="bm-group-avatar__tile bm-avatar-blank" style={ style } />;
+                    ? <img key={ avatarKey( u, i ) } src={ src } alt="" className="wplus-group-avatar__tile" style={ style } />
+                    : <span key={ avatarKey( u, i ) } className="wplus-group-avatar__tile wplus-avatar-blank" style={ style } />;
             } ) }
         </span>
     );
@@ -194,9 +194,9 @@ export function AvatarStack( { users, size = 28, max = 3, shape }: AvatarStackPr
     const more = valid.length - list.length;
     const radius = shape ? SHAPE_RADIUS[ shape ] : undefined;
     return (
-        <span className="bm-avatar-stack">
+        <span className="wplus-avatar-stack">
             { list.map( ( u, i ) => (
-                <span key={ avatarKey( u, i ) } className="bm-avatar-stack__item" style={{
+                <span key={ avatarKey( u, i ) } className="wplus-avatar-stack__item" style={{
                     marginLeft: i === 0 ? 0 : -size * 0.35,
                     borderRadius: radius,
                 }}>
@@ -204,7 +204,7 @@ export function AvatarStack( { users, size = 28, max = 3, shape }: AvatarStackPr
                 </span>
             ) ) }
             { more > 0 && (
-                <span className="bm-avatar-stack__more" style={{
+                <span className="wplus-avatar-stack__more" style={{
                     marginLeft: -size * 0.35,
                     width: size,
                     height: size,
@@ -222,9 +222,9 @@ export interface TypingDotsProps {
 
 export function TypingDots( { small }: TypingDotsProps ) {
     return (
-        <span className="bm-typing-dots" data-small={ small ? 1 : undefined }>
+        <span className="wplus-typing-dots" data-small={ small ? 1 : undefined }>
             { [ 0, 1, 2 ].map( i => (
-                <span key={ i } className="bm-typing-dots__dot"
+                <span key={ i } className="wplus-typing-dots__dot"
                       style={{ animationDelay: `${i * 0.15}s` }}/>
             ) ) }
         </span>
@@ -291,8 +291,8 @@ export function ActivityIndicator( { entries, activity = "typing", names = [], c
     let icon;
     if ( iconActivity === "recording" ) {
         icon = (
-            <span className="bm-activity__rec">
-                <span className="bm-activity__rec-dot" />
+            <span className="wplus-activity__rec">
+                <span className="wplus-activity__rec-dot" />
                 <Icon name="mic" size={ 12 } />
             </span>
         );
@@ -303,11 +303,11 @@ export function ActivityIndicator( { entries, activity = "typing", names = [], c
     }
 
     return (
-        <span className="bm-activity" data-compact={ compact ? 1 : undefined }>
+        <span className="wplus-activity" data-compact={ compact ? 1 : undefined }>
             { icon }
             { /* Parsed, not printed: the names in it are markup (a site's badges), from the host's nameHtml(); the
-                 strings themselves hold none. .bm-uname sizes a badge against this line. */ }
-            <span className="bm-uname">{ parse( label ) }</span>
+                 strings themselves hold none. .wplus-uname sizes a badge against this line. */ }
+            <span className="wplus-uname">{ parse( label ) }</span>
         </span>
     );
 }
@@ -335,7 +335,7 @@ export function PresenceLabel( { presence, detail, size = 11.5, label, color }: 
     const p = presence || "offline";
     if ( p === "offline" && detail ) {
         return (
-            <span className="bm-presence-label" data-presence="offline"
+            <span className="wplus-presence-label" data-presence="offline"
                   style={{ fontSize: size }}>{ detail }</span>
         );
     }
@@ -344,13 +344,13 @@ export function PresenceLabel( { presence, detail, size = 11.5, label, color }: 
     if ( p === "offline" && ! host().presenceKnown() ) return null;
     const showDetail = !! detail && p !== "away";
     return (
-        <span className="bm-presence-label" data-presence={ p }
+        <span className="wplus-presence-label" data-presence={ p }
               style={{ fontSize: size, ...( color && p !== "offline" ? { color } : {} ) }}>
             <span>{ ( p !== "offline" && label ) ? label : presenceLabelText( p ) }</span>
             { showDetail && (
                 <>
-                    <span className="bm-presence-label__dot" />
-                    <span className="bm-presence-label__detail">{ detail }</span>
+                    <span className="wplus-presence-label__dot" />
+                    <span className="wplus-presence-label__detail">{ detail }</span>
                 </>
             ) }
         </span>
@@ -366,15 +366,15 @@ export function ReadBy( { users, size = 14 }: ReadByProps ) {
     const valid = users.filter( ( u ): u is PresenceUser => !! u );
     if ( valid.length === 0 ) return null;
     return (
-        <span className="bm-read-by">
+        <span className="wplus-read-by">
             { valid.slice( 0, 3 ).map( ( u, i ) => {
                 const style = { marginLeft: i === 0 ? 0 : -size * 0.4, width: size, height: size };
                 const src = avatarSrc( u );
                 return src
                     ? <img key={ avatarKey( u, i ) } src={ src } alt={ plainName( u.name ) }
-                           width={ size } height={ size } className="bm-read-by__avatar" style={ style }/>
+                           width={ size } height={ size } className="wplus-read-by__avatar" style={ style }/>
                     : <span key={ avatarKey( u, i ) } role="img" aria-label={ plainName( u.name ) }
-                            className="bm-read-by__avatar bm-avatar-blank" style={ style }/>;
+                            className="wplus-read-by__avatar wplus-avatar-blank" style={ style }/>;
             } ) }
         </span>
     );

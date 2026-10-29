@@ -6,9 +6,9 @@ import { escapeHtml, plainName } from "./inc/names.ts";
 
 /**
  * What the screens ask of the app they are in, and nothing else: its translations, its users' avatars and names, who
- * is signed in, how it shows an error, and the WordPlus SDK's shared parts. Better Messages hands in its own
- * (WordPress's translations, its user store, its toasts); an app on @wordplus/realtime gets the defaults below, the
- * package's own strings and the people its realtime server names.
+ * is signed in, how it shows an error and asks before an act, and the WordPlus SDK's shared parts. Better Messages
+ * hands in its own (WordPress's translations, its user store, its toasts, its dialogs); an app on @wordplus/realtime
+ * gets the defaults below, the package's own strings and the people its realtime server names.
  *
  * Set once, before the first screen draws: `configureUi( { translate, Avatar, … } )`. Anything left out keeps its
  * default.
@@ -33,6 +33,11 @@ export interface UiHost {
     currentUserId(): number | string;
     /** Shows an error a screen's action ran into, as the app shows its errors. */
     showError( error: unknown ): void;
+    /**
+     * Asks before an act that cannot be taken back (End for Everyone), in the app's own dialog: true when the person
+     * goes ahead. By default the browser's confirm().
+     */
+    confirm( question: UiConfirm ): Promise<boolean>;
     /** A user's picture, as the app draws it. */
     Avatar: ComponentType<UserAvatarProps>;
     /** A user's name, as the app writes it. */
@@ -57,6 +62,17 @@ export interface UiHost {
 }
 
 export type SharedPart = "toasts" | "tooltips" | "menus";
+
+/** A question for UiHost.confirm: its title, a line on what follows, and the words of the button that goes ahead. */
+export interface UiConfirm {
+    title: string;
+    message?: string;
+    confirm: string;
+    /** The way out, when not the app's own Cancel. */
+    cancel?: string;
+    /** An act that destroys something, its button in the danger colour. */
+    danger?: boolean;
+}
 
 export interface UserAvatarProps {
     user_id: number | string;
@@ -98,6 +114,7 @@ const defaults: UiHost = {
     accentColor: () => "#21759b",
     currentUserId: () => 0,
     showError: ( error ) => console.error( error ),
+    confirm: async ( question ) => typeof window !== "undefined" && window.confirm( question.message ? question.title + "\n\n" + question.message : question.title ),
     Avatar: FallbackAvatar,
     Name: FallbackName,
     nameHtml: ( name ) => escapeHtml( plainName( name ) ),

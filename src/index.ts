@@ -6,7 +6,7 @@
 
 // What the screens ask of the app they are in.
 export { configureUi, host, setUiUsers, uiUser } from "./host.ts";
-export type { UiHost, UiUser, UserAvatarProps, UserNameProps, SharedPart } from "./host.ts";
+export type { UiHost, UiUser, UiConfirm, UserAvatarProps, UserNameProps, SharedPart } from "./host.ts";
 export { __, _x, _n, _nx, sprintf, applyFilters } from "./inc/globals.ts";
 export { plainName, escapeHtml } from "./inc/names.ts";
 

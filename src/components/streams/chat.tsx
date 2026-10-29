@@ -506,16 +506,16 @@ export interface RoomHome {
 
 export const RoomHomeContext = createContext<RoomHome | null>( null );
 
-// Better Messages draws its rooms light or dark by a class of the page's body alone (bm-messages-dark, and
-// bm-messages-light against the system's choice): dark while a room is in the player's full screen, which is dark, and
+// Better Messages draws its rooms light or dark by a class of the page's body alone (wplus-messages-dark, and
+// wplus-messages-light against the system's choice): dark while a room is in the player's full screen, which is dark, and
 // the page's own classes back by the function returned.
 function darkRooms( body : HTMLElement ) : () => void {
-    const had = { dark: body.classList.contains( 'bm-messages-dark' ), light: body.classList.contains( 'bm-messages-light' ) };
-    body.classList.add( 'bm-messages-dark' );
-    body.classList.remove( 'bm-messages-light' );
+    const had = { dark: body.classList.contains( 'wplus-messages-dark' ), light: body.classList.contains( 'wplus-messages-light' ) };
+    body.classList.add( 'wplus-messages-dark' );
+    body.classList.remove( 'wplus-messages-light' );
     return () => {
-        body.classList.toggle( 'bm-messages-dark', had.dark );
-        body.classList.toggle( 'bm-messages-light', had.light );
+        body.classList.toggle( 'wplus-messages-dark', had.dark );
+        body.classList.toggle( 'wplus-messages-light', had.light );
     };
 }
 

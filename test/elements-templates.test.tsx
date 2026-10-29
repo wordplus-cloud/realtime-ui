@@ -31,7 +31,7 @@ it( 'fills a chat\'s empty conversation and its messages from the page\'s templa
 
     const root = document.querySelector( 'chat-room' )!.shadowRoot!;
     expect( root.querySelector( '[part="empty-conversation"] .ask' )?.textContent ).toBe( 'Ask us about your order' );
-    expect( root.querySelector( '.bm-empty-thread' ) ).toBeNull();
+    expect( root.querySelector( '.wplus-empty-thread' ) ).toBeNull();
     // Its own style, inside the element's root.
     expect( root.querySelector( '[part="empty-conversation"] style' ) ).not.toBeNull();
 
@@ -44,7 +44,7 @@ it( 'fills a chat\'s empty conversation and its messages from the page\'s templa
     expect( line.querySelector( 'b' )?.textContent ).toBe( 'Ben' );
     expect( root.querySelector( '[part="message"]' )?.getAttribute( 'data-mine' ) ).toBe( '0' );
     // Ours where the template asked for it.
-    expect( line.querySelector( 'i[data-ours] .bm-chat-text' )?.textContent ).toBe( 'Where is my <b>mug</b>?' );
+    expect( line.querySelector( 'i[data-ours] .wplus-chat-text' )?.textContent ).toBe( 'Where is my <b>mug</b>?' );
 } );
 
 it( 'fills the online list\'s rows, with the call buttons where the template puts ours', async () => {
@@ -65,8 +65,8 @@ it( 'fills the online list\'s rows, with the call buttons where the template put
     expect( rows[ 1 ].querySelector( 'em' )?.textContent ).toBe( 'Customer' );
     expect( rows[ 1 ].querySelector( 'img' )?.getAttribute( 'src' ) ).toBe( '/avatars/ben.svg' );
     // The template's place for ours holds the row as we draw it, with its call button.
-    expect( rows[ 1 ].querySelector( '[data-ours] .bm-row-action' ) ).not.toBeNull();
-    expect( rows[ 0 ].querySelector( '[data-ours] .bm-row-action' ) ).toBeNull();
+    expect( rows[ 1 ].querySelector( '[data-ours] .wplus-row-action' ) ).not.toBeNull();
+    expect( rows[ 0 ].querySelector( '[data-ours] .wplus-row-action' ) ).toBeNull();
 } );
 
 it( 'adds the page\'s own buttons to the dock and tells the page when one is pressed, and fills the ring\'s card', async () => {
@@ -90,8 +90,8 @@ it( 'adds the page\'s own buttons to the dock and tells the page when one is pre
     const mine = container.querySelector( '.realtime-control-raise' )!;
     expect( mine.getAttribute( 'aria-label' ) ).toBe( 'Raise hand' );
     // Hanging up stays the last of the row.
-    const last = container.querySelector( '.bm-call-buttons' )!.lastElementChild!;
-    expect( last.matches( '.bm-cancel' ) || !! last.querySelector( '.bm-cancel' ) ).toBe( true );
+    const last = container.querySelector( '.wplus-call-buttons' )!.lastElementChild!;
+    expect( last.matches( '.wplus-cancel' ) || !! last.querySelector( '.wplus-cancel' ) ).toBe( true );
     fireEvent.click( mine );
     expect( pressed ).toEqual( [ 'raise' ] );
 

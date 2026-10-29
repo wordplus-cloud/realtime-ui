@@ -35,77 +35,39 @@ export const speakers : Map<string, MediaDeviceInfo> = new Map();
 
 let configAvailable = false;
 
-export function useCameras(){
-    const [cameraDevices, setCameraDevices] = useState<Map<string, MediaDeviceInfo>>(cameras);
+// What the registry holds, kept up to date in a component. Read again as it starts listening: the read this module
+// starts when it loads can land between the first draw and the subscription, and nothing said so again. A copy each
+// time, as the lists change in place and React draws nothing for the same Map handed back.
+function useRegistry<T>( read: () => T ): T {
+    const [ value, setValue ] = useState<T>( read );
 
-    useEffect(() => {
-        const sub = mediaUpdatedSubject.subscribe({
-            next: () => {
-                setCameraDevices(cameras);
-            }
-        });
+    useEffect( () => {
+        const update = () => setValue( read() );
+        const sub = mediaUpdatedSubject.subscribe( { next: update } );
+        update();
 
         return () => {
             sub.unsubscribe();
         }
-    }, []);
+    }, [] );
 
+    return value;
+}
 
-    return cameraDevices;
+export function useCameras(){
+    return useRegistry( () => new Map( cameras ) );
 }
 
 export function useMicrophones(){
-    const [microphoneDevices, setMicrophoneDevices] = useState<Map<string, MediaDeviceInfo>>(microphones);
-
-    useEffect(() => {
-        const sub = mediaUpdatedSubject.subscribe({
-            next: () => {
-                setMicrophoneDevices(microphones);
-            }
-        });
-
-        return () => {
-            sub.unsubscribe();
-        }
-    }, []);
-
-    return microphoneDevices;
+    return useRegistry( () => new Map( microphones ) );
 }
 
 export function useSpeakers(){
-    const [speakerDevices, setSpeakerDevices] = useState<Map<string, MediaDeviceInfo>>(speakers);
-
-    useEffect(() => {
-        const sub = mediaUpdatedSubject.subscribe({
-            next: () => {
-                setSpeakerDevices(speakers);
-            }
-        });
-
-        return () => {
-            sub.unsubscribe();
-        }
-    }, []);
-
-    return speakerDevices;
+    return useRegistry( () => new Map( speakers ) );
 }
 
 export function useConfigAvailable(){
-    const [available, setAvailable] = useState<boolean>(configAvailable);
-
-    useEffect(() => {
-        const sub = mediaUpdatedSubject.subscribe({
-            next: () => {
-                setAvailable(configAvailable);
-            }
-        });
-
-        return () => {
-            sub.unsubscribe();
-        }
-    }, []);
-
-    return available;
+    return useRegistry( () => configAvailable );
 }
 
 // Whether opening this device will put a permission prompt on the screen.

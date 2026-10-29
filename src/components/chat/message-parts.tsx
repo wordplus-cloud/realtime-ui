@@ -24,9 +24,9 @@ export interface DaySeparatorProps {
 
 export function DaySeparator( { label, title }: DaySeparatorProps ) {
     return (
-        <div className="bm-day-sep">
+        <div className="wplus-day-sep">
             <Tooltip label={ title ?? "" }>
-                <span className="bm-day-pill">{ label }</span>
+                <span className="wplus-day-pill">{ label }</span>
             </Tooltip>
         </div>
     );
@@ -34,10 +34,10 @@ export function DaySeparator( { label, title }: DaySeparatorProps ) {
 
 export function UnreadDivider() {
     return (
-        <div className="bm-unread-divider">
-            <span className="bm-unread-divider__line" />
-            <span className="bm-unread-divider__label">{ _x( "New messages", "Unread divider", "bp-better-messages" ) }</span>
-            <span className="bm-unread-divider__line" />
+        <div className="wplus-unread-divider">
+            <span className="wplus-unread-divider__line" />
+            <span className="wplus-unread-divider__label">{ _x( "New messages", "Unread divider", "bp-better-messages" ) }</span>
+            <span className="wplus-unread-divider__line" />
         </div>
     );
 }
@@ -59,11 +59,11 @@ export interface SystemRowProps {
 /** An event in the conversation (someone joined, a call ended), centred as a pill. */
 export function SystemRow( { type, tone = "neutral", icon = "bolt", title, children }: SystemRowProps ) {
     return (
-        <div className="bm-system-row" data-system-type={ type ?? undefined }>
+        <div className="wplus-system-row" data-system-type={ type ?? undefined }>
             <Tooltip label={ title ?? "" }>
-                <div className="bm-system-row__pill" data-tone={ tone }>
+                <div className="wplus-system-row__pill" data-tone={ tone }>
                     <Icon name={ icon } size={ 11 } />
-                    <span className="bm-system-row__text">{ children }</span>
+                    <span className="wplus-system-row__text">{ children }</span>
                 </div>
             </Tooltip>
         </div>
@@ -84,13 +84,13 @@ export interface DeletedBubbleProps {
  */
 export function DeletedBubble( { isMe, label, time, timeTitle }: DeletedBubbleProps ) {
     return (
-        <div className="bm-msg-deleted" data-is-me={ isMe ? 1 : 0 }>
-            <span className="bm-msg-deleted__label">
+        <div className="wplus-msg-deleted" data-is-me={ isMe ? 1 : 0 }>
+            <span className="wplus-msg-deleted__label">
                 { label ?? __( "This message was deleted", "bp-better-messages" ) }
-                <span className="bm-msg-deleted__spacer" data-time={ time } aria-hidden="true" />
+                <span className="wplus-msg-deleted__spacer" data-time={ time } aria-hidden="true" />
             </span>
             <Tooltip label={ timeTitle ?? "" }>
-                <span className="bm-msg-deleted__time">{ time }</span>
+                <span className="wplus-msg-deleted__time">{ time }</span>
             </Tooltip>
         </div>
     );
@@ -119,14 +119,14 @@ export interface MessageStackProps {
 /** Consecutive messages from one sender: their avatar, their name and the messages. */
 export function MessageStack( { isMe, side, bubble, blocked, avatar, name, time, children }: MessageStackProps ) {
     return (
-        <div className="bm-msg-stack" data-is-me={ isMe ? 1 : undefined } data-side={ side } data-bubble={ bubble } data-blocked={ blocked ? 1 : undefined }>
-            { avatar && <div className="bm-msg-stack__avatar">{ avatar }</div> }
-            <div className="bm-msg-stack__bubbles">
-                <div className="bm-msg-stack__info">
+        <div className="wplus-msg-stack" data-is-me={ isMe ? 1 : undefined } data-side={ side } data-bubble={ bubble } data-blocked={ blocked ? 1 : undefined }>
+            { avatar && <div className="wplus-msg-stack__avatar">{ avatar }</div> }
+            <div className="wplus-msg-stack__bubbles">
+                <div className="wplus-msg-stack__info">
                     { name }
                     { time && (
                         <Tooltip label={ time.title ?? "" }>
-                            <span className="bm-msg-stack__time">{ time.label }</span>
+                            <span className="wplus-msg-stack__time">{ time.label }</span>
                         </Tooltip>
                     ) }
                 </div>
@@ -140,7 +140,7 @@ export function MessageStack( { isMe, side, bubble, blocked, avatar, name, time,
 
 export interface MessageBodyProps extends HTMLAttributes<HTMLDivElement> {
     isMe: boolean;
-    /** Its class: Better Messages' filterable `bm-msg-body bm-message` by default. */
+    /** Its class: Better Messages' filterable `wplus-msg-body wplus-message` by default. */
     className?: string;
     /** "Forwarded from …", above it. */
     forwarded?: ReactNode;
@@ -151,11 +151,11 @@ export interface MessageBodyProps extends HTMLAttributes<HTMLDivElement> {
 }
 
 /** One message: its main column, which the hover actions centre on, and what follows it. */
-export function MessageBody( { isMe, className = "bm-msg-body bm-message", forwarded, after, children, ...attributes }: MessageBodyProps ) {
+export function MessageBody( { isMe, className = "wplus-msg-body wplus-message", forwarded, after, children, ...attributes }: MessageBodyProps ) {
     return (
         <div className={ className } data-is-me={ isMe ? 1 : 0 } { ...attributes }>
             { forwarded }
-            <div className="bm-msg-main">{ children }</div>
+            <div className="wplus-msg-main">{ children }</div>
             { after }
         </div>
     );
@@ -171,8 +171,8 @@ export interface MessageTextProps {
 /** A message's text bubble. */
 export function MessageText( { children, after }: MessageTextProps ) {
     return (
-        <div className="bm-msg-bubble bm-message-content">
-            <div className="bm-msg-bubble__text bm-message-content-text">{ children }</div>
+        <div className="wplus-msg-bubble wplus-message-content">
+            <div className="wplus-msg-bubble__text wplus-message-content-text">{ children }</div>
             { after }
         </div>
     );
@@ -181,8 +181,8 @@ export function MessageText( { children, after }: MessageTextProps ) {
 /** An answer still on its way (an AI's), in place of its text. */
 export function AiWaiting() {
     return (
-        <span className="bm-ai-waiting" aria-label={ _x( "typing", "Typing indicator (private conversation)", "bp-better-messages" ) }>
-            <span className="bm-ai-waiting__dot" />
+        <span className="wplus-ai-waiting" aria-label={ _x( "typing", "Typing indicator (private conversation)", "bp-better-messages" ) }>
+            <span className="wplus-ai-waiting__dot" />
         </span>
     );
 }
@@ -219,15 +219,15 @@ export function StatusTick( { status, label, interactive = true, onClick }: Stat
     const words = label ?? tickLabel( status );
     const icon = status === "failed" ? <Icon name="alert" size={ 12 } />
         : status === "queued" ? <Icon name="clock" size={ 12 } />
-        : status === "sending" ? <span className="bm-status-spinner" />
+        : status === "sending" ? <span className="wplus-status-spinner" />
         // Seen doubles down on weight as well as colour: on an own bubble painted near the accent, colour alone
         // can't carry the step from delivered.
-        : status === "seen" ? <Icon name="checks" size={ 12 } strokeWidth={ 3.2 } className="bm-status-read" />
+        : status === "seen" ? <Icon name="checks" size={ 12 } strokeWidth={ 3.2 } className="wplus-status-read" />
         : status === "delivered" ? <Icon name="checks" size={ 12 } />
         : <Icon name="check2" size={ 12 } />;
     return (
         <Tooltip label={ words } disabled={ ! interactive }>
-            <span className="bm-msg-status" data-status={ status } data-detailed={ onClick ? 1 : undefined } onClick={ onClick }>{ icon }</span>
+            <span className="wplus-msg-status" data-status={ status } data-detailed={ onClick ? 1 : undefined } onClick={ onClick }>{ icon }</span>
         </Tooltip>
     );
 }
@@ -254,14 +254,14 @@ export function MetaPieces( { time, edited, pinned, favorite, status, translatio
             { translation }
             { edited && (
                 <Tooltip label={ edited.title } disabled={ ! interactive }>
-                    <span className="bm-msg-meta__edited">
+                    <span className="wplus-msg-meta__edited">
                         <Icon name="edit" size={ 10 } />
                     </span>
                 </Tooltip>
             ) }
             { pinned && (
                 <Tooltip label={ __( "Message is pinned", "bp-better-messages" ) } disabled={ ! interactive }>
-                    <span className="bm-msg-meta__pinned">
+                    <span className="wplus-msg-meta__pinned">
                         <Icon name="pin" size={ 10 } />
                     </span>
                 </Tooltip>
@@ -269,10 +269,10 @@ export function MetaPieces( { time, edited, pinned, favorite, status, translatio
             { favorite }
             { time && (
                 <Tooltip label={ time.title ?? "" } disabled={ ! interactive }>
-                    <span className="bm-msg-meta__time">{ time.label }</span>
+                    <span className="wplus-msg-meta__time">{ time.label }</span>
                 </Tooltip>
             ) }
-            { status && <span className="bm-msg-meta__status">{ status }</span> }
+            { status && <span className="wplus-msg-meta__status">{ status }</span> }
         </>
     );
 }
@@ -293,12 +293,12 @@ export interface MessageMetaProps {
 /** A message's meta line. */
 export function MessageMeta( { variant = "inline", pieces }: MessageMetaProps ) {
     if ( variant !== "inline" ) {
-        return <span className="bm-msg-meta" data-variant={ variant }>{ pieces( true ) }</span>;
+        return <span className="wplus-msg-meta" data-variant={ variant }>{ pieces( true ) }</span>;
     }
     return (
         <>
-            <span className="bm-msg-meta" data-variant="spacer" aria-hidden="true">{ pieces( false ) }</span>
-            <span className="bm-msg-meta" data-variant="overlay">{ pieces( true ) }</span>
+            <span className="wplus-msg-meta" data-variant="spacer" aria-hidden="true">{ pieces( false ) }</span>
+            <span className="wplus-msg-meta" data-variant="overlay">{ pieces( true ) }</span>
         </>
     );
 }
@@ -318,8 +318,8 @@ export function HoverButton( { icon, label, active, modifier, onClick }: HoverBu
     return (
         <Tooltip label={ label }>
             <Btn
-                className={ "bm-hover-actions__btn"
-                    + ( modifier ? " bm-hover-actions__btn--" + modifier : "" )
+                className={ "wplus-hover-actions__btn"
+                    + ( modifier ? " wplus-hover-actions__btn--" + modifier : "" )
                     + ( active ? " is-active" : "" ) }
                 onClick={ onClick }
                 aria-label={ label }
@@ -332,7 +332,7 @@ export function HoverButton( { icon, label, active, modifier, onClick }: HoverBu
 
 /** The strip a message shows under the pointer: its HoverButtons. */
 export function HoverActions( { children }: { children: ReactNode } ) {
-    return <span className="bm-hover-actions">{ children }</span>;
+    return <span className="wplus-hover-actions">{ children }</span>;
 }
 
 // ─── THE PINNED TYPING LINE, THE EMPTY CONVERSATION ────────────────────
@@ -340,9 +340,9 @@ export function HoverActions( { children }: { children: ReactNode } ) {
 /** Who is writing, under the last message: a small avatar beside a small bubble. */
 export function TypingPinned( { avatar, children }: { avatar?: ReactNode; children: ReactNode } ) {
     return (
-        <div className="bm-typing-pinned">
+        <div className="wplus-typing-pinned">
             { avatar }
-            <span className="bm-typing-pinned__bubble">{ children }</span>
+            <span className="wplus-typing-pinned__bubble">{ children }</span>
         </div>
     );
 }
@@ -350,13 +350,13 @@ export function TypingPinned( { avatar, children }: { avatar?: ReactNode; childr
 /** A conversation with no messages yet. */
 export function EmptyThread() {
     return (
-        <div className="bm-empty-thread">
-            <div className="bm-empty-thread__disc">
+        <div className="wplus-empty-thread">
+            <div className="wplus-empty-thread__disc">
                 <Icon name="thread" size={ 28 } strokeWidth={ 1.5 } />
             </div>
-            <div className="bm-empty-thread__text">
-                <div className="bm-empty-thread__title">{ _x( "Say hi", "Empty conversation", "bp-better-messages" ) }</div>
-                <div className="bm-empty-thread__sub">
+            <div className="wplus-empty-thread__text">
+                <div className="wplus-empty-thread__title">{ _x( "Say hi", "Empty conversation", "bp-better-messages" ) }</div>
+                <div className="wplus-empty-thread__sub">
                     { _x( "No messages here yet — start the conversation from the composer below", "Empty conversation", "bp-better-messages" ) }
                 </div>
             </div>

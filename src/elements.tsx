@@ -183,7 +183,7 @@ function styled( root: ShadowRoot ): void {
     root.append( style );
 }
 
-// Light and dark follow the system unless the page says which: `bm-messages-light` or `bm-messages-dark` on its body, as
+// Light and dark follow the system unless the page says which: `wplus-messages-light` or `wplus-messages-dark` on its body, as
 // for Better Messages' screens, or a `color-scheme` of one alone (`color-scheme: light` on a page drawn only light). No
 // body reaches into a shadow root, so each element carries the answer as `data-scheme`, which its tokens read (the
 // build's hostOf()), and takes it again when the page's html or body changes and once the page has its styles.
@@ -192,8 +192,8 @@ let schemeWatch: MutationObserver | null = null;
 
 function pageScheme( host: Element ): 'light' | 'dark' | null {
     const body = document.body?.classList;
-    if ( body?.contains( 'bm-messages-light' ) ) return 'light';
-    if ( body?.contains( 'bm-messages-dark' ) ) return 'dark';
+    if ( body?.contains( 'wplus-messages-light' ) ) return 'light';
+    if ( body?.contains( 'wplus-messages-dark' ) ) return 'dark';
     const named = String( getComputedStyle( host ).colorScheme ?? '' ).split( /\s+/ ).filter( ( w ) => w === 'light' || w === 'dark' );
     return named.length === 1 ? named[ 0 ] as 'light' | 'dark' : null;
 }
@@ -318,7 +318,8 @@ abstract class RoomElement extends HTMLElement {
     static readonly hostCss: string = '';
     /** Its holder's class beside `realtime-calls`, which the shared stylesheet styles it by. */
     static readonly holderClass: string = '';
-    static readonly observedAttributes = [ 'room', 'call', 'type', 'title', 'event', 'reactions', 'placeholder', 'max-length', 'messages', 'to', 'name', 'avatar', 'start-call' ];
+    static readonly observedAttributes = [ 'room', 'call', 'type', 'title', 'event', 'reactions', 'placeholder', 'max-length', 'messages', 'to', 'name', 'avatar', 'start-call',
+        'upload', 'accept', 'max-file-size', 'max-files', 'file-hosts' ];
     private holder: HTMLDivElement | null = null;
     private root: Root | null = null;
     /** The pieces its templates fill (templates.tsx), read at each connection. */
@@ -444,6 +445,8 @@ class CountElement extends RoomElement {
  * the other person, on its top bar (`name` and `avatar` theirs, where the page has them), and `call` the call that shows
  * in the chat while it is on: `call` alone the call
  * named as the room, a value another (`date:{pair}`). `start-call="video"` calls them as the chat opens, once.
+ * `upload="/api/uploads"` takes files, to the app's route (Chat's `upload`), with `accept`, `max-file-size` in bytes,
+ * `max-files`, and `file-hosts`, the hosts beside the site's own its files are kept on, space-separated.
  */
 class ChatElement extends RoomElement {
     static readonly tag = 'chat-room';
@@ -476,6 +479,8 @@ class ChatElement extends RoomElement {
         // `call` alone, or `call="true"`, is the call named as the room, and any other value names it.
         const call = this.getAttribute( 'call' );
         const start = this.getAttribute( 'start-call' );
+        const maxFileSize = Number( this.getAttribute( 'max-file-size' ) ?? 0 );
+        const maxFiles = Number( this.getAttribute( 'max-files' ) ?? 0 );
         const Conversation = views.Chat ?? Chat;
         return <PageCalls.Provider value={ controller }>
             <Conversation rt={ rt } room={ room }
@@ -484,6 +489,11 @@ class ChatElement extends RoomElement {
                      placeholder={ this.getAttribute( 'placeholder' ) ?? undefined }
                      maxLength={ Number.isFinite( maxLength ) && maxLength > 0 ? maxLength : 0 }
                      onSent={ ( message ) => this.dispatchEvent( new CustomEvent( 'sent', { detail: message } ) ) }
+                     upload={ this.getAttribute( 'upload' ) || undefined }
+                     accept={ this.getAttribute( 'accept' ) ?? undefined }
+                     maxFileSize={ Number.isFinite( maxFileSize ) && maxFileSize > 0 ? maxFileSize : 0 }
+                     maxFiles={ Number.isFinite( maxFiles ) && maxFiles > 0 ? maxFiles : undefined }
+                     fileHosts={ this.getAttribute( 'file-hosts' )?.split( /\s+/ ).filter( Boolean ) }
                      to={ this.getAttribute( 'to' ) ?? undefined }
                      name={ this.getAttribute( 'name' ) ?? undefined }
                      avatar={ this.getAttribute( 'avatar' ) ?? undefined }

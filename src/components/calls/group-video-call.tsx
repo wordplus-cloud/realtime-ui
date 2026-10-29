@@ -1,14 +1,8 @@
-import React, { useContext, useEffect, useRef, useState } from "react";
+import React, { useCallback, useContext, useEffect, useRef, useState } from "react";
 import {__, _x} from "../../inc/globals.ts";
 import { moderates } from "./moderation.ts";
-import DeviceSwitch from "./device-switch.tsx";
-import {
-    screenShareSupport,
-    useCameras,
-    useConfigAvailable,
-    useMicrophones,
-    useSpeakers
-} from "../../inc/calls/permissions.ts";
+import DevicePanel, { JoinPrompt, useJoinPrompt } from "./device-panel.tsx";
+import { screenShareSupport, useConfigAvailable } from "../../inc/calls/permissions.ts";
 import {CallContext, CallContextInterface} from "./context.ts";
 import ConnectionStatus from "../parts/connection-status.tsx";
 import Tooltip from "../helpers/tooltip.tsx";
@@ -20,13 +14,19 @@ import CallDock from "./call-dock.tsx";
 import { AddPersonButton, AddPersonPanel } from "./add-person.tsx";
 import usePendingActions from "../../inc/calls/pending.ts";
 import { Piece } from "../../pieces.tsx";
+import { CallViewContext, fullScreenItems } from "./call-view.tsx";
+import HostToasts from "./host-toasts.tsx";
+import {
+    ModerationPanelContext, PersonPanel, RoomPanel, hostControlsItem, lockedMicItem, roomModerated, useModeratorNotice,
+    type ModerationPanel,
+} from "./moderation-panels.tsx";
 
 /**
  * A group video call, from the CallContext: its tiles (GroupVideoGrid) and its dock. The dock holds the user's own
- * controls (camera, microphone, sharing the screen, full screen, raised hand, the settings with the devices, leaving),
- * Show Chat / Hide Chat where the call has a chat beside it, Add Person where the call can add people, and a
- * moderator's controls for the room (mute everyone, lock it, lower every hand, participatory or broadcast), each
- * spinning while its request is out.
+ * controls (camera, microphone, locked while a moderator keeps it off, sharing the screen, full screen, raised hand for
+ * someone who can't send, the settings with the devices, leaving), Show Chat / Hide Chat where the call has a chat
+ * beside it, Add Person where the call can add people, and a moderator's Host Controls, whose panel holds the room's
+ * rules (moderation-panels.tsx). A moderator's ⋯ on a tile opens that person's panel in the same place.
  */
 export default function GroupVideoCallLayout() {
     const {
@@ -83,28 +83,37 @@ export default function GroupVideoCallLayout() {
         chatToggle,
         callDurationRef
     } = useContext<CallContextInterface>( CallContext );
+    const call = useContext<CallContextInterface>( CallContext );
+    // Filling the window or the screen (call-view.tsx): the chat beside the call is out of reach then.
+    const view = useContext( CallViewContext );
+    const expanded = view.windowed || fullScreenEnabled;
 
     const [ configOpen, setConfigOpen ] = useState( false );
+    // Opened from the prompt of the join's Preview: the camera's preview and the microphone's test run from the start,
+    // asked of the browser together, once.
+    const [ previewOnOpen, setPreviewOnOpen ] = useState( false );
+    useEffect( () => { if ( ! configOpen ) setPreviewOnOpen( false ); }, [ configOpen ] );
     const [ addOpen, setAddOpen ] = useState( false );
+    const [ panel, setPanel ] = useState<ModerationPanel>( null );
+    const closePanel = useCallback( () => setPanel( null ), [] );
+    const stageRef = useRef<HTMLDivElement>( null );
+    const { notice, remind } = useModeratorNotice( myMicMuted );
 
-    // The room's controls show a spinner while their request is out (see
-    // pending.ts); each flips its own state once the request succeeds.
+    // The user's own hand shows a spinner while its request is out (see pending.ts).
     const [ isPending, run ] = usePendingActions();
     const busy = ( key: string ) => isPending( key ) ? 1 : undefined;
     const glyph = ( key: string, name: IconName ) => isPending( key )
-        ? <Icon name="spinner" size={ 20 } className="bm-svg-animate" />
+        ? <Icon name="spinner" size={ 20 } className="wplus-svg-animate" />
         : <Icon name={ name } size={ 20 } />;
     // The camera spins as they do while it is checked before it goes out (context.ts). It still takes a press: turning
     // the camera off wins over its check at once.
     const cameraGlyph = ( name: IconName ) => cameraChecking
-        ? <Icon name="spinner" size={ 20 } className="bm-svg-animate" />
+        ? <Icon name="spinner" size={ 20 } className="wplus-svg-animate" />
         : <Icon name={ name } size={ 20 } />;
     const controlsRef = useRef<HTMLDivElement>(null);
 
     const configAvailable = useConfigAvailable();
-    const cameraDevices = useCameras();
-    const microphoneDevices = useMicrophones();
-    const speakerDevices = useSpeakers();
+    const [ joinPrompt, dismissJoinPrompt ] = useJoinPrompt( configOpen );
 
     const localParticipant = participants.has('me') ? participants.get('me') : null;
     // Someone who only listens has no tile of their own, and sends nothing to measure: connected, they read as good.
@@ -119,10 +128,13 @@ export default function GroupVideoCallLayout() {
         if( participant.screen ) received.push( !! participant.screenPaused );
     } );
     const allPaused = useHeld( connectionState === 'connected' && received.length > 0 && received.every( Boolean ), PAUSED_NOTICE_MS );
-    const status = statusMessage || ( allPaused ? _x('Your connection is weak: videos are paused, sound continues.', 'Group Video Chat', 'bp-better-messages') : '' );
+    const status = statusMessage || notice || ( allPaused ? _x('Your connection is weak: videos are paused, sound continues.', 'Group Video Chat', 'bp-better-messages') : '' );
+    // Someone who can't send asks to: in broadcast mode always, otherwise where the call takes raised hands.
+    const handOffered = ! canPublish && ! adminMode && ( callMode === 'broadcast' || moderates( moderation, 'raise_hand' ) );
 
+    // Only once in the call: until then nothing has said what this side may send.
     useEffect(() => {
-        if( ! canPublish ){
+        if( connectionState === 'connected' && ! canPublish ){
             if( myCameraTrackRef.current ){
                 disableCamera();
             }
@@ -135,7 +147,7 @@ export default function GroupVideoCallLayout() {
                 disableShareScreen();
             }
         }
-    }, [ canPublish ])
+    }, [ canPublish, connectionState ])
 
     useEffect(() => {
         if( myMicMuted && myMicrophoneTrackRef.current ){
@@ -143,34 +155,35 @@ export default function GroupVideoCallLayout() {
         }
     }, [ myMicMuted ])
 
-    return (<div className="bm-group-call-container bm-call-container" style={{display: "block"}}>
+    return (<ModerationPanelContext.Provider value={ { panel, setPanel } }>
+        <div ref={ stageRef } className="wplus-group-call-container wplus-call-container" style={{display: "block"}}>
         <GroupVideoGrid />
 
         <Piece name="CallStatus" props={ { layout: 'group-video', action, text: status, duration: callDurationRef?.current ?? 0 } }>
-            { status && <div className="bm-group-call-status" role="status" part="call-status">{ status }</div> }
+            { status && <div className="wplus-group-call-status" role="status" part="call-status">{ status }</div> }
         </Piece>
 
-            <div ref={controlsRef} className="bm-group-call-controls-v2" part="call-controls">
-                { configOpen === true &&
-                    <div className="bm-call-settings">
-                        <DeviceSwitch label={_x('Camera', 'Media Inputs', 'bp-better-messages')} devices={cameraDevices} selectedDevice={activeCameraDevice} setSelectedDevice={setSelectedCameraDevice} />
-                        <DeviceSwitch label={_x('Microphone', 'Media Inputs', 'bp-better-messages')} devices={microphoneDevices} selectedDevice={selectedMicrophoneDevice} setSelectedDevice={setSelectedMicrophoneDevice} />
-                        <DeviceSwitch label={_x('Speaker', 'Media Inputs', 'bp-better-messages')} devices={speakerDevices} selectedDevice={selectedSpeakerDevice} setSelectedDevice={setSelectedSpeakerDevice} />
-                    </div>
-                }
+        {/* A raised hand and who joined, for a moderator (host-toasts.tsx). */}
+        { adminMode && <HostToasts /> }
+
+        {/* Joined with the microphone and camera off, and Preview (device-panel.tsx). */}
+        { joinPrompt && <JoinPrompt video preview={ () => { setPreviewOnOpen( true ); setConfigOpen( true ); } } dismiss={ dismissJoinPrompt } /> }
+
+            <div ref={controlsRef} className="wplus-group-call-controls-v2" part="call-controls">
+                { configOpen === true && <DevicePanel video start={ previewOnOpen ? 'both' : undefined } close={ () => setConfigOpen( false ) } /> }
                 { addOpen && <AddPersonPanel close={ () => setAddOpen( false ) } /> }
                 <ConnectionStatus state={connectionState} quality={quality}></ConnectionStatus>
 
-                <CallDock className="bm-group-call-controls-buttons" pinned={ 1 }>
-                    {/* Show / hide the conversation beside the call. First,
-                        so it is the last to fold into More, and in the dock
-                        so nothing on the stage can sit under it. Not in full
-                        screen, which the chat is outside of, and not in the
-                        single-column layout, whose handle on the call's edge
-                        does this (_call-surface.scss). */}
-                    { ( chatToggle && ! fullScreenEnabled ) &&
+                <CallDock className="wplus-group-call-controls-buttons" pinned={ 1 }>
+                    {/* Show / hide the conversation beside the call, or under
+                        it in a single column (a phone). First, so it is the
+                        last to fold into More, and in the dock so nothing on
+                        the stage can sit under it. Not while the call fills
+                        the window or the screen, which the chat is outside
+                        of. */}
+                    { ( chatToggle && ! expanded ) &&
                         <Tooltip content={ chatShown ? _x('Hide Chat', 'Call Controls', 'bp-better-messages') : _x('Show Chat', 'Call Controls', 'bp-better-messages') }>
-                            <span onClick={ () => chatToggle( ( shown: boolean ) => ! shown ) } className="bm-toggle-chat" data-active={ chatShown ? 1 : undefined }>
+                            <span onClick={ () => chatToggle( ( shown: boolean ) => ! shown ) } className="wplus-toggle-chat" data-active={ chatShown ? 1 : undefined }>
                                 <Icon name="thread" size={ 20 } />
                             </span>
                         </Tooltip>
@@ -179,7 +192,7 @@ export default function GroupVideoCallLayout() {
                         <>
                             { configAvailable &&
                                 <Tooltip content={_x('Configure', 'Group Video Chat', 'bp-better-messages')}>
-                                    <span onClick={() => { setConfigOpen(!configOpen) }} className="bm-configure-call">
+                                    <span onClick={() => { setConfigOpen(!configOpen) }} className="wplus-configure-call">
                                         <Icon name="settings" size={ 20 } />
                                     </span>
                                 </Tooltip>
@@ -190,14 +203,14 @@ export default function GroupVideoCallLayout() {
                             { canPublish && <>
                                 { myCameraTrack &&
                                     <Tooltip content={_x('Disable Camera', 'Group Video Chat', 'bp-better-messages')}>
-                                    <span onClick={ disableCamera } data-busy={ cameraChecking ? 1 : undefined } className="bm-disable-video">
+                                    <span onClick={ disableCamera } data-busy={ cameraChecking ? 1 : undefined } className="wplus-disable-video">
                                         { cameraGlyph( iconsReverted ? 'video' : 'videoOff' ) }
                                     </span>
                                     </Tooltip>}
 
                                 { ! myCameraTrack &&
                                     <Tooltip content={_x('Enable Camera', 'Group Video Chat', 'bp-better-messages')}>
-                                        <span onClick={ enableCamera } data-busy={ cameraChecking ? 1 : undefined } className="bm-enable-video">
+                                        <span onClick={ enableCamera } data-busy={ cameraChecking ? 1 : undefined } className="wplus-enable-video">
                                             { cameraGlyph( iconsReverted ? 'videoOff' : 'video' ) }
                                         </span>
                                     </Tooltip>}
@@ -207,7 +220,7 @@ export default function GroupVideoCallLayout() {
                                 <>
                                     { myMicrophoneTrack &&
                                         <Tooltip content={_x('Disable Microphone', 'Group Video Chat', 'bp-better-messages')}>
-                                            <span onClick={disableMic} className="bm-disable-mic">
+                                            <span onClick={disableMic} className="wplus-disable-mic">
                                                 { ! iconsReverted && <Icon name="micOff" size={ 20 } />}
                                                 { iconsReverted && <Icon name="mic" size={ 20 } />}
                                             </span>
@@ -215,7 +228,7 @@ export default function GroupVideoCallLayout() {
                                     }
                                     {! myMicrophoneTrack &&
                                         <Tooltip content={_x('Enable Microphone', 'Group Video Chat', 'bp-better-messages')}>
-                                            <span onClick={enableMic} className="bm-enable-mic">
+                                            <span onClick={enableMic} className="wplus-enable-mic">
                                                 { ! iconsReverted && <Icon name="mic" size={ 20 } />}
                                                 { iconsReverted && <Icon name="micOff" size={ 20 } />}
                                             </span>
@@ -223,31 +236,16 @@ export default function GroupVideoCallLayout() {
                                     }
                                 </>
                             }
+                            { ( canPublish && myMicMuted ) && lockedMicItem( remind ) }
 
-                            { fullScreenAvailable &&
-                                <>
-                                    { ! fullScreenEnabled &&
-                                        <Tooltip content={_x('Switch to Full Screen Mode', 'Group Video Chat', 'bp-better-messages')}>
-                                            <span onClick={ enableFullScreen } className="bm-fs-enable">
-                                                <Icon name="maximize" size={ 20 } />
-                                            </span>
-                                        </Tooltip>
-                                    }
-                                    { fullScreenEnabled &&
-                                        <Tooltip content={_x('Exit Full Screen Mode', 'Group Video Chat', 'bp-better-messages')}>
-                                            <span onClick={ disableFullScreen } className="bm-fs-disable">
-                                                <Icon name="minimize" size={ 20 } />
-                                            </span>
-                                        </Tooltip>
-                                    }
-                                </>
-                            }
+                            {/* Expand to the window, then the whole screen (call-view.tsx). */}
+                            { fullScreenItems( call, view ) }
 
                             { ( canPublish && screenShareSupport ) &&
                                 <>
                                     { ! myScreenVideoTrack &&
                                         <Tooltip content={_x('Share Screen', 'Group Video Chat', 'bp-better-messages')}>
-                                            <span onClick={enableShareScreen} className="bm-switch-share-screen">
+                                            <span onClick={enableShareScreen} className="wplus-switch-share-screen">
                                                 <Icon name="screenShare" size={ 20 } />
                                             </span>
                                         </Tooltip>
@@ -255,7 +253,7 @@ export default function GroupVideoCallLayout() {
 
                                     { myScreenVideoTrack &&
                                         <Tooltip content={_x('Stop Screen Sharing', 'Group Video Chat', 'bp-better-messages')}>
-                                            <span onClick={disableShareScreen} className="bm-switch-share-screen" data-active="1">
+                                            <span onClick={disableShareScreen} className="wplus-switch-share-screen" data-active="1">
                                                 <Icon name="screenShareOff" size={ 20 } />
                                             </span>
                                         </Tooltip>
@@ -263,117 +261,44 @@ export default function GroupVideoCallLayout() {
                                 </>
                             }
 
-                            { ( callMode === 'broadcast' && ! canPublish && ! adminMode ) && <>
+                            { handOffered && <>
                                 { ! myHandRaised &&
                                     <Tooltip content={_x('Raise Hand', 'Group Video Chat', 'bp-better-messages')}>
-                                        <span onClick={() => run( 'own-hand', raiseHand )} data-busy={ busy( 'own-hand' ) } className="bm-raise-hand">
+                                        <span onClick={() => run( 'own-hand', raiseHand )} data-busy={ busy( 'own-hand' ) } className="wplus-raise-hand">
                                             { glyph( 'own-hand', 'raisehand' ) }
                                         </span>
                                     </Tooltip>
                                 }
                                 { myHandRaised &&
                                     <Tooltip content={_x('Lower Hand', 'Group Video Chat', 'bp-better-messages')}>
-                                        <span onClick={() => run( 'own-hand', raiseHand )} data-busy={ busy( 'own-hand' ) } className="bm-lower-hand bm-hand-active">
+                                        <span onClick={() => run( 'own-hand', raiseHand )} data-busy={ busy( 'own-hand' ) } className="wplus-lower-hand wplus-hand-active">
                                             { glyph( 'own-hand', 'raisehand' ) }
                                         </span>
                                     </Tooltip>
                                 }
                             </> }
 
-                            { adminMode &&
-                                <>
-                                    {/* One button on the state the room is
-                                        actually in, the way the lock beneath
-                                        it is drawn. Muting everyone is a rule
-                                        the room keeps — a transient the join
-                                        route reports back as `roomMuted` — so
-                                        a moderator who walks into a room
-                                        somebody else muted is offered the way
-                                        out of it, which drawing the pair from
-                                        a local flag never managed. */}
-                                    { ! roomMuted && moderates( moderation, 'mute_all' ) &&
-                                        <Tooltip content={_x('Mute All', 'Group Video Chat', 'bp-better-messages')}>
-                                            <span onClick={() => run( 'room-mute', async () => {
-                                                try {
-                                                    await moderate({ act: 'mute_all', type: callInfo.type });
-                                                    setRoomMuted(true);
-                                                } catch (e) { host().showError(e); }
-                                            } )} data-busy={ busy( 'room-mute' ) } className="bm-mute-all">
-                                                { glyph( 'room-mute', 'micOff' ) }
-                                            </span>
-                                        </Tooltip>
-                                    }
-                                    { roomMuted && moderates( moderation, 'unmute_all' ) &&
-                                        <Tooltip content={_x('Unmute All', 'Group Video Chat', 'bp-better-messages')}>
-                                            <span onClick={() => run( 'room-mute', async () => {
-                                                try {
-                                                    await moderate({ act: 'unmute_all', type: callInfo.type });
-                                                    setRoomMuted(false);
-                                                } catch (e) { host().showError(e); }
-                                            } )} data-busy={ busy( 'room-mute' ) } className="bm-unmute-all">
-                                                { glyph( 'room-mute', 'mic' ) }
-                                            </span>
-                                        </Tooltip>
-                                    }
-
-                                    { ! roomLocked && moderates( moderation, 'lock_room' ) &&
-                                        <Tooltip content={_x('Lock Room', 'Group Video Chat', 'bp-better-messages')}>
-                                            <span onClick={() => run( 'room-lock', async () => {
-                                                try {
-                                                    await moderate({ act: 'lock_room', type: callInfo.type });
-                                                    setRoomLocked(true);
-                                                } catch (e) { host().showError(e); }
-                                            } )} data-busy={ busy( 'room-lock' ) } className="bm-lock-room">
-                                                { glyph( 'room-lock', 'lockOpen' ) }
-                                            </span>
-                                        </Tooltip>
-                                    }
-                                    { roomLocked && moderates( moderation, 'unlock_room' ) &&
-                                        <Tooltip content={_x('Unlock Room', 'Group Video Chat', 'bp-better-messages')}>
-                                            <span onClick={() => run( 'room-lock', async () => {
-                                                try {
-                                                    await moderate({ act: 'unlock_room', type: callInfo.type });
-                                                    setRoomLocked(false);
-                                                } catch (e) { host().showError(e); }
-                                            } )} data-busy={ busy( 'room-lock' ) } className="bm-unlock-room">
-                                                { glyph( 'room-lock', 'lock' ) }
-                                            </span>
-                                        </Tooltip>
-                                    }
-
-                                    { callMode === 'broadcast' && Array.from(participants.values()).some(p => p.handRaised) &&
-                                        <Tooltip content={_x('Lower All Hands', 'Group Video Chat', 'bp-better-messages')}>
-                                            <span onClick={() => run( 'hands', lowerAllHands )} data-busy={ busy( 'hands' ) } className="bm-lower-all-hands">
-                                                { glyph( 'hands', 'raisehand' ) }
-                                            </span>
-                                        </Tooltip>
-                                    }
-
-                                    { callMode === 'participatory' && moderates( moderation, 'set_broadcast_mode' ) &&
-                                        <Tooltip content={_x('Switch to Broadcast Mode', 'Group Video Chat', 'bp-better-messages')}>
-                                            <span onClick={() => run( 'mode', () => setCallMode('broadcast') )} data-busy={ busy( 'mode' ) } className="bm-set-broadcast-mode">
-                                                { glyph( 'mode', 'megaphone' ) }
-                                            </span>
-                                        </Tooltip>
-                                    }
-                                    { callMode === 'broadcast' && moderates( moderation, 'set_participatory_mode' ) &&
-                                        <Tooltip content={_x('Switch to Participatory Mode', 'Group Video Chat', 'bp-better-messages')}>
-                                            <span onClick={() => run( 'mode', () => setCallMode('participatory') )} data-busy={ busy( 'mode' ) } className="bm-set-participatory-mode">
-                                                { glyph( 'mode', 'users' ) }
-                                            </span>
-                                        </Tooltip>
-                                    }
-                                </>
+                            {/* The room's rules — everyone muted, the lock, broadcast mode, every hand lowered — in one
+                                panel whose rows say what each does and whether it is on, where four bare icons were.
+                                Muting everyone is a rule the room keeps and the join route reports it back as
+                                `roomMuted`, so a moderator who walks into a muted room finds the switch on. */}
+                            { ( adminMode && roomModerated( moderation ) ) &&
+                                hostControlsItem( panel === 'room', roomMuted || roomLocked || callMode === 'broadcast', () => setPanel( panel === 'room' ? null : 'room' ) )
                             }
                         </>
                     }
                     <Tooltip content={_x('Exit Chat', 'Group Video Chat', 'bp-better-messages')}>
-                        <span onClick={ () => endCall() } className="bm-exit-room">
+                        <span onClick={ () => endCall() } className="wplus-exit-room">
                             <Icon name="logout" size={ 20 } />
                         </span>
                     </Tooltip>
                 </CallDock>
             </div>
+
+            {/* The moderator's menus, at the button that opened them (moderation-panels.tsx). */}
+            { ( adminMode && panel === 'room' ) && <RoomPanel stage={ stageRef } close={ closePanel } /> }
+            { ( adminMode && panel !== null && panel !== 'room' ) && <PersonPanel key={ panel } stage={ stageRef } tileKey={ panel } type="video" close={ closePanel } /> }
         </div>
+    </ModerationPanelContext.Provider>
     )
 }

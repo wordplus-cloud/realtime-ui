@@ -105,7 +105,7 @@ function useBmTooltips( also? : RefObject<HTMLElement | null> ) : ( element : HT
         stop.current = null;
         const tooltips = sharedTooltips();
         const place = element?.parentElement ?? element;
-        if( place && tooltips ) stop.current = tooltips.watch( place, { attribute: 'data-bm-tip', focus: true, className: 'bm-tooltip' } );
+        if( place && tooltips ) stop.current = tooltips.watch( place, { attribute: 'data-wplus-tip', focus: true, className: 'wplus-tooltip' } );
     }, [ also ] );
 }
 
@@ -151,11 +151,11 @@ export function RoomButton( props : { room : RoomControls } ){
             ref={ tips }
             role="button"
             tabIndex={ 0 }
-            className={ 'bm-btn bm-icon-btn estream-bm-button' + ( live ? ' estream-bm-button--live' : '' ) }
+            className={ 'wplus-btn wplus-icon-btn estream-bm-button' + ( live ? ' estream-bm-button--live' : '' ) }
             data-active={ shown ? 1 : undefined }
             aria-label={ label }
             aria-pressed={ shown }
-            data-bm-tip={ label }
+            data-wplus-tip={ label }
             onClick={ press }
             onKeyDown={ pressed( press ) }
         >
@@ -183,9 +183,9 @@ export function RoomBanner( props : { room : RoomControls } ){
         const counted = player.appearance.viewers !== false || host;
 
         return (
-            <div className="bm-before-message-list estream-bm-banner">
-                <div className="bm-group-call-in-progress estream-bm-banner__live">
-                    <span className="bm-group-call-in-progress-info">
+            <div className="wplus-before-message-list estream-bm-banner">
+                <div className="wplus-group-call-in-progress estream-bm-banner__live">
+                    <span className="wplus-group-call-in-progress-info">
                         <span className="estream-bm-banner__badge">{ _x( 'Live', 'a stream on air', 'wordplus-live-stream' ) }</span>
                         <span className="estream-bm-banner__title">{ player.title || __( 'Live stream', 'wordplus-live-stream' ) }</span>
                         { counted && state.viewers > 0 && (
@@ -194,8 +194,8 @@ export function RoomBanner( props : { room : RoomControls } ){
                             </span>
                         ) }
                     </span>
-                    <span className="bm-group-call-in-progress-join">
-                        <span role="button" tabIndex={ 0 } className="bm-btn" onClick={ props.room.open } onKeyDown={ pressed( props.room.open ) }>
+                    <span className="wplus-group-call-in-progress-join">
+                        <span role="button" tabIndex={ 0 } className="wplus-btn" onClick={ props.room.open } onKeyDown={ pressed( props.room.open ) }>
                             { __( 'Watch', 'wordplus-live-stream' ) }
                         </span>
                     </span>
@@ -206,15 +206,15 @@ export function RoomBanner( props : { room : RoomControls } ){
 
     if( planned && ! shown ){
         return (
-            <div className="bm-before-message-list estream-bm-banner">
-                <div className="bm-group-call-in-progress estream-bm-banner__planned">
-                    <span className="bm-group-call-in-progress-info">
+            <div className="wplus-before-message-list estream-bm-banner">
+                <div className="wplus-group-call-in-progress estream-bm-banner__planned">
+                    <span className="wplus-group-call-in-progress-info">
                         <BmIcon name="clock" size={ 16 } />
                         <span className="estream-bm-banner__title">{ sprintf( _x( 'Live stream: starts %s', 'a date and time', 'wordplus-live-stream' ), dateTime( at! ) ) }</span>
                     </span>
                     { host && (
-                        <span className="bm-group-call-in-progress-join">
-                            <span role="button" tabIndex={ 0 } className="bm-btn" onClick={ props.room.open } onKeyDown={ pressed( props.room.open ) }>
+                        <span className="wplus-group-call-in-progress-join">
+                            <span role="button" tabIndex={ 0 } className="wplus-btn" onClick={ props.room.open } onKeyDown={ pressed( props.room.open ) }>
                                 { __( 'Set up', 'wordplus-live-stream' ) }
                             </span>
                         </span>
@@ -228,7 +228,7 @@ export function RoomBanner( props : { room : RoomControls } ){
 }
 
 // One control in the call's dock, as Better Messages draws its own: a span with the class that gives it its tone
-// (bm-enable-video, off; bm-exit-room, danger; bm-answer, go), `data-active` when latched. Written as an element, not
+// (wplus-enable-video, off; wplus-exit-room, danger; wplus-answer, go), `data-active` when latched. Written as an element, not
 // a component of its own, so the dock sees the span itself and folds it into its More sheet as a call's control,
 // labelled by its aria-label.
 interface DockButtonProps {
@@ -252,7 +252,7 @@ function dockButton( props : DockButtonProps ) : ReactElement {
             aria-disabled={ props.disabled ? true : undefined }
             aria-pressed={ props.active }
             aria-label={ props.label }
-            data-bm-tip={ props.label }
+            data-wplus-tip={ props.label }
             onClick={ run }
             onKeyDown={ pressed( run ) }
         >
@@ -269,12 +269,12 @@ function moreButton( props : { open : boolean, toggle : () => void, sheet : Reac
         <span
             role="button"
             tabIndex={ 0 }
-            className="bm-call-more"
+            className="wplus-call-more"
             data-active={ props.open ? 1 : undefined }
             aria-haspopup="menu"
             aria-expanded={ props.open }
             aria-label={ label }
-            data-bm-tip={ label }
+            data-wplus-tip={ label }
             onClick={ props.toggle }
             onKeyDown={ pressed( props.toggle ) }
         >
@@ -292,7 +292,7 @@ function useChatButton( room : RoomControls ) : ReactElement | null {
     if( shown === null || player.fullscreen ) return null;
 
     const label = shown ? __( 'Hide chat', 'wordplus-live-stream' ) : __( 'Show chat', 'wordplus-live-stream' );
-    return dockButton( { tone: 'bm-toggle-chat', icon: 'thread', label, active: shown, onClick: room.toggleChat } );
+    return dockButton( { tone: 'wplus-toggle-chat', icon: 'thread', label, active: shown, onClick: room.toggleChat } );
 }
 
 function useSoundButton() : ReactElement {
@@ -302,7 +302,7 @@ function useSoundButton() : ReactElement {
     const off = player.muted || state.audioBlocked;
 
     return dockButton( {
-        tone: off ? 'bm-enable-mic estream-bm-sound' : 'bm-disable-mic estream-bm-sound',
+        tone: off ? 'wplus-enable-mic estream-bm-sound' : 'wplus-disable-mic estream-bm-sound',
         icon: off ? 'volumeOff' : 'volume',
         label: off ? __( 'Turn sound on', 'wordplus-live-stream' ) : __( 'Mute', 'wordplus-live-stream' ),
         onClick: () => {
@@ -317,8 +317,8 @@ function useFullscreenButton() : ReactElement | null {
     if( ! player.canFullscreen ) return null;
 
     return player.fullscreen
-        ? dockButton( { tone: 'bm-fs-disable', icon: 'minimize', label: __( 'Exit full screen', 'wordplus-live-stream' ), onClick: player.toggleFullscreen } )
-        : dockButton( { tone: 'bm-fs-enable', icon: 'maximize', label: __( 'Full screen', 'wordplus-live-stream' ), onClick: player.toggleFullscreen } );
+        ? dockButton( { tone: 'wplus-fs-disable', icon: 'minimize', label: __( 'Exit full screen', 'wordplus-live-stream' ), onClick: player.toggleFullscreen } )
+        : dockButton( { tone: 'wplus-fs-enable', icon: 'maximize', label: __( 'Full screen', 'wordplus-live-stream' ), onClick: player.toggleFullscreen } );
 }
 
 function usePipButton() : ReactElement | null {
@@ -326,7 +326,7 @@ function usePipButton() : ReactElement | null {
     if( ! player.canPip ) return null;
 
     const label = player.pip ? __( 'Exit picture-in-picture', 'wordplus-live-stream' ) : __( 'Picture-in-picture', 'wordplus-live-stream' );
-    return dockButton( { tone: 'bm-pic-in-pic', icon: 'pip', label, active: player.pip, onClick: player.togglePip } );
+    return dockButton( { tone: 'wplus-pic-in-pic', icon: 'pip', label, active: player.pip, onClick: player.togglePip } );
 }
 
 // What a viewer sets, in the sheet Better Messages' calls open over the dock, as the player's own bar and settings
@@ -345,10 +345,10 @@ function WatchSheet( props : { before? : ReactNode } ){
     };
 
     return (
-        <div className="bm-call-settings estream-bm-watch">
+        <div className="wplus-call-settings estream-bm-watch">
             { props.before }
             { player.volumeSettable && (
-                <div className="bm-call-setting estream-bm-volume">
+                <div className="wplus-call-setting estream-bm-volume">
                     <label htmlFor={ volumeId }>{ __( 'Volume', 'wordplus-live-stream' ) }</label>
                     <input
                         id={ volumeId }
@@ -367,9 +367,9 @@ function WatchSheet( props : { before? : ReactNode } ){
                     />
                 </div>
             ) }
-            <div className="bm-call-setting bm-switch-device">
+            <div className="wplus-call-setting wplus-switch-device">
                 <label htmlFor={ qualityId }>{ __( 'Quality', 'wordplus-live-stream' ) }</label>
-                <div className="bm-switch-device-select-wrap">
+                <div className="wplus-switch-device-select-wrap">
                     <select id={ qualityId } value={ shownQuality( state.quality, choices ) } onChange={ ( e ) => quality( e.target.value as VideoChoice ) }>
                         <option value="auto">
                             { player.height > 0
@@ -380,7 +380,7 @@ function WatchSheet( props : { before? : ReactNode } ){
                     </select>
                 </div>
             </div>
-            <button type="button" className="bm-call-setting estream-bm-stats" aria-pressed={ player.statsOpen } onClick={ player.toggleStats }>
+            <button type="button" className="wplus-call-setting estream-bm-stats" aria-pressed={ player.statsOpen } onClick={ player.toggleStats }>
                 { player.statsOpen ? _x( 'Hide statistics', 'of the player', 'wordplus-live-stream' ) : __( 'Statistics', 'wordplus-live-stream' ) }
             </button>
         </div>
@@ -392,7 +392,7 @@ function ReactionSheet( props : { kinds : Reaction[] } ){
     const client = useClient();
 
     return (
-        <div className="bm-call-settings estream-bm-reactions" role="group" aria-label={ __( 'Reactions', 'wordplus-live-stream' ) }>
+        <div className="wplus-call-settings estream-bm-reactions" role="group" aria-label={ __( 'Reactions', 'wordplus-live-stream' ) }>
             { props.kinds.map( ( kind ) => (
                 <span
                     key={ kind }
@@ -400,7 +400,7 @@ function ReactionSheet( props : { kinds : Reaction[] } ){
                     tabIndex={ 0 }
                     className="estream-bm-reaction"
                     aria-label={ reactionName( kind ) }
-                    data-bm-tip={ reactionName( kind ) }
+                    data-wplus-tip={ reactionName( kind ) }
                     onClick={ () => client.react( kind ) }
                     onKeyDown={ pressed( () => client.react( kind ) ) }
                 >
@@ -416,13 +416,13 @@ function ReactionSheet( props : { kinds : Reaction[] } ){
 const bmTileInfo : TileInfo = ( tile, named ) => (
     <>
         { named && (
-            <div className="bm-group-call-input-video-inner-info">
-                <span className="bm-caller-info"><span className="bm-info-name"><span className="bm-caller-name">{ tile.name }</span></span></span>
+            <div className="wplus-group-call-input-video-inner-info">
+                <span className="wplus-caller-info"><span className="wplus-info-name"><span className="wplus-caller-name">{ tile.name }</span></span></span>
             </div>
         ) }
         { tile.micMuted && (
-            <span className="bm-caller-status">
-                <span className="bm-mic-disabled" role="img" aria-label={ __( 'Microphone off', 'wordplus-live-stream' ) } data-bm-tip={ __( 'Microphone off', 'wordplus-live-stream' ) }>
+            <span className="wplus-caller-status">
+                <span className="wplus-mic-disabled" role="img" aria-label={ __( 'Microphone off', 'wordplus-live-stream' ) } data-wplus-tip={ __( 'Microphone off', 'wordplus-live-stream' ) }>
                     <BmIcon name="micOff" size={ 14 } />
                 </span>
             </span>
@@ -443,11 +443,11 @@ function deviceButtons( camera : boolean, microphone : boolean, toggle : ( devic
     return (
         <>
             { camera
-                ? dockButton( { tone: 'bm-disable-video', icon: 'video', label: __( 'Turn camera off', 'wordplus-live-stream' ), onClick: () => toggle( 'camera' ) } )
-                : dockButton( { tone: 'bm-enable-video', icon: 'videoOff', label: __( 'Turn camera on', 'wordplus-live-stream' ), onClick: () => toggle( 'camera' ) } ) }
+                ? dockButton( { tone: 'wplus-disable-video', icon: 'video', label: __( 'Turn camera off', 'wordplus-live-stream' ), onClick: () => toggle( 'camera' ) } )
+                : dockButton( { tone: 'wplus-enable-video', icon: 'videoOff', label: __( 'Turn camera on', 'wordplus-live-stream' ), onClick: () => toggle( 'camera' ) } ) }
             { microphone
-                ? dockButton( { tone: 'bm-disable-mic', icon: 'mic', label: __( 'Turn microphone off', 'wordplus-live-stream' ), onClick: () => toggle( 'microphone' ) } )
-                : dockButton( { tone: 'bm-enable-mic', icon: 'micOff', label: __( 'Turn microphone on', 'wordplus-live-stream' ), onClick: () => toggle( 'microphone' ) } ) }
+                ? dockButton( { tone: 'wplus-disable-mic', icon: 'mic', label: __( 'Turn microphone off', 'wordplus-live-stream' ), onClick: () => toggle( 'microphone' ) } )
+                : dockButton( { tone: 'wplus-enable-mic', icon: 'micOff', label: __( 'Turn microphone on', 'wordplus-live-stream' ), onClick: () => toggle( 'microphone' ) } ) }
         </>
     );
 }
@@ -457,9 +457,9 @@ function DeviceSheet( props : { studio : StudioControls } ){
     const { devices, camera, microphone, choose, player } = props.studio;
     const speakers = typeof HTMLMediaElement !== 'undefined' && 'setSinkId' in HTMLMediaElement.prototype;
     const field = ( label : string, kind : 'camera' | 'microphone' | 'speaker', list : typeof devices.cameras, value : string, onChange : ( id : string ) => void ) => (
-        <div className="bm-call-setting bm-switch-device">
+        <div className="wplus-call-setting wplus-switch-device">
             <label>{ label }</label>
-            <div className="bm-switch-device-select-wrap">
+            <div className="wplus-switch-device-select-wrap">
                 <select value={ value } aria-label={ label } onChange={ ( e ) => onChange( e.target.value ) }>
                     { value === '' && <option value="">{ __( 'Default', 'wordplus-live-stream' ) }</option> }
                     { list.map( ( d, i ) => <option key={ d.id } value={ d.id }>{ deviceName( d, i, kind ) }</option> ) }
@@ -469,7 +469,7 @@ function DeviceSheet( props : { studio : StudioControls } ){
     );
 
     return (
-        <div className="bm-call-settings">
+        <div className="wplus-call-settings">
             { props.studio.live && <Statistics stats={ props.studio.sending } /> }
             { field( __( 'Camera', 'wordplus-live-stream' ), 'camera', devices.cameras, deviceOf( camera ), ( id ) => choose( 'camera', id ) ) }
             { field( __( 'Microphone', 'wordplus-live-stream' ), 'microphone', devices.microphones, deviceOf( microphone ), ( id ) => choose( 'microphone', id ) ) }
@@ -494,7 +494,7 @@ function Watching(){
     const text = host ? watching + ', ' + sprintf( _x( 'peak %s', 'the most watching at once', 'wordplus-live-stream' ), count( peak ) ) : watching;
 
     return (
-        <span className="estream-bm-watching" role="img" aria-label={ text } data-bm-tip={ text }>
+        <span className="estream-bm-watching" role="img" aria-label={ text } data-wplus-tip={ text }>
             <BmIcon name="eye" size={ 16 } />
             <span>{ count( state.viewers ) }</span>
             { host && (
@@ -508,7 +508,7 @@ function Watching(){
 }
 
 // How the host's picture goes out, as a call's connection: a dot, green or amber, and what it is, which a narrow stage
-// keeps to the dot (Better Messages' .bm-connection-quality).
+// keeps to the dot (Better Messages' .wplus-connection-quality).
 function Sending( props : { stats : MediaStats | null } ){
     const state = useStream();
     const now = useNow( 1000 );
@@ -520,7 +520,7 @@ function Sending( props : { stats : MediaStats | null } ){
         : __( 'Weak connection', 'wordplus-live-stream' );
 
     return (
-        <span className={ 'bm-connection-quality bm-state-connected bm-quality-' + ( health.kind === 'good' ? 'good' : 'poor' ) } role="status" aria-label={ health.text } data-bm-tip={ health.text }>
+        <span className={ 'wplus-connection-quality wplus-state-connected wplus-quality-' + ( health.kind === 'good' ? 'good' : 'poor' ) } role="status" aria-label={ health.text } data-wplus-tip={ health.text }>
             <span>{ word }</span>
         </span>
     );
@@ -535,7 +535,7 @@ function Statistics( props : { stats : MediaStats | null } ){
     const { tally } = state;
 
     return (
-        <div className="bm-call-setting estream-bm-statistics">
+        <div className="wplus-call-setting estream-bm-statistics">
             <label>{ __( 'Statistics', 'wordplus-live-stream' ) }</label>
             <dl className="estream-bm-figures">
                 { stats && ( stats.height > 0 || stats.paused ) && (
@@ -572,18 +572,18 @@ function StageFrame( props : { studio? : boolean, screen? : ReactNode, notice? :
             style={ themeStyle( { ...player.appearance, theme: 'dark' } ) }
             onKeyDown={ shortcuts }
         >
-            <div className="bm-group-call-container bm-call-container">
+            <div className="wplus-group-call-container wplus-call-container">
                 <div className="estream-bm-stage__picture">
                     <Stage bare studio={ props.studio } screen={ props.screen } tileInfo={ bmTileInfo } />
                 </div>
-                { props.notice && <div className="bm-group-call-status" role="status">{ props.notice }</div> }
-                <div className="bm-group-call-controls-v2">
+                { props.notice && <div className="wplus-group-call-status" role="status">{ props.notice }</div> }
+                <div className="wplus-group-call-controls-v2">
                     { props.sheet }
-                    <div className="bm-connection-control estream-bm-status">
+                    <div className="wplus-connection-control estream-bm-status">
                         { props.status }
                         <Watching />
                     </div>
-                    <FoldingDock className="bm-group-call-controls-buttons" pinned={ props.pinned ?? 0 } more={ moreButton }>{ props.children }</FoldingDock>
+                    <FoldingDock className="wplus-group-call-controls-buttons" pinned={ props.pinned ?? 0 } more={ moreButton }>{ props.children }</FoldingDock>
                 </div>
             </div>
         </div>
@@ -591,7 +591,7 @@ function StageFrame( props : { studio? : boolean, screen? : ReactNode, notice? :
 }
 
 function leaveButton( room : RoomControls ) : ReactElement {
-    return dockButton( { tone: 'bm-exit-room', icon: 'logout', label: __( 'Close the live stream', 'wordplus-live-stream' ), onClick: room.leave } );
+    return dockButton( { tone: 'wplus-exit-room', icon: 'logout', label: __( 'Close the live stream', 'wordplus-live-stream' ), onClick: room.leave } );
 }
 
 // A viewer's stage: the stream with what the player's bar gives them, its sound and volume, its quality, reactions,
@@ -617,7 +617,7 @@ function ViewerStage( props : { room : RoomControls } ){
                 { chat }
                 { deviceButtons( state.devices.camera, state.devices.microphone, ( device ) => void ( device === 'camera' ? client.setCamera( ! state.devices.camera ) : client.setMicrophone( ! state.devices.microphone ) ) ) }
                 { fullscreen }
-                { dockButton( { tone: 'bm-exit-room', icon: 'logout', label: __( 'Leave the stage', 'wordplus-live-stream' ), onClick: () => void client.leaveStage() } ) }
+                { dockButton( { tone: 'wplus-exit-room', icon: 'logout', label: __( 'Leave the stage', 'wordplus-live-stream' ), onClick: () => void client.leaveStage() } ) }
             </StageFrame>
         );
     }
@@ -627,7 +627,7 @@ function ViewerStage( props : { room : RoomControls } ){
     return (
         <StageFrame pinned={ leaving ? 1 : 0 } sheet={ sheet === 'settings' && remote ? <WatchSheet /> : sheet === 'reactions' && reactions.length > 0 ? <ReactionSheet kinds={ reactions } /> : null }>
             { chat }
-            { remote && dockButton( { tone: 'bm-configure-call', icon: 'settings', label: __( 'Settings', 'wordplus-live-stream' ), active: sheet === 'settings', onClick: () => toggle( 'settings' ) } ) }
+            { remote && dockButton( { tone: 'wplus-configure-call', icon: 'settings', label: __( 'Settings', 'wordplus-live-stream' ), active: sheet === 'settings', onClick: () => toggle( 'settings' ) } ) }
             { remote && sound }
             { reactions.length > 0 && dockButton( { tone: 'estream-bm-react', icon: 'reaction', label: __( 'Reactions', 'wordplus-live-stream' ), active: sheet === 'reactions', onClick: () => toggle( 'reactions' ) } ) }
             { pip }
@@ -698,11 +698,11 @@ function HostStage( props : { room : RoomControls } ){
             { chat }
             { sends && (
                 <>
-                    { dockButton( { tone: 'bm-configure-call', icon: 'settings', label: __( 'Settings', 'wordplus-live-stream' ), active: sheet === 'settings', onClick: () => toggleSheet( 'settings' ) } ) }
+                    { dockButton( { tone: 'wplus-configure-call', icon: 'settings', label: __( 'Settings', 'wordplus-live-stream' ), active: sheet === 'settings', onClick: () => toggleSheet( 'settings' ) } ) }
                     { deviceButtons( state.devices.camera, state.devices.microphone, toggle ) }
                     { /* Before going live too, and only where the browser can share a screen (no phone's can). */ }
                     { state.canShareScreen && dockButton( {
-                        tone: 'bm-switch-share-screen',
+                        tone: 'wplus-switch-share-screen',
                         icon: state.screenSharing ? 'screenShareOff' : 'screenShare',
                         label: state.screenSharing ? __( 'Stop sharing', 'wordplus-live-stream' ) : __( 'Share screen', 'wordplus-live-stream' ),
                         active: state.screenSharing,
@@ -712,18 +712,18 @@ function HostStage( props : { room : RoomControls } ){
             ) }
             { ! sends && remote && (
                 <>
-                    { dockButton( { tone: 'bm-configure-call', icon: 'settings', label: __( 'Settings', 'wordplus-live-stream' ), active: sheet === 'settings', onClick: () => toggleSheet( 'settings' ) } ) }
+                    { dockButton( { tone: 'wplus-configure-call', icon: 'settings', label: __( 'Settings', 'wordplus-live-stream' ), active: sheet === 'settings', onClick: () => toggleSheet( 'settings' ) } ) }
                     { sound }
                     { pip }
                 </>
             ) }
             { fullscreen }
             { live ? dockButton( {
-                tone: 'bm-exit-room estream-bm-end', icon: 'stop', label: __( 'End stream', 'wordplus-live-stream' ), disabled: busy, onClick: () => void end()
+                tone: 'wplus-exit-room estream-bm-end', icon: 'stop', label: __( 'End stream', 'wordplus-live-stream' ), disabled: busy, onClick: () => void end()
             } ) : countingDown ? dockButton( {
-                tone: 'bm-exit-room', icon: 'x', label: __( 'Cancel', 'wordplus-live-stream' ), onClick: cancelCountdown
+                tone: 'wplus-exit-room', icon: 'x', label: __( 'Cancel', 'wordplus-live-stream' ), onClick: cancelCountdown
             } ) : dockButton( {
-                tone: 'bm-answer estream-bm-go',
+                tone: 'wplus-answer estream-bm-go',
                 icon: 'live',
                 label: ready ? __( 'Go live', 'wordplus-live-stream' )
                     : state.canShareScreen ? __( 'Turn on your camera or microphone, or share your screen, to go live', 'wordplus-live-stream' )

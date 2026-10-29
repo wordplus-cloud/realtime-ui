@@ -40,7 +40,7 @@ export function encodeReaction( emoji: string ): string {
 /** The pills under a message, and its meta where it rides their row. */
 export function ReactionPills( { children, meta }: { children: ReactNode; meta?: ReactNode } ) {
     return (
-        <div className="bm-reactions">
+        <div className="wplus-reactions">
             { children }
             { meta }
         </div>
@@ -60,13 +60,13 @@ export interface ReactionPillProps {
 export function ReactionPill( { emoji, count, mine, onClick }: ReactionPillProps ) {
     return (
         <Btn
-            className="bm-reaction-pill"
+            className="wplus-reaction-pill"
             data-reacted-by-me={ mine ? 1 : undefined }
             data-static={ onClick ? undefined : 1 }
             onClick={ onClick }
         >
-            <span className="bm-reaction-pill__emoji">{ emoji }</span>
-            { count > 1 && <span className="bm-reaction-pill__count">{ count }</span> }
+            <span className="wplus-reaction-pill__emoji">{ emoji }</span>
+            { count > 1 && <span className="wplus-reaction-pill__count">{ count }</span> }
         </Btn>
     );
 }
@@ -107,7 +107,7 @@ export interface ReactionPickerProps {
 }
 
 const textEmoji = ( key: string, size: number ) => (
-    <span className="bm-reaction-emoji" style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: size, height: size, fontSize: Math.round( size * 0.85 ), lineHeight: 1 }}>{ decodeReaction( key ) }</span>
+    <span className="wplus-reaction-emoji" style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: size, height: size, fontSize: Math.round( size * 0.85 ), lineHeight: 1 }}>{ decodeReaction( key ) }</span>
 );
 
 /** The reaction picker at a message's corner: its trigger, and the strip of the set it opens. */
@@ -186,7 +186,7 @@ export function ReactionPicker( { keys, mine, onPick, renderEmoji = textEmoji }:
             if ( ! el || ! corner ) return;
 
             // Columns first, read off the rendered cell, so density and page zoom don't break the math.
-            const cells = el.querySelectorAll<HTMLElement>( ".bm-reaction-strip__item" );
+            const cells = el.querySelectorAll<HTMLElement>( ".wplus-reaction-strip__item" );
             const cell  = cells.length ? cells[ cells.length - 1 ].offsetHeight : 0;
             if ( cell > 0 ) iconHeight = cell;
             const perColumn = Math.max( 1, Math.floor( STRIP_MAX_HEIGHT / iconHeight ) );
@@ -259,7 +259,7 @@ export function ReactionPicker( { keys, mine, onPick, renderEmoji = textEmoji }:
     return (
         <>
             <Btn
-                className={ "bm-reaction-trigger" + ( isOpen ? " bm-hidden" : "" ) }
+                className={ "wplus-reaction-trigger" + ( isOpen ? " wplus-hidden" : "" ) }
                 ref={ triggerRef }
                 aria-label={ _x( "React", "Reactions selector trigger", "bp-better-messages" ) }
                 aria-expanded={ isOpen }
@@ -271,19 +271,19 @@ export function ReactionPicker( { keys, mine, onPick, renderEmoji = textEmoji }:
             </Btn>
             { mounted && createPortal(
                 <div
-                    className="bm-reaction-strip-anchor"
+                    className="wplus-reaction-strip-anchor"
                     ref={ anchorRef }
                     data-open={ entered ? "1" : undefined }
                     style={ { left: pos?.left ?? 0, top: pos?.top ?? 0, visibility: pos ? undefined : "hidden" } }
                     onMouseEnter={ touch ? undefined : cancelClose }
                     onMouseLeave={ touch ? undefined : scheduleClose }
                 >
-                    <div className="bm-reaction-strip" role="menu">
+                    <div className="wplus-reaction-strip" role="menu">
                         { keys.map( key => (
                             <Btn
                                 key={ "reaction-" + key }
                                 role="menuitem"
-                                className="bm-reaction-strip__item"
+                                className="wplus-reaction-strip__item"
                                 data-mine={ key === mine ? 1 : undefined }
                                 // A finger never leaves the strip, so a pick closes it on a phone; a pointer walks
                                 // off on its own. Pinned first: the pill row the pick adds resizes the bubble.

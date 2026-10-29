@@ -8,7 +8,7 @@ import useStateRef from "../../inc/hooks/state-ref.ts";
 import UserName from "../users/user-name.tsx";
 import Resizable from "../helpers/resizable.tsx";
 import Icon, { IconName } from "../../primitives/icon.tsx";
-import { moderates, useModerationActs } from "./moderation.ts";
+import { ManageParticipant, MicLockedChip, ModerationPanelContext, heldMute, tileModerated } from "./moderation-panels.tsx";
 import { usePictureDrawn } from "../../inc/calls/ratio.ts";
 import usePendingActions from "../../inc/calls/pending.ts";
 import useHeld, { PAUSED_NOTICE_MS } from "../../inc/hooks/held.ts";
@@ -21,8 +21,9 @@ import { pictureless, stalledShown, STALLED_VIDEO_CLASS, VideoInterruptedNotice 
  * own camera shown once a frame of it is drawn), their name, the ring of whoever speaks, microphone and raised hand,
  * "Reconnecting..." while they are briefly away or nothing of theirs arrives, "Video interrupted" over their blurred
  * last frame while their camera alone stopped arriving (stalled.tsx), "Paused: weak connection" over their last frame
- * while the media server holds their video back from this page's download, and a moderator's controls for them (pin,
- * broadcast, microphone, remove, speaker), each spinning until the tile shows what it asked for.
+ * while the media server holds their video back from this page's download, "Viewer" for someone who can't send, a
+ * locked microphone for one a moderator muted, and for a moderator the ⋯ that opens what they can do about this person
+ * (moderation-panels.tsx), the tile outlined while that panel is open.
  */
 export default memo(function GroupVideoGridItem({ unique_key, participant, width, height, x, y } : {
     unique_key: string,
@@ -39,10 +40,6 @@ export default memo(function GroupVideoGridItem({ unique_key, participant, width
         adminMode,
         selectedSpeakerDevice,
         lowerHand,
-        callMode,
-        promoteParticipant,
-        demoteParticipant,
-        moderate,
         moderation,
         optimizingMaxMs
     } = useContext<CallContextInterface>( CallContext );
@@ -93,15 +90,15 @@ export default memo(function GroupVideoGridItem({ unique_key, participant, width
     // usePictureDrawn).
     const selfPicture = usePictureDrawn( unique_key === 'me' ? videoElement : null, participant.video );
 
-    const selfPictureClass = unique_key !== 'me' ? undefined : "bm-group-call-self-video"
-        + ( selfPicture ? " bm-group-call-self-video--ready" : "" )
-        + ( selfPicture === 'counted' ? " bm-group-call-self-video--counted" : "" );
+    const selfPictureClass = unique_key !== 'me' ? undefined : "wplus-group-call-self-video"
+        + ( selfPicture ? " wplus-group-call-self-video--ready" : "" )
+        + ( selfPicture === 'counted' ? " wplus-group-call-self-video--counted" : "" );
 
-    let className = "bm-group-call-input-video";
-    let innerClass = "bm-group-call-input-video-inner";
+    let className = "wplus-group-call-input-video";
+    let innerClass = "wplus-group-call-input-video-inner";
 
-    if( !! participant.screen ) className += " bm-group-call-input-video-screen";
-    if( unique_key === 'me' ) className += " bm-group-call-input-mine";
+    if( !! participant.screen ) className += " wplus-group-call-input-video-screen";
+    if( unique_key === 'me' ) className += " wplus-group-call-input-mine";
 
     let style : React.CSSProperties = {
         width: width + '%',
@@ -127,7 +124,7 @@ export default memo(function GroupVideoGridItem({ unique_key, participant, width
     }, [ accentColor, participant.audioLevel, participant.isSpeaking ]);
 
     if( speakerHighlight ){
-        innerClass += " bm-active-speaker";
+        innerClass += " wplus-active-speaker";
         innerStyle['boxShadow'] = speakerHighlight.boxShadow;
     }
 
@@ -139,17 +136,20 @@ export default memo(function GroupVideoGridItem({ unique_key, participant, width
         user_id = /^[1-9][0-9]*$/.test( id ) ? Number( id ) : id;
     }
 
-    const { kickUser, muteUser, unmuteUser, muteMic, unmuteMic, pinUser, unpinUser } = useModerationActs( moderate, 'video' );
+    // Someone who can't send: "Viewer" on their tile, in broadcast mode or made one, and no microphone chip.
+    const viewer = ! participant.canPublish && ! participant.canAdmin;
+    const held = heldMute( moderation, participant );
 
-    // A control waits from the click until the tile shows what it asked for
-    // (see pending.ts). One key per slot, so pin and unpin share one: the
-    // spinner stays put while the button under it swaps.
+    const moderating = useContext( ModerationPanelContext ).panel === unique_key;
+    if( moderating ) innerClass += " wplus-moderating";
+
+    // The moderator's lowering of a raised hand waits from the click until the tile shows it (see pending.ts).
     const [ isPending, run ] = usePendingActions(
         [ participant.isPinned, participant.canPublish, participant.micMuted, participant.handRaised ].join( '|' )
     );
     const busy = ( key: string ) => isPending( key ) ? 1 : undefined;
     const glyph = ( key: string, name: IconName ) => isPending( key )
-        ? <Icon name="spinner" size={ 14 } className="bm-svg-animate" />
+        ? <Icon name="spinner" size={ 14 } className="wplus-svg-animate" />
         : <Icon name={ name } size={ 14 } />;
 
     // Their camera moving to another codec: "Optimizing video quality..." over its last frame until the new one draws,
@@ -175,11 +175,11 @@ export default memo(function GroupVideoGridItem({ unique_key, participant, width
     // above "Video interrupted", or under "Reconnecting..." as on a tile away.
     const faceShown = ( stalled === 'all' || interrupted ) && !! participant.video && ! participant.screen && pictureless( videoElement );
     if( faceShown && stalled === 'all' ){
-        innerClass += " bm-call-pictureless";
+        innerClass += " wplus-call-pictureless";
         innerStyle.backgroundImage = "url('" + participant.avatar + "')";
     }
     const face = faceShown && interrupted
-        ? <span className="bm-call-stalled-face" aria-hidden="true" style={ { backgroundImage: "url('" + participant.avatar + "')" } } />
+        ? <span className="wplus-call-stalled-face" aria-hidden="true" style={ { backgroundImage: "url('" + participant.avatar + "')" } } />
         : undefined;
 
     // Their sound, in the tile's media, and after an app's own tile in its place (pieces.tsx).
@@ -190,81 +190,13 @@ export default memo(function GroupVideoGridItem({ unique_key, participant, width
         <Piece name="GridTile" props={ { participant, layout: 'group-video' } } always={ sound }>
         <Tooltip content={ participant.name }>
             <div className={innerClass} style={innerStyle}>
-                { ( adminMode && connectionState === 'connected' ) &&
-                    <span className="bm-admin-controls">
-                        { ! participant.isPinned && moderates( moderation, 'pin_participant' ) && <Tooltip content={_x('Pin Participant', 'Group Video Chat', 'bp-better-messages')}>
-                            <span onClick={() => run( 'pin', () => pinUser( participant.identity ) )} data-busy={ busy( 'pin' ) } style={{position: "relative"}}>
-                                { glyph( 'pin', 'pin' ) }
-                            </span>
-                        </Tooltip> }
-                        { participant.isPinned && moderates( moderation, 'unpin_participant' ) && <Tooltip content={_x('Unpin Participant', 'Group Video Chat', 'bp-better-messages')}>
-                            <span onClick={() => run( 'pin', () => unpinUser( participant.identity ) )} data-busy={ busy( 'pin' ) } style={{position: "relative"}}>
-                                { glyph( 'pin', 'pinOff' ) }
-                            </span>
-                        </Tooltip> }
-
-                        { ( unique_key !== 'me') && <>
-                            { callMode !== 'broadcast' && <>
-                                { participant.canPublish && moderates( moderation, 'mute_participant' ) &&
-                                    <Tooltip content={_x('Block Broadcast', 'Group Video Chat', 'bp-better-messages')}>
-                                        <span onClick={() => run( 'broadcast', () => muteUser( participant.identity ) )} data-busy={ busy( 'broadcast' ) } style={{position: "relative"}}>
-                                            { glyph( 'broadcast', 'megaphoneOff' ) }
-                                        </span>
-                                    </Tooltip>
-                                }
-
-                                { ! participant.canPublish && moderates( moderation, 'unmute_participant' ) && <Tooltip content={_x('Allow Broadcast', 'Group Video Chat', 'bp-better-messages')}>
-                                    <span onClick={() => run( 'broadcast', () => unmuteUser( participant.identity ) )} data-busy={ busy( 'broadcast' ) }>
-                                        { glyph( 'broadcast', 'megaphone' ) }
-                                    </span>
-                                    </Tooltip>
-                                }
-                            </> }
-
-                            { participant.canPublish && <>
-                                { ! participant.micMuted && moderates( moderation, 'mute_mic' ) &&
-                                    <Tooltip content={_x('Mute Microphone', 'Group Video Chat', 'bp-better-messages')}>
-                                        <span onClick={() => run( 'mic', () => muteMic( participant.identity ) )} data-busy={ busy( 'mic' ) } style={{position: "relative"}}>
-                                            { glyph( 'mic', 'micOff' ) }
-                                        </span>
-                                    </Tooltip>
-                                }
-
-                                { participant.micMuted && moderates( moderation, 'unmute_mic' ) &&
-                                    <Tooltip content={_x('Unmute Microphone', 'Group Video Chat', 'bp-better-messages')}>
-                                        <span onClick={() => run( 'mic', () => unmuteMic( participant.identity ) )} data-busy={ busy( 'mic' ) }>
-                                            { glyph( 'mic', 'mic' ) }
-                                        </span>
-                                    </Tooltip>
-                                }
-                            </> }
-
-                            { moderates( moderation, 'remove_participant' ) && <Tooltip content={_x('Kick User', 'Group Video Chat', 'bp-better-messages')}>
-                                <span onClick={() => run( 'kick', () => kickUser( participant.identity ) )} data-busy={ busy( 'kick' ) }>{ glyph( 'kick', 'userX' ) }</span>
-                            </Tooltip> }
-
-                            { ( callMode === 'broadcast' && ! participant.canAdmin ) && <>
-                                { ! participant.canPublish &&
-                                    <Tooltip content={_x('Promote to Speaker', 'Group Video Chat', 'bp-better-messages')}>
-                                        <span onClick={() => run( 'speaker', () => promoteParticipant( participant.identity ) )} data-busy={ busy( 'speaker' ) } className={ participant.handRaised ? 'bm-promote-highlighted' : '' }>
-                                            { glyph( 'speaker', 'arrowUp' ) }
-                                        </span>
-                                    </Tooltip>
-                                }
-                                { participant.canPublish &&
-                                    <Tooltip content={_x('Demote to Viewer', 'Group Video Chat', 'bp-better-messages')}>
-                                        <span onClick={() => run( 'speaker', () => demoteParticipant( participant.identity ) )} data-busy={ busy( 'speaker' ) }>
-                                            { glyph( 'speaker', 'arrowDown' ) }
-                                        </span>
-                                    </Tooltip>
-                                }
-                            </> }
-                        </> }
-                    </span>
+                {/* A moderator's actions for this person, in their panel above the dock (moderation-panels.tsx). */}
+                { ( adminMode && connectionState === 'connected' && tileModerated( moderation, unique_key, 'video' ) ) &&
+                    <ManageParticipant tileKey={ unique_key } participant={ participant } />
                 }
 
                 { ( participant.reconnecting || stalled === 'all' ) &&
-                    <span className="bm-call-reconnecting" role="status">{ _x('Reconnecting...', 'Call Screen', 'bp-better-messages') }</span>
+                    <span className="wplus-call-reconnecting" role="status">{ _x('Reconnecting...', 'Call Screen', 'bp-better-messages') }</span>
                 }
 
                 { optimizingShown && <CameraOptimizingNotice state={ optimizing } avatar={ participant.avatar } /> }
@@ -272,9 +204,9 @@ export default memo(function GroupVideoGridItem({ unique_key, participant, width
                 { ( interrupted && !! participant.video && ! participant.screen ) && <VideoInterruptedNotice face={ face } /> }
 
                 { paused &&
-                    <span className="bm-call-paused" part="video-paused">
+                    <span className="wplus-call-paused" part="video-paused">
                         <Tooltip content={ _x('Your connection cannot carry this video right now. The sound goes on and the video comes back by itself.', 'Call Screen', 'bp-better-messages') }>
-                            <span className="bm-call-paused-notice">
+                            <span className="wplus-call-paused-notice">
                                 <Icon name="wifiWeak" size={ 16 } />
                                 <span>{ _x('Paused: weak connection', 'Call Screen', 'bp-better-messages') }</span>
                             </span>
@@ -282,45 +214,47 @@ export default memo(function GroupVideoGridItem({ unique_key, participant, width
                     </span>
                 }
 
-                { ( connectionState === 'connected' && ! participant.reconnecting && ! participant.audio && ! participant.screenAudio && ! ( callMode === 'broadcast' && ! participant.canPublish && ! participant.canAdmin ) ) && <span className="bm-caller-status">
-                    <Tooltip content={_x('Microphone Disabled', 'Group Video Chat', 'bp-better-messages')}>
-                        <span className="bm-mic-disabled">
-                            <Icon name="micOff" size={ 14 } />
-                        </span>
-                    </Tooltip>
+                {/* The microphone off: locked when a moderator keeps it so, which is what they look here for. */}
+                { ( connectionState === 'connected' && ! participant.reconnecting && ! viewer && ( held || ( ! participant.audio && ! participant.screenAudio ) ) ) && <span className="wplus-caller-status">
+                    { held
+                        ? <MicLockedChip />
+                        : <Tooltip content={_x('Microphone Disabled', 'Group Video Chat', 'bp-better-messages')}>
+                            <span className="wplus-mic-disabled">
+                                <Icon name="micOff" size={ 14 } />
+                            </span>
+                        </Tooltip> }
                 </span> }
 
-                { ( connectionState === 'connected' && participant.handRaised ) && <span className="bm-hand-raised-status">
+                { ( connectionState === 'connected' && participant.handRaised ) && <span className="wplus-hand-raised-status">
                     <Tooltip content={ adminMode && unique_key !== 'me' ? _x('Lower Hand', 'Group Video Chat', 'bp-better-messages') : _x('Hand Raised', 'Group Video Chat', 'bp-better-messages') }>
-                        <span className="bm-hand-raised" onClick={ adminMode && unique_key !== 'me' ? () => run( 'hand', () => lowerHand( participant.identity ) ) : undefined } data-busy={ busy( 'hand' ) } style={ adminMode && unique_key !== 'me' ? { cursor: 'pointer' } : undefined }>
+                        <span className="wplus-hand-raised" onClick={ adminMode && unique_key !== 'me' ? () => run( 'hand', () => lowerHand( participant.identity ) ) : undefined } data-busy={ busy( 'hand' ) } style={ adminMode && unique_key !== 'me' ? { cursor: 'pointer' } : undefined }>
                             { glyph( 'hand', 'raisehand' ) }
                         </span>
                     </Tooltip>
                 </span> }
 
-                { ( connectionState === 'connected' && callMode === 'broadcast' && ! participant.canPublish && ! participant.canAdmin ) &&
-                    <span className="bm-viewer-badge">
+                { ( connectionState === 'connected' && viewer ) &&
+                    <span className="wplus-viewer-badge">
                         <Tooltip content={_x('Viewer', 'Group Video Chat', 'bp-better-messages')}>
                             <span>{_x('Viewer', 'Group Video Chat', 'bp-better-messages')}</span>
                         </Tooltip>
                     </span>
                 }
 
-                { ( ( adminMode === true && unique_key !== 'me') || ! participant.video ) &&
-                    <div className="bm-group-call-input-video-inner-info">
-                    <span className="bm-caller-info" style={callerInfoStyle}>
-                        <span className="bm-info-name">
-                            <span className="bm-caller-name"><UserName user_id={user_id}/></span>
+                {/* The name on every tile, over a picture too: who is who stays on screen for everyone. */}
+                <div className="wplus-group-call-input-video-inner-info">
+                    <span className="wplus-caller-info" style={callerInfoStyle}>
+                        <span className="wplus-info-name">
+                            <span className="wplus-caller-name"><UserName user_id={user_id}/></span>
                         </span>
                     </span>
-                    </div>
-                }
+                </div>
 
-                <div className={"bm-media-container" + ( !! participant.screen ? " bm-screen-shared" : "" )}>
+                <div className={"wplus-media-container" + ( !! participant.screen ? " wplus-screen-shared" : "" )}>
                     { ( !! participant.screen ) && <video ref={setScreenElement} className={screenClass} datatype="screen" autoPlay={true} playsInline={true}></video> }
 
                     { ( !! participant.video && !! participant.screen ) &&
-                        <Resizable className="bm-small-video" resizeDirection="none">
+                        <Resizable className="wplus-small-video" resizeDirection="none">
                             <video ref={setVideoElement} className={cameraClass()} datatype="camera" autoPlay playsInline muted={unique_key === 'me'}/>
                         </Resizable>
                     }

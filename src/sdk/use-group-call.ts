@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useContext, useEffect, useMemo, useRef, useState } from "react";
+import { CallOptionsContext } from "./call-options.ts";
 import type { CallConnectionState, CallContextInterface, CallParticipant } from "../components/calls/context.ts";
 import { callInfoDefaults } from "../components/calls/context.ts";
 import { _x } from "../inc/globals.ts";
@@ -29,7 +30,8 @@ const hosts = ( group: SdkGroupCall, can: SdkCallPermissions | undefined ) => !!
  * A group call made with the SDK (`calls.group()`, a call that became one, or a ring into one accepted), as the group
  * video grid and the group audio roster read it: everyone in its room with their pictures and sound and who speaks,
  * this page's own tile, its camera, microphone and screen, and leaving. `close` is called once it is over. `turnOn`: what
- * it turns on as it starts, the microphone and on a video call the camera when not given.
+ * it turns on as it starts. When not given, nothing where the join offers the devices (CallOptions' devicesOnJoin),
+ * else the microphone and on a video call the camera.
  */
 export function useGroupCall(
     group: SdkGroupCall,
@@ -39,6 +41,7 @@ export function useGroupCall(
     turnOn?: JoinMedia,
 ): CallContextInterface {
     const wrapper = useRef<HTMLDivElement | null>( null );
+    const options = useContext( CallOptionsContext );
     const media = useLocalMedia( ( source, track ) => group.setTrack( source, track ) );
     const full = useFullScreen( wrapper );
 
@@ -90,10 +93,12 @@ export function useGroupCall(
         refresh();
 
         // A listener starts with nothing on: what they may not send, they never ask the browser for. A page that joined by
-        // itself turns on only what it was given, so nothing is asked of the browser until the person turns it on.
+        // itself turns on only what it was given, and so does one whose join offers the devices (devicesOnJoin): there
+        // nothing is asked of the browser until the person turns it on.
+        const join = turnOn ?? ( options.devicesOnJoin ? { microphone: false, camera: false } : undefined );
         if ( group.can?.publish !== false ) {
-            const microphone = turnOn?.microphone ?? true;
-            const camera = type === 'video' && ( turnOn?.camera ?? true );
+            const microphone = join?.microphone ?? true;
+            const camera = type === 'video' && ( join?.camera ?? true );
             // On a video call, the camera asked for with the microphone, so the browser asks once.
             if ( microphone && camera ) void media.enableMicAndCamera();
             else if ( microphone ) void media.enableMic();
@@ -186,6 +191,14 @@ export function useGroupCall(
         close( null );
     };
 
+    // Host Controls' End for Everyone, as the cloud lets a host end a call: each of the others taken out through the
+    // app's calls route, who are told they were removed, and then this page leaves.
+    const endForEveryone = async () => {
+        await Promise.all( people.filter( ( person ) => person.user !== null )
+            .map( ( person ) => group.moderate!( 'remove', person.user! ).catch( () => false ) ) );
+        await endCall();
+    };
+
     return {
         wrapper,
         thread: { thread_id: 0, participants: [] },
@@ -240,8 +253,11 @@ export function useGroupCall(
         promoteParticipant: async () => {},
         demoteParticipant: async () => {},
         moderate: admin ? moderate : noModeration,
-        moderation: MODERATION,
+        moderation: admin ? [ ...MODERATION, 'end_call' ] : MODERATION,
+        endForEveryone: admin ? endForEveryone : undefined,
         ...adding,
         iconsReverted: false,
+        mutedHint: options.mutedHint,
+        devicesOnJoin: options.devicesOnJoin,
     } as CallContextInterface;
 }

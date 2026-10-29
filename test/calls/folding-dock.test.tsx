@@ -33,7 +33,7 @@ afterEach( () => {
 const Tip = ( props : { content : string, children : ReactNode } ) => <>{ props.children }</>;
 
 const more = ( props : { open : boolean, toggle : () => void, sheet : ReactNode } ) => (
-    <span className="bm-call-more" role="button" aria-label="More" data-active={ props.open ? 1 : undefined } onClick={ props.toggle }>{ props.sheet }</span>
+    <span className="wplus-call-more" role="button" aria-label="More" data-active={ props.open ? 1 : undefined } onClick={ props.toggle }>{ props.sheet }</span>
 );
 
 describe( 'a dock that folds', () => {
@@ -46,7 +46,7 @@ describe( 'a dock that folds', () => {
                     <span className="b" aria-label="Microphone" />
                     <Tip content="Settings"><span className="c" /></Tip>
                 </>
-                <span className="d" aria-label="Full screen" data-bm-tip="Full screen" onClick={ pressed } />
+                <span className="d" aria-label="Full screen" data-wplus-tip="Full screen" onClick={ pressed } />
                 { false }
                 <span className="e" aria-label="Share screen" />
                 <span className="leave" aria-label="Leave" />
@@ -55,29 +55,29 @@ describe( 'a dock that folds', () => {
         const dock = container.querySelector( '.dock' ) as HTMLElement;
 
         // Two inline, More, and the pinned one: four in the row.
-        expect( [ ...dock.children ].map( ( el ) => el.className ) ).toEqual( [ 'a', 'b', 'bm-call-more', 'leave' ] );
+        expect( [ ...dock.children ].map( ( el ) => el.className ) ).toEqual( [ 'a', 'b', 'wplus-call-more', 'leave' ] );
         expect( dock.getAttribute( 'data-folded' ) ).toBe( '3' );
 
         fireEvent.click( within( dock ).getByRole( 'button', { name: 'More' } ) );
-        const sheet = dock.querySelector( '.bm-call-dock-sheet' ) as HTMLElement;
+        const sheet = dock.querySelector( '.wplus-call-dock-sheet' ) as HTMLElement;
         const rows = within( sheet ).getAllByRole( 'menuitem' );
         // Labelled by the tooltip's copy, or the control's own label; no tooltip of its own in the sheet.
         expect( rows.map( ( row ) => row.textContent ) ).toEqual( [ 'Settings', 'Full screen', 'Share screen' ] );
-        expect( rows.map( ( row ) => row.className ) ).toEqual( [ 'c bm-call-dock-sheet__row', 'd bm-call-dock-sheet__row', 'e bm-call-dock-sheet__row' ] );
-        expect( rows[ 1 ].getAttribute( 'data-bm-tip' ) ).toBeNull();
+        expect( rows.map( ( row ) => row.className ) ).toEqual( [ 'c wplus-call-dock-sheet__row', 'd wplus-call-dock-sheet__row', 'e wplus-call-dock-sheet__row' ] );
+        expect( rows[ 1 ].getAttribute( 'data-wplus-tip' ) ).toBeNull();
 
         // A row acts, then the sheet goes.
         fireEvent.click( rows[ 1 ] );
         expect( pressed ).toHaveBeenCalledTimes( 1 );
-        expect( dock.querySelector( '.bm-call-dock-sheet' ) ).toBeNull();
+        expect( dock.querySelector( '.wplus-call-dock-sheet' ) ).toBeNull();
 
         // Escape and a press outside close it too.
         fireEvent.click( within( dock ).getByRole( 'button', { name: 'More' } ) );
         fireEvent.keyDown( document, { key: 'Escape' } );
-        expect( dock.querySelector( '.bm-call-dock-sheet' ) ).toBeNull();
+        expect( dock.querySelector( '.wplus-call-dock-sheet' ) ).toBeNull();
         fireEvent.click( within( dock ).getByRole( 'button', { name: 'More' } ) );
         fireEvent.pointerDown( document.body );
-        expect( dock.querySelector( '.bm-call-dock-sheet' ) ).toBeNull();
+        expect( dock.querySelector( '.wplus-call-dock-sheet' ) ).toBeNull();
     } );
 
     it( 'draws no More while everything fits', () => {
@@ -89,6 +89,6 @@ describe( 'a dock that folds', () => {
         );
 
         expect( [ ...( container.querySelector( '.dock' ) as HTMLElement ).children ].map( ( el ) => el.className ) ).toEqual( [ 'a', 'leave' ] );
-        expect( container.querySelector( '.bm-call-more' ) ).toBeNull();
+        expect( container.querySelector( '.wplus-call-more' ) ).toBeNull();
     } );
 } );

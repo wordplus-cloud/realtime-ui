@@ -15,7 +15,8 @@
 import React, { createContext, useContext, type ComponentType, type ReactElement, type ReactNode } from "react";
 import type { UserAvatarProps, UserNameProps } from "./host.ts";
 import type { CallAction, CallContextInterface, CallParticipant, CallTrack } from "./components/calls/context.ts";
-import type { ChatMessage } from "./sdk/use-chat.ts";
+import type { ChatFile, ChatMessage } from "./sdk/use-chat.ts";
+import type { ChatUploader } from "./sdk/chat-files.tsx";
 
 /** Ours, as the screen would draw it: an app's piece may wrap it, or draw something else. */
 export interface Drawn {
@@ -83,8 +84,10 @@ export interface MessageProps {
 
 /** Where the user writes. */
 export interface ComposerProps {
-    /** Sends a message: the chat shows it at once, and again as sent. */
-    send: ( text: string ) => Promise<void>;
+    /** Sends a message, with the files `upload` took for it: the chat shows it at once, and again as sent. */
+    send: ( text: string, files?: ChatFile[] ) => Promise<void>;
+    /** Takes a file up to the app's server, where the chat takes files (its `upload`): none where it doesn't. */
+    upload?: ChatUploader;
     /** Says the user is typing, as the composer says it while one types: at most every few seconds. */
     typing: () => void;
     disabled: boolean;

@@ -10,7 +10,7 @@ export interface CallControlProps {
     onClick: () => void;
     /** Latched on, as the microphone or the shared screen is. */
     active?: boolean;
-    /** A class of the app's own, beside `bm-call-control`. */
+    /** A class of the app's own, beside `wplus-call-control`. */
     className?: string;
 }
 
@@ -21,7 +21,7 @@ export interface CallControlProps {
 export default function CallControl( { label, icon, onClick, active, className }: CallControlProps ) {
     return <Tooltip content={ label }>
         <span onClick={ onClick } role="button" aria-label={ label } data-active={ active ? 1 : undefined }
-              className={ "bm-call-control" + ( className ? " " + className : "" ) }>
+              className={ "wplus-call-control" + ( className ? " " + className : "" ) }>
             { typeof icon === "string" && ! isValidElement( icon ) ? <Icon name={ icon as IconName } size={ 20 } /> : icon }
         </span>
     </Tooltip>;

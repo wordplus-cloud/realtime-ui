@@ -130,12 +130,12 @@ describe( 'npx @wordplus/realtime-ui', () => {
             "import { CallControl, type Pieces } from '@wordplus/realtime-ui/react';",
             "export const shopPieces: Pieces = { controls: ( buttons ) => [ ...buttons, <CallControl key=\"order\" icon=\"cart\" label=\"Order shown\" onClick={ () => {} } /> ] };",
         ].join( '\n' ) );
-        writeFileSync( join( dir, 'shop.css' ), '.shop .bm-call-buttons > * { border-radius: 50%; }\n' );
+        writeFileSync( join( dir, 'shop.css' ), '.shop .wplus-call-buttons > * { border-radius: 50%; }\n' );
 
         run( dir, 'preview', '--out', join( dir, 'preview' ), '--pieces', 'calls.tsx#shopPieces', '--css', 'shop.css', '--class', 'shop' );
         expect( read( dir, 'preview/preview.js' ) ).toContain( 'Order shown' );
         expect( read( dir, 'preview/preview.js' ) ).toContain( '"shop"' );
-        expect( read( dir, 'preview/app.css' ) ).toContain( '.shop .bm-call-buttons > *' );
+        expect( read( dir, 'preview/app.css' ) ).toContain( '.shop .wplus-call-buttons > *' );
         expect( read( dir, 'preview/index.html' ) ).toContain( '<link rel="stylesheet" href="app.css">' );
         expect( config( dir ).preview ).toEqual( { pieces: 'calls.tsx#shopPieces', css: [ 'shop.css' ], class: 'shop' } );
 

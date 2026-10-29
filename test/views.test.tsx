@@ -25,7 +25,7 @@ describe( 'the device switch', () => {
         }
         const { container } = render( <Switch /> );
 
-        expect( container.querySelector( '.bm-switch-device label' )?.textContent ).toBe( 'Microphone' );
+        expect( container.querySelector( '.wplus-switch-device label' )?.textContent ).toBe( 'Microphone' );
         expect( [ ...container.querySelectorAll( 'option' ) ].map( ( o ) => o.textContent ) ).toEqual( [ 'Default', 'Same as system - MacBook Microphone', 'USB Headset' ] );
 
         fireEvent.change( container.querySelector( 'select' )!, { target: { value: 'usb' } } );
@@ -39,15 +39,15 @@ describe( 'the ring\'s card', () => {
         const onAnswer = vi.fn(), onReject = vi.fn();
         const { container, rerender } = render( <IncomingCallCard user_id={ 34 } type="video" onAnswer={ onAnswer } onReject={ onReject } /> );
 
-        expect( container.querySelector( '.bm-toast-site-call-title' )?.textContent ).toBe( 'Ann' );
-        expect( container.querySelector( '.bm-toast-site-call-text' )?.textContent ).toBe( 'Incoming Video Call' );
-        fireEvent.click( container.querySelector( '.bm-toast-site-call-action-answer' )! );
-        fireEvent.click( container.querySelector( '.bm-toast-site-call-action-reject' )! );
+        expect( container.querySelector( '.wplus-toast-site-call-title' )?.textContent ).toBe( 'Ann' );
+        expect( container.querySelector( '.wplus-toast-site-call-text' )?.textContent ).toBe( 'Incoming Video Call' );
+        fireEvent.click( container.querySelector( '.wplus-toast-site-call-action-answer' )! );
+        fireEvent.click( container.querySelector( '.wplus-toast-site-call-action-reject' )! );
         expect( [ onAnswer.mock.calls.length, onReject.mock.calls.length ] ).toEqual( [ 1, 1 ] );
 
         rerender( <IncomingCallCard user_id={ 77 } name="Dora" type="audio" onAnswer={ onAnswer } onReject={ onReject } /> );
-        expect( container.querySelector( '.bm-toast-site-call-title' )?.textContent ).toBe( 'Dora' );
-        expect( container.querySelector( '.bm-toast-site-call-text' )?.textContent ).toBe( 'Incoming Audio Call' );
+        expect( container.querySelector( '.wplus-toast-site-call-title' )?.textContent ).toBe( 'Dora' );
+        expect( container.querySelector( '.wplus-toast-site-call-text' )?.textContent ).toBe( 'Incoming Audio Call' );
     } );
 } );
 
@@ -56,17 +56,17 @@ describe( 'the connection status', () => {
         vi.useFakeTimers();
         try {
             const { container, rerender } = render( <ConnectionStatus state="connecting" quality="unknown" /> );
-            const span = () => container.querySelector( '.bm-connection-quality' )!;
-            expect( span().querySelector( '.bm-svg-animate' ) ).not.toBeNull();
-            expect( span().className ).toContain( 'bm-opacity' );
+            const span = () => container.querySelector( '.wplus-connection-quality' )!;
+            expect( span().querySelector( '.wplus-svg-animate' ) ).not.toBeNull();
+            expect( span().className ).toContain( 'wplus-opacity' );
 
             rerender( <ConnectionStatus state="connected" quality="good" /> );
             expect( span().textContent ).toBe( 'connected (good)' );
-            expect( span().className ).toContain( 'bm-quality-good' );
-            expect( span().querySelector( '.bm-svg-animate' ) ).toBeNull();
+            expect( span().className ).toContain( 'wplus-quality-good' );
+            expect( span().querySelector( '.wplus-svg-animate' ) ).toBeNull();
 
             await act( async () => { vi.advanceTimersByTime( 3100 ); } );
-            expect( span().className ).not.toContain( 'bm-opacity' );
+            expect( span().className ).not.toContain( 'wplus-opacity' );
         } finally {
             vi.useRealTimers();
         }
@@ -77,7 +77,7 @@ describe( 'the icon button', () => {
     it( 'is labelled, latched when active, and does nothing while disabled', () => {
         const onClick = vi.fn();
         const { container, rerender } = render( <IconButton icon="mic" label="Mute" active onClick={ onClick } /> );
-        const button = () => container.querySelector( '.bm-icon-btn' )!;
+        const button = () => container.querySelector( '.wplus-icon-btn' )!;
 
         expect( button().getAttribute( 'aria-label' ) ).toBe( 'Mute' );
         expect( button().getAttribute( 'data-active' ) ).toBe( '1' );
@@ -93,7 +93,7 @@ describe( 'the icon button', () => {
 describe( 'the presence dot', () => {
     it( 'says the presence, offline when there is none, and wears a status\'s own colour only while not offline', () => {
         const { container, rerender } = render( <PresenceDot presence="away" color="#ff8800" /> );
-        const dot = () => container.querySelector<HTMLElement>( '.bm-presence-dot' )!;
+        const dot = () => container.querySelector<HTMLElement>( '.wplus-presence-dot' )!;
 
         expect( dot().getAttribute( 'data-presence' ) ).toBe( 'away' );
         expect( dot().style.background ).toContain( 'ff8800' );

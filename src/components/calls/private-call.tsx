@@ -4,15 +4,12 @@ import {isMobile} from "../../inc/functions/browser-info.ts";
 import { deepFocus, focusBack } from "./focus-return.ts";
 import UserAvatar from "../users/user-avatar.tsx";
 import {__, _x} from "../../inc/globals.ts";
-import DeviceSwitch from "./device-switch.tsx";
+import DevicePanel from "./device-panel.tsx";
 import Tooltip from "../helpers/tooltip.tsx";
 import {
     pictureInPictureSupport as pictureInPicture,
     screenShareSupport,
-    useCameras,
-    useConfigAvailable,
-    useMicrophones,
-    useSpeakers
+    useConfigAvailable
 } from "../../inc/calls/permissions.ts";
 import {formatSize, msToTime} from "../../inc/functions.ts";
 import useStateRef from "../../inc/hooks/state-ref.ts";
@@ -23,6 +20,7 @@ import { AddPersonButton, AddPersonPanel } from "./add-person.tsx";
 import { cssRatio, useMediaRatio, usePictureDrawn } from "../../inc/calls/ratio.ts";
 import useHeld, { PAUSED_NOTICE_MS } from "../../inc/hooks/held.ts";
 import { Piece } from "../../pieces.tsx";
+import { CallViewContext, fullScreenItems } from "./call-view.tsx";
 import { CameraOptimizingNotice, useCameraOptimizing } from "./optimizing.tsx";
 import { pictureless, stalledShown, STALLED_VIDEO_CLASS, VideoInterruptedNotice } from "./stalled.tsx";
 
@@ -75,6 +73,10 @@ export default function PrivateCallLayout() {
         chatShown,
         chatToggle
     } = useContext<CallContextInterface>( CallContext );
+    const call = useContext<CallContextInterface>( CallContext );
+    // Filling the window or the screen (call-view.tsx): the chat beside the call is out of reach then.
+    const view = useContext( CallViewContext );
+    const expanded = view.windowed || fullScreenEnabled;
 
     const [, setTick] = useState(0);
     useEffect(() => {
@@ -87,9 +89,6 @@ export default function PrivateCallLayout() {
     const bytesReceived = bytesReceivedRef ? bytesReceivedRef.current : 0;
 
     const configAvailable = useConfigAvailable();
-    const cameraDevices = useCameras();
-    const microphoneDevices = useMicrophones();
-    const speakerDevices = useSpeakers();
 
     const [ configOpen, setConfigOpen ] = useState( false );
     const [ addOpen, setAddOpen ] = useState( false );
@@ -97,7 +96,7 @@ export default function PrivateCallLayout() {
     // The camera spins while it is checked before it goes out (context.ts), as a group call's controls do while their
     // request is out. It still takes a press: turning the camera off wins over its check at once.
     const cameraGlyph = ( name: IconName ) => cameraChecking
-        ? <Icon name="spinner" size={ 20 } className="bm-svg-animate" />
+        ? <Icon name="spinner" size={ 20 } className="wplus-svg-animate" />
         : <Icon name={ name } size={ 20 } />;
 
     const [ myCameraVideo, setMyCameraVideo ] = useStateRef<HTMLVideoElement | null>(null);
@@ -111,9 +110,9 @@ export default function PrivateCallLayout() {
     // of it is sized once more when it does.
     const selfPicture = usePictureDrawn( myCameraVideo, myCameraTrack );
 
-    const selfPreviewClass = "bm-call-small-video"
-        + ( selfPicture ? " bm-call-small-video--ready" : "" )
-        + ( selfPicture === 'counted' ? " bm-call-small-video--counted" : "" );
+    const selfPreviewClass = "wplus-call-small-video"
+        + ( selfPicture ? " wplus-call-small-video--ready" : "" )
+        + ( selfPicture === 'counted' ? " wplus-call-small-video--counted" : "" );
     const [ myScreen, setMyScreen ] = useStateRef<HTMLVideoElement | null>(null);
 
     const [ primaryVideo, setPrimaryVideo ] = useState<'screen' | 'camera'>('screen');
@@ -211,7 +210,7 @@ export default function PrivateCallLayout() {
     // other side's camera and screen whether they are on the stage or in a
     // chip, so reading them here covers both places they can be shown.
     //
-    // Resizable hands the answer to CSS as --bm-chip-ratio, so these are the
+    // Resizable hands the answer to CSS as --wplus-chip-ratio, so these are the
     // written form; the group grids take the same reading as a number and do
     // arithmetic with it.
     const myCameraRatio = cssRatio( useMediaRatio( myCameraVideo ) );
@@ -331,7 +330,7 @@ export default function PrivateCallLayout() {
     // Their camera on the stage never showed a frame here, so there is no last frame to blur: their face on it.
     const peerFaceShown = ( peerStalled === 'all' || peerInterrupted ) && !! otherParticipant?.video
         && ( ! otherParticipant.screen || primaryVideo === 'camera' ) && pictureless( videoElement );
-    const peerFace = peerFaceShown && <div className="bm-call-animation bm-animation-pause">
+    const peerFace = peerFaceShown && <div className="wplus-call-animation wplus-animation-pause">
         <UserAvatar user_id={ thread.participants[0] } link={ false } size={ 100 } fromThread={ thread } />
     </div>;
 
@@ -356,7 +355,7 @@ export default function PrivateCallLayout() {
     </>;
 
     // A dialog named by the other person, so a screen reader says whom the call is with as it opens.
-    return <div ref={ callRef } tabIndex={ 0 } role="dialog" aria-label={ otherParticipant?.name || undefined } onTouchStart={ onTouchStart } onClickCapture={ onClickCapture } className={((isMobile() && isTapped) ? "bm-tapped " : '') + "bm-video-container bm-private-call bm-call-container"}>
+    return <div ref={ callRef } tabIndex={ 0 } role="dialog" aria-label={ otherParticipant?.name || undefined } onTouchStart={ onTouchStart } onClickCapture={ onClickCapture } className={((isMobile() && isTapped) ? "wplus-tapped " : '') + "wplus-video-container wplus-private-call wplus-call-container"}>
         { ( action === 'outgoing_call' || action === 'incoming_call' ) && <>
             { ( !! myCameraTrack && !! myScreenVideoTrack ) &&
                 <Resizable className={ selfPreviewClass } resizeDirection={"top-left"} aspectRatio={ myCameraRatio }>
@@ -364,39 +363,39 @@ export default function PrivateCallLayout() {
                 </Resizable>
             }
 
-            <div className="bm-main-placeholder">
+            <div className="wplus-main-placeholder">
                 { ( !! myCameraTrack && ! myScreenVideoTrack ) &&
-                    <div className="bm-placeholder-video">
+                    <div className="wplus-placeholder-video">
                         <video ref={setMyCameraVideo} datatype={'camera'} autoPlay={true} playsInline muted={true}/>
                     </div>
                 }
                 {( !! myScreenVideoTrack ) &&
-                    <div className="bm-placeholder-video bm-video-contain">
+                    <div className="wplus-placeholder-video wplus-video-contain">
                         <video ref={setMyScreen} datatype={'screen'} autoPlay={true} playsInline muted={true}/>
                     </div>
                 }
 
-                <div className={ "bm-call-animation " } >
+                <div className={ "wplus-call-animation " } >
                     <UserAvatar user_id={thread.participants[0]} link={false} size={100} fromThread={thread}/>
                 </div>
 
                 <Piece name="CallStatus" props={ { layout: 'private', action, text: statusMessage, duration: callDuration } }>
-                <div className="bm-placeholder-message" part="call-status">
-                    { statusMessage && <span className="bm-placeholder-status">{statusMessage}</span> }
+                <div className="wplus-placeholder-message" part="call-status">
+                    { statusMessage && <span className="wplus-placeholder-status">{statusMessage}</span> }
 
                     { ! statusMessage && <>
-                        {action === "incoming_call" && <span className="bm-placeholder-incoming-text">{_x('Incoming Call', 'Private Call Screen', 'bp-better-messages')}</span>}
-                        {action === "outgoing_call" && <span className="bm-placeholder-outgoing-text">{_x('Calling...', 'Private Call Screen', 'bp-better-messages')}</span>}
+                        {action === "incoming_call" && <span className="wplus-placeholder-incoming-text">{_x('Incoming Call', 'Private Call Screen', 'bp-better-messages')}</span>}
+                        {action === "outgoing_call" && <span className="wplus-placeholder-outgoing-text">{_x('Calling...', 'Private Call Screen', 'bp-better-messages')}</span>}
                     </>}
                 </div>
                 </Piece>
 
                 {errorMessages.length > 0 &&
-                    <div className="bm-placeholder-no-access-message">
-                        <div className="bm-placeholder-no-access-message-icon">
+                    <div className="wplus-placeholder-no-access-message">
+                        <div className="wplus-placeholder-no-access-message-icon">
                             <Icon name="alert" size={ 28 } />
                         </div>
-                        <div className="bm-placeholder-no-access-message-text">
+                        <div className="wplus-placeholder-no-access-message-text">
                             {errorMessages.map((error, index) => (
                                 <p key={"error_" + index} style={{margin: 0}}>{error}</p>
                             ))}
@@ -409,26 +408,26 @@ export default function PrivateCallLayout() {
 
         { ( action === 'call_in_progress' || action === 'connecting' ) && <>
             <Piece name="VideoTile" props={ { participant: otherParticipant, action } } always={ sound }>
-            <div className="bm-main-video" part="video-tile">
+            <div className="wplus-main-video" part="video-tile">
                 { ( ! otherParticipant || ( ! otherParticipant.video && ! otherParticipant.screen ) ) &&
-                    <div className="bm-main-placeholder">
-                        <div className="bm-call-animation bm-animation-pause">
+                    <div className="wplus-main-placeholder">
+                        <div className="wplus-call-animation wplus-animation-pause">
                             <UserAvatar user_id={thread.participants[0]} link={false} size={100} fromThread={thread}/>
                         </div>
                         <Piece name="CallStatus" props={ { layout: 'private', action, text: statusMessage, duration: callDuration } }>
-                        <div className={"bm-placeholder-message"} part="call-status">
+                        <div className={"wplus-placeholder-message"} part="call-status">
                             {action === 'connecting' &&
-                                <span className={"bm-placeholder-status"}>{statusMessage}</span>}
+                                <span className={"wplus-placeholder-status"}>{statusMessage}</span>}
                             {action === 'call_in_progress' &&
-                                <span className={"bm-timer"}>{msToTime(callDuration)}</span>}
+                                <span className={"wplus-timer"}>{msToTime(callDuration)}</span>}
                         </div>
                         </Piece>
 
                         { peerMicOff &&
-                            <div className="bm-placeholder-no-source-message">
+                            <div className="wplus-placeholder-no-source-message">
                                 <Icon name="micOff" size={ 24 } />
 
-                                <div className="bm-placeholder-participant-no-source-message-text">
+                                <div className="wplus-placeholder-participant-no-source-message-text">
                                     { callInfo.type === 'video'
                                         ? _x('The microphone and camera not enabled at the other side', 'Call Screen', 'bp-better-messages')
                                         : _x('The microphone is not enabled at the other side', 'Call Screen', 'bp-better-messages') }
@@ -438,20 +437,20 @@ export default function PrivateCallLayout() {
                 }
 
                 { ( peerMicOff && peerHasPicture ) &&
-                    <div className="bm-placeholder-participant-muted-message">
+                    <div className="wplus-placeholder-participant-muted-message">
                         <Icon name="micOff" size={ 20 } />
 
-                        <div className="bm-placeholder-participant-muted-message-text">
+                        <div className="wplus-placeholder-participant-muted-message-text">
                             {_x('The microphone is not enabled at the other side', 'Call Screen', 'bp-better-messages')}
                         </div>
                     </div>
                 }
 
                 { ( ( ! justConnected && otherParticipant && otherParticipant.quality === 'lost' ) || peerStalled === 'all' ) && <>
-                    <div className="bm-placeholder-participant-lost-message">
+                    <div className="wplus-placeholder-participant-lost-message">
                         <Icon name="wifiOff" size={ 24 } />
 
-                        <div className="bm-placeholder-participant-lost-message-text">
+                        <div className="wplus-placeholder-participant-lost-message-text">
                             {_x('The other side lost connection', 'Call Screen', 'bp-better-messages')}
                         </div>
                     </div>
@@ -471,11 +470,11 @@ export default function PrivateCallLayout() {
 
                     { ( peerInterrupted && !! otherParticipant.video && ( ! otherParticipant.screen || primaryVideo === 'camera' ) ) && <VideoInterruptedNotice main face={ peerFace || undefined } /> }
 
-                    { ( peerFaceShown && peerStalled === 'all' ) && <div className="bm-call-stalled-face-main" aria-hidden="true">{ peerFace }</div> }
+                    { ( peerFaceShown && peerStalled === 'all' ) && <div className="wplus-call-stalled-face-main" aria-hidden="true">{ peerFace }</div> }
 
                     { peerPaused &&
-                        <div className="bm-call-paused bm-call-paused-main" part="video-paused">
-                            <div className="bm-call-paused-notice">
+                        <div className="wplus-call-paused wplus-call-paused-main" part="video-paused">
+                            <div className="wplus-call-paused-notice">
                                 <Icon name="wifiWeak" size={ 22 } />
                                 <div>
                                     <p>{ _x('Paused: weak connection', 'Call Screen', 'bp-better-messages') }</p>
@@ -500,15 +499,15 @@ export default function PrivateCallLayout() {
 
             { ( !! otherParticipant && otherParticipant.video && otherParticipant.screen )  && <>
                 { primaryVideo === 'screen' &&
-                    <Resizable className={"bm-call-small-video-2"} resizeDirection={"top-right"} aspectRatio={ peerCameraRatio }>
-                        <span className="bm-switch-videos" onClick={switchVideos}><Icon name="swapVideos" size={ 14 } /></span>
+                    <Resizable className={"wplus-call-small-video-2"} resizeDirection={"top-right"} aspectRatio={ peerCameraRatio }>
+                        <span className="wplus-switch-videos" onClick={switchVideos}><Icon name="swapVideos" size={ 14 } /></span>
                         <video ref={ setVideoElement } className={ peerCameraClass( '' ).trim() || undefined } autoPlay playsInline muted={true} />
                     </Resizable>
                 }
 
                 { primaryVideo === 'camera' &&
-                    <Resizable className={"bm-call-small-video-2"} resizeDirection={"top-right"} aspectRatio={ peerScreenRatio }>
-                        <span className="bm-switch-videos" onClick={switchVideos}><Icon name="swapVideos" size={ 14 } /></span>
+                    <Resizable className={"wplus-call-small-video-2"} resizeDirection={"top-right"} aspectRatio={ peerScreenRatio }>
+                        <span className="wplus-switch-videos" onClick={switchVideos}><Icon name="swapVideos" size={ 14 } /></span>
                         <video ref={ setScreenElement } className={ peerScreenClass( '' ).trim() || undefined } autoPlay playsInline muted={true} />
                     </Resizable>
                 }
@@ -516,7 +515,7 @@ export default function PrivateCallLayout() {
             }
 
             { ( myScreenVideoTrack )  &&
-                <Resizable className="bm-call-small-video-3" resizeDirection="bottom-left" aspectRatio={ myScreenRatio }>
+                <Resizable className="wplus-call-small-video-3" resizeDirection="bottom-left" aspectRatio={ myScreenRatio }>
                     <video ref={ setMyScreen } datatype={'screen'} autoPlay playsInline muted={true} />
                 </Resizable>
             }
@@ -524,37 +523,25 @@ export default function PrivateCallLayout() {
         </>
         }
 
-        <div className={(( ( action === 'call_in_progress' || action === 'connecting' ) && !isMobile()) ? "bm-show-on-hover " : '') +
+        <div className={(( ( action === 'call_in_progress' || action === 'connecting' ) && !isMobile()) ? "wplus-show-on-hover " : '') +
             ( ( ( action === 'call_in_progress' || action === 'connecting' ) && isMobile()) ? "show-on-tap " : '') +
-            "bm-call-controls"} part="call-controls" ref={ controlsRef }
+            "wplus-call-controls"} part="call-controls" ref={ controlsRef }
         >
             {configOpen === true &&
-                <>
-                    <div className="bm-call-settings">
-                        <div className="bm-call-setting">
-                            <label>{__('Statistics', 'bp-better-messages')}</label>
-                            <div className="bm-call-statistics">
-                                <div className="bm-call-traffic">
-                                    <span>{__('Downloaded', 'bp-better-messages')}: {formatSize(bytesReceived)}</span>
-                                    <span>{__('Uploaded', 'bp-better-messages')}: {formatSize(bytesSent)}</span>
-                                </div>
-                            </div>
-                        </div>
+                <DevicePanel video group={ false } close={ () => setConfigOpen( false ) }>
+                    <div className="wplus-call-traffic" aria-label={__('Statistics', 'bp-better-messages')}>
+                        <span>{__('Downloaded', 'bp-better-messages')}: {formatSize(bytesReceived)}</span>
+                        <span>{__('Uploaded', 'bp-better-messages')}: {formatSize(bytesSent)}</span>
                     </div>
-                    <div className="bm-call-settings">
-                        <DeviceSwitch label={_x('Camera', 'Media Inputs', 'bp-better-messages')}  devices={cameraDevices} selectedDevice={activeCameraDevice} setSelectedDevice={setSelectedCameraDevice}/>
-                        <DeviceSwitch label={_x('Microphone', 'Media Inputs', 'bp-better-messages')} devices={microphoneDevices} selectedDevice={selectedMicrophoneDevice} setSelectedDevice={setSelectedMicrophoneDevice}/>
-                        <DeviceSwitch label={_x('Speaker', 'Media Inputs', 'bp-better-messages')} devices={speakerDevices} selectedDevice={selectedSpeakerDevice} setSelectedDevice={setSelectedSpeakerDevice}/>
-                    </div>
-                </>
+                </DevicePanel>
             }
 
             { addOpen && <AddPersonPanel close={ () => setAddOpen( false ) } /> }
 
-            <CallDock className="bm-call-buttons" pinned={ 1 }>
+            <CallDock className="wplus-call-buttons" pinned={ 1 }>
                 {action === 'incoming_call' &&
                     <Tooltip content={_x('Answer', 'Private Call Screen', 'bp-better-messages')}>
-                        <span onTouchStart={answerCall} onClick={answerCall} className="bm-answer">
+                        <span onTouchStart={answerCall} onClick={answerCall} className="wplus-answer">
                             <Icon name="phone" size={ 20 } />
                         </span>
                     </Tooltip>
@@ -562,9 +549,9 @@ export default function PrivateCallLayout() {
 
                 {/* Show / hide the conversation — see the group video room.
                     After Answer, which leads a ringing dock. */}
-                { ( chatToggle && ! fullScreenEnabled ) &&
+                { ( chatToggle && ! expanded ) &&
                     <Tooltip content={ chatShown ? _x('Hide Chat', 'Call Controls', 'bp-better-messages') : _x('Show Chat', 'Call Controls', 'bp-better-messages') }>
-                        <span onClick={ () => chatToggle( ( shown: boolean ) => ! shown ) } className="bm-toggle-chat" data-active={ chatShown ? 1 : undefined }>
+                        <span onClick={ () => chatToggle( ( shown: boolean ) => ! shown ) } className="wplus-toggle-chat" data-active={ chatShown ? 1 : undefined }>
                             <Icon name="thread" size={ 20 } />
                         </span>
                     </Tooltip>
@@ -572,7 +559,7 @@ export default function PrivateCallLayout() {
 
                 { configAvailable &&
                     <Tooltip content={_x('Configure', 'Private Call Screen', 'bp-better-messages')}>
-                        <span onClick={ () => { setConfigOpen(!configOpen) }} className="bm-configure-call">
+                        <span onClick={ () => { setConfigOpen(!configOpen) }} className="wplus-configure-call">
                             <Icon name="settings" size={ 20 } />
                         </span>
                     </Tooltip>
@@ -582,14 +569,14 @@ export default function PrivateCallLayout() {
 
                 { ( ! selectedCameraDevice && ( myCameraTrack || switchingCamera ) && isMobile() ) &&
                 <Tooltip content={_x('Switch Camera', 'Private Call Screen', 'bp-better-messages')}>
-                        <span onClick={switchCamera} className="bm-switch-camera-video">
+                        <span onClick={switchCamera} className="wplus-switch-camera-video">
                             <Icon name="switchCamera" size={ 20 } />
                         </span>
                 </Tooltip> }
 
                 { myCameraTrack &&
                     <Tooltip content={_x('Disable Camera', 'Private Call Screen', 'bp-better-messages')}>
-                        <span onClick={ disableCamera } data-busy={ cameraChecking ? 1 : undefined } className="bm-disable-video">
+                        <span onClick={ disableCamera } data-busy={ cameraChecking ? 1 : undefined } className="wplus-disable-video">
                             { cameraGlyph( iconsReverted ? 'video' : 'videoOff' ) }
                         </span>
                     </Tooltip>
@@ -597,14 +584,14 @@ export default function PrivateCallLayout() {
 
                 {!myCameraTrack &&
                     <Tooltip content={_x('Enable Camera', 'Private Call Screen', 'bp-better-messages')}>
-                            <span onClick={ enableCamera } data-busy={ cameraChecking ? 1 : undefined } className="bm-enable-video">
+                            <span onClick={ enableCamera } data-busy={ cameraChecking ? 1 : undefined } className="wplus-enable-video">
                                 { cameraGlyph( iconsReverted ? 'videoOff' : 'video' ) }
                             </span>
                     </Tooltip>}
 
                 {myMicrophoneTrack &&
                     <Tooltip content={_x('Disable Microphone', 'Private Call Screen', 'bp-better-messages')}>
-                                <span onClick={disableMic} className="bm-disable-mic">
+                                <span onClick={disableMic} className="wplus-disable-mic">
                                     { ! iconsReverted && <Icon name="micOff" size={ 20 } />}
                                     { iconsReverted && <Icon name="mic" size={ 20 } />}
                                 </span>
@@ -613,7 +600,7 @@ export default function PrivateCallLayout() {
 
                 { ! myMicrophoneTrack &&
                     <Tooltip content={_x('Enable Microphone', 'Private Call Screen', 'bp-better-messages')}>
-                            <span onClick={enableMic} className="bm-enable-mic">
+                            <span onClick={enableMic} className="wplus-enable-mic">
                                 {!iconsReverted && <Icon name="mic" size={ 20 } />}
                                 {iconsReverted && <Icon name="micOff" size={ 20 } />}
                             </span>
@@ -623,7 +610,7 @@ export default function PrivateCallLayout() {
                 { ( action === 'call_in_progress' && pictureInPicture && !! otherParticipant && ( otherParticipant.video || otherParticipant.screen )) &&
                         <>
                             <Tooltip content={_x('Picture In Picture', 'Private Call Screen', 'bp-better-messages')}>
-                                <span onClick={switchPicInPic} className="bm-pic-in-pic" data-active={ picInPic ? 1 : undefined }>
+                                <span onClick={switchPicInPic} className="wplus-pic-in-pic" data-active={ picInPic ? 1 : undefined }>
                                     { ! picInPic &&
                                         <Icon name="pip" size={ 20 } />
                                     }
@@ -640,7 +627,7 @@ export default function PrivateCallLayout() {
                     <>
                         { ! myScreenVideoTrack &&
                             <Tooltip content={_x('Share Screen', 'Private Call Screen', 'bp-better-messages')}>
-                                <span onClick={enableShareScreen} className="bm-switch-share-screen">
+                                <span onClick={enableShareScreen} className="wplus-switch-share-screen">
                                     <Icon name="screenShare" size={ 20 } />
                                 </span>
                             </Tooltip>
@@ -649,7 +636,7 @@ export default function PrivateCallLayout() {
                         { myScreenVideoTrack &&
                             <Tooltip
                                 content={_x('Stop Screen Sharing', 'Private Call Screen', 'bp-better-messages')}>
-                                <span onClick={disableShareScreen} className="bm-switch-share-screen" data-active="1">
+                                <span onClick={disableShareScreen} className="wplus-switch-share-screen" data-active="1">
                                     <Icon name="screenShareOff" size={ 20 } />
                                 </span>
                             </Tooltip>
@@ -657,29 +644,13 @@ export default function PrivateCallLayout() {
                     </>
                 }
 
-                { fullScreenAvailable &&
-                        <>
-                            { ! fullScreenEnabled &&
-                                <Tooltip  content={_x('Switch to Full Screen Mode', 'Private Call Screen', 'bp-better-messages')}>
-                                <span onClick={enableFullScreen} className="bm-fs-enable">
-                                        <Icon name="maximize" size={ 20 } />
-                                </span>
-                                </Tooltip>
-                            }
-                            { fullScreenEnabled &&
-                                <Tooltip content={_x('Exit Full Screen Mode', 'Private Call Screen', 'bp-better-messages')}>
-                                <span onClick={disableFullScreen} className="bm-fs-disable">
-                                    <Icon name="minimize" size={ 20 } />
-                                </span>
-                                </Tooltip>
-                            }
-                        </>
-                }
+                {/* Expand to the window, then the whole screen (call-view.tsx). */}
+                { fullScreenItems( call, view ) }
 
                 {action === 'outgoing_call' &&
                     <Tooltip content={_x('Cancel', 'Private Call Screen', 'bp-better-messages')}>
                         <span onTouchStart={() => endCall('abort')} onClick={() => endCall('abort')}
-                              className="bm-cancel">
+                              className="wplus-cancel">
                             <Icon name="phone" size={ 20 } />
                         </span>
                     </Tooltip>
@@ -688,7 +659,7 @@ export default function PrivateCallLayout() {
                 {action === 'incoming_call' &&
                     <Tooltip content={_x('Reject', 'Private Call Screen', 'bp-better-messages')}>
                         <span onTouchStart={() => endCall('reject')} onClick={() => endCall('reject')}
-                              className="bm-cancel">
+                              className="wplus-cancel">
                             <Icon name="phone" size={ 20 } />
                         </span>
                     </Tooltip>
@@ -699,7 +670,7 @@ export default function PrivateCallLayout() {
                         <span
                             onTouchStart={() => endCall()}
                             onClick={() => endCall()}
-                            className="bm-cancel">
+                            className="wplus-cancel">
                             <Icon name="phone" size={ 20 } />
                         </span>
                     </Tooltip>

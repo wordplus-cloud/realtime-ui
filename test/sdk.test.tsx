@@ -97,12 +97,12 @@ describe( 'the SDK\'s calls on Better Messages\' screens', () => {
         const incoming = Object.assign( new Emitter(), { id: 'ring-1', call: 'support:34:42', from: 42, info: { name: 'Ben' }, type: 'video' as const, group: null, state: 'ringing', accept: vi.fn( async () => answered ), decline: vi.fn( async () => {} ) } ) as unknown as SdkIncoming;
         await act( async () => calls.fire( 'incoming', incoming ) );
 
-        expect( container.querySelector( '.realtime-call-ring .bm-toast-site-call-title' )?.textContent ).toBe( 'Ben' );
-        expect( container.querySelector( '.realtime-call-ring .bm-toast-site-call-text' )?.textContent ).toBe( 'Incoming Video Call' );
+        expect( container.querySelector( '.realtime-call-ring .wplus-toast-site-call-title' )?.textContent ).toBe( 'Ben' );
+        expect( container.querySelector( '.realtime-call-ring .wplus-toast-site-call-text' )?.textContent ).toBe( 'Incoming Video Call' );
 
-        await act( async () => { fireEvent.click( container.querySelector( '.bm-toast-site-call-action-answer' )! ); } );
+        await act( async () => { fireEvent.click( container.querySelector( '.wplus-toast-site-call-action-answer' )! ); } );
         expect( container.querySelector( '.realtime-call-ring' ) ).toBeNull();
-        expect( container.querySelector( '.realtime-call-window.bm-call-surface .bm-call-wrap .bm-private-call' ) ).not.toBeNull();
+        expect( container.querySelector( '.realtime-call-window.wplus-call-surface .wplus-call-wrap .wplus-private-call' ) ).not.toBeNull();
         // It starts with the microphone and, on a video call, the camera, both handed to the call.
         expect( answered.sent.map( ( [ source ] ) => source ).sort() ).toEqual( [ 'camera', 'microphone' ] );
 
@@ -112,7 +112,7 @@ describe( 'the SDK\'s calls on Better Messages\' screens', () => {
             answered.fire( 'state', 'connected' );
             answered.fire( 'remote', { ...answered.remote, camera, media: { ...answered.remote.media, camera: true, microphone: true } } );
         } );
-        const video = container.querySelector( '.bm-private-call video.video1' );
+        const video = container.querySelector( '.wplus-private-call video.video1' );
         expect( video ).not.toBeNull();
         expect( camera.on ).toContain( video );
     } );
@@ -127,17 +127,17 @@ describe( 'the SDK\'s calls on Better Messages\' screens', () => {
         await act( async () => calls.fire( 'incoming', incoming ) );
 
         const control = ( el: Element ) => [ el.getAttribute( 'role' ), ( el as HTMLElement ).tabIndex, el.getAttribute( 'aria-label' ) ];
-        const answer = container.querySelector( '.bm-toast-site-call-action-answer' )!;
+        const answer = container.querySelector( '.wplus-toast-site-call-action-answer' )!;
         expect( control( answer ) ).toEqual( [ 'button', 0, 'Answer' ] );
-        expect( control( container.querySelector( '.bm-toast-site-call-action-reject' )! ) ).toEqual( [ 'button', 0, 'Reject' ] );
+        expect( control( container.querySelector( '.wplus-toast-site-call-action-reject' )! ) ).toEqual( [ 'button', 0, 'Reject' ] );
         await act( async () => { fireEvent.keyDown( answer, { key: 'Enter' } ); } );
         expect( incoming.accept ).toHaveBeenCalled();
 
-        await act( async () => { fireEvent.click( container.querySelector( '.bm-private-call' )! ); } );
-        const controls = [ ...container.querySelectorAll( '.bm-call-buttons [aria-label]' ) ];
+        await act( async () => { fireEvent.click( container.querySelector( '.wplus-private-call' )! ); } );
+        const controls = [ ...container.querySelectorAll( '.wplus-call-buttons [aria-label]' ) ];
         expect( controls.length ).toBeGreaterThan( 2 );
         for ( const el of controls ) expect( control( el ).slice( 0, 2 ) ).toEqual( [ 'button', 0 ] );
-        await act( async () => { fireEvent.keyDown( container.querySelector( '.bm-call-buttons .bm-cancel' )!, { key: ' ' } ); } );
+        await act( async () => { fireEvent.keyDown( container.querySelector( '.wplus-call-buttons .wplus-cancel' )!, { key: ' ' } ); } );
         expect( answered.ended ).toBe( true );
     } );
 
@@ -150,7 +150,7 @@ describe( 'the SDK\'s calls on Better Messages\' screens', () => {
 
         await act( async () => controller.place( 'support:34:42', 34, 'video', { name: 'Ann' } ) );
         expect( calls.start ).toHaveBeenCalledWith( 'support:34:42', { to: 34, type: 'video' } );
-        expect( container.querySelector( '.bm-placeholder-outgoing-text' )?.textContent ).toBe( 'Calling...' );
+        expect( container.querySelector( '.wplus-placeholder-outgoing-text' )?.textContent ).toBe( 'Calling...' );
 
         const second = Object.assign( new Emitter(), { id: 'ring-2', call: 'x', from: 43, info: {}, type: 'audio' as const, group: null, state: 'ringing', accept: vi.fn(), decline: vi.fn( async () => {} ) } ) as unknown as SdkIncoming;
         await act( async () => calls.fire( 'incoming', second ) );
@@ -186,7 +186,7 @@ describe( 'the SDK\'s calls on Better Messages\' screens', () => {
         const { container } = render( <CallsApp controller={ controller } /> );
         await act( async () => controller.place( 'support:34:42', 34, 'video', { name: 'Ann' } ) );
 
-        await act( async () => { fireEvent.click( container.querySelector( '.bm-call-buttons .bm-cancel' )! ); } );
+        await act( async () => { fireEvent.click( container.querySelector( '.wplus-call-buttons .wplus-cancel' )! ); } );
         expect( placed.ended ).toBe( true );
         expect( container.querySelector( '.realtime-call-window' ) ).toBeNull();
     } );
@@ -210,7 +210,7 @@ describe( 'the SDK\'s calls on Better Messages\' screens', () => {
         listeners()[ 0 ]( leaving );
         expect( leaving.defaultPrevented ).toBe( true );
 
-        await act( async () => { fireEvent.click( container.querySelector( '.bm-call-buttons .bm-cancel' )! ); } );
+        await act( async () => { fireEvent.click( container.querySelector( '.wplus-call-buttons .wplus-cancel' )! ); } );
         expect( removed ).toHaveBeenCalledWith( 'beforeunload', listeners()[ 0 ] );
         added.mockRestore();
         removed.mockRestore();
@@ -225,10 +225,10 @@ describe( 'the SDK\'s calls on Better Messages\' screens', () => {
         await act( async () => controller.place( 'support:34:42', 34, 'video', { name: 'Ann' } ) );
 
         // Add Person: the app's people for the call, and the one picked rung in.
-        await act( async () => { fireEvent.click( container.querySelector( '.bm-private-call' )! ); } );
-        await act( async () => { fireEvent.click( container.querySelector( '.bm-add-person' )! ); } );
+        await act( async () => { fireEvent.click( container.querySelector( '.wplus-private-call' )! ); } );
+        await act( async () => { fireEvent.click( container.querySelector( '.wplus-add-person' )! ); } );
         expect( calls.people ).toHaveBeenCalledWith( 'support:34:42' );
-        await act( async () => { fireEvent.click( container.querySelector( '.bm-call-add-person-list button' )! ); } );
+        await act( async () => { fireEvent.click( container.querySelector( '.wplus-call-add-person-list button' )! ); } );
         expect( placed.add ).toHaveBeenCalledWith( 43 );
 
         const people: SdkPerson[] = [
@@ -238,8 +238,8 @@ describe( 'the SDK\'s calls on Better Messages\' screens', () => {
         const group = Object.assign( new Emitter(), { state: 'connected', people: () => people, setTrack: vi.fn( async () => {} ), leave: vi.fn(), add: vi.fn() } ) as unknown as SdkGroupCall;
         await act( async () => placed.fire( 'group', group ) );
 
-        expect( container.querySelector( '.realtime-call-window[data-layout="video"] .bm-call-wrap-group' ) ).not.toBeNull();
-        expect( container.querySelector( '.bm-group-call-videos-grid' ) ).not.toBeNull();
+        expect( container.querySelector( '.realtime-call-window[data-layout="video"] .wplus-call-wrap-group' ) ).not.toBeNull();
+        expect( container.querySelector( '.wplus-group-call-videos-grid' ) ).not.toBeNull();
     } );
 
     it( 'lets someone who only listens listen, then speak once the app server lets them, from the first click', async () => {
@@ -258,15 +258,15 @@ describe( 'the SDK\'s calls on Better Messages\' screens', () => {
         await act( async () => controller.join( 'class:7', 'video', 'Class' ) );
 
         // Listening: the teacher on screen, and no microphone, camera or tile of their own, nothing asked of the browser.
-        expect( container.querySelector( '.bm-group-call-videos-grid' ) ).not.toBeNull();
-        expect( container.querySelectorAll( '.bm-enable-mic, .bm-disable-mic, .bm-enable-camera, .bm-disable-camera' ) ).toHaveLength( 0 );
+        expect( container.querySelector( '.wplus-group-call-videos-grid' ) ).not.toBeNull();
+        expect( container.querySelectorAll( '.wplus-enable-mic, .wplus-disable-mic, .wplus-enable-camera, .wplus-disable-camera' ) ).toHaveLength( 0 );
         expect( navigator.mediaDevices.getUserMedia ).not.toHaveBeenCalled();
         expect( group.setTrack ).not.toHaveBeenCalled();
 
         // The teacher lets them speak: the controls come, the microphone off, and its first click sends.
         group.can = { publish: true, subscribe: true };
         await act( async () => group.fire( 'permissions', group.can ) );
-        const enable = container.querySelector( '.bm-enable-mic' ) as HTMLElement;
+        const enable = container.querySelector( '.wplus-enable-mic' ) as HTMLElement;
         expect( enable ).not.toBeNull();
         await act( async () => { fireEvent.click( enable ); } );
         await act( async () => {} );
@@ -277,7 +277,7 @@ describe( 'the SDK\'s calls on Better Messages\' screens', () => {
         // Back to listening: the controls go again.
         group.can = { publish: false, subscribe: true };
         await act( async () => group.fire( 'permissions', group.can ) );
-        expect( container.querySelectorAll( '.bm-enable-mic, .bm-disable-mic' ) ).toHaveLength( 0 );
+        expect( container.querySelectorAll( '.wplus-enable-mic, .wplus-disable-mic' ) ).toHaveLength( 0 );
 
         await act( async () => ended.fire( 'ended', 'removed' ) );
         expect( container.querySelector( '.realtime-call-window' ) ).toBeNull();
@@ -302,7 +302,7 @@ describe( 'a call in the page, in a spot of its own', () => {
 
         await act( async () => controller.place( 'match:34:42', 34, 'video', { name: 'Ann' } ) );
         const window = spot.querySelector( '.realtime-call-window' );
-        expect( window?.querySelector( '.bm-private-call' ) ).not.toBeNull();
+        expect( window?.querySelector( '.wplus-private-call' ) ).not.toBeNull();
         expect( spot.querySelector( '.realtime-call-holder' )?.getAttribute( 'data-place' ) ).toBe( 'spot' );
         expect( other.childElementCount ).toBe( 0 );
         expect( controller.snapshot().spot ).toBe( spot );
@@ -383,7 +383,7 @@ describe( 'a call in the page, in a spot of its own', () => {
 
         await act( async () => controllerFor( calls ).place( 'match:34:42', 34, 'video', { name: 'Ann' } ) );
         expect( date.getAttribute( 'data-call' ) ).toBe( 'match:34:42' );
-        expect( date.querySelector( '.realtime-call-window .bm-private-call' ) ).not.toBeNull();
+        expect( date.querySelector( '.realtime-call-window .wplus-private-call' ) ).not.toBeNull();
         expect( date.textContent ).not.toContain( 'The chat' );
         expect( office.hasAttribute( 'hidden' ) ).toBe( true );
 
@@ -438,7 +438,7 @@ describe( 'a call in the page, in a spot of its own', () => {
         expect( group.setTrack ).not.toHaveBeenCalled();
 
         // Left: its children again, and the page renders on without joining it again.
-        await act( async () => fireEvent.click( spot.querySelector( '.bm-exit-room' )! ) );
+        await act( async () => fireEvent.click( spot.querySelector( '.wplus-exit-room' )! ) );
         expect( group.leave ).toHaveBeenCalled();
         rerender( <Page words="Nobody is in the meeting" /> );
         await act( async () => {} );
@@ -474,10 +474,10 @@ describe( 'a call in the page, in a spot of its own', () => {
         expect( container.querySelector( '.realtime-call-sound' ) ).toBeNull();
         expect( play.mock.calls.length ).toBeGreaterThan( 1 );
         play.mockRestore();
-        await act( async () => fireEvent.click( container.querySelector( '.bm-exit-room' )! ) );
+        await act( async () => fireEvent.click( container.querySelector( '.wplus-exit-room' )! ) );
     } );
 
-    it( 'CallSpot joinWith turns on what it names as it joins, and the button turns on both', async () => {
+    it( 'CallSpot joinWith turns on what it names as it joins, and the button nothing but the devices, or both without them', async () => {
         const { CallScreen, CallSpot, GroupCallButton } = await import( '../src/react.tsx' );
         const calls = fakeCalls();
         const group = Object.assign( new Emitter(), { state: 'connected', people: () => [], setTrack: vi.fn( async () => {} ), leave: vi.fn(), decline: vi.fn() } );
@@ -489,21 +489,33 @@ describe( 'a call in the page, in a spot of its own', () => {
         const { container, unmount } = render( <><CallScreen rt={ rt } /><CallSpot rt={ rt } call="meeting:daily" join="video" joinWith="microphone camera" /></> );
         await act( async () => {} );
         expect( asked() ).toEqual( [ 'audio video' ] );
-        await act( async () => fireEvent.click( container.querySelector( '.bm-exit-room' )! ) );
+        await act( async () => fireEvent.click( container.querySelector( '.wplus-exit-room' )! ) );
         unmount();
 
         // The microphone alone, on a video call: the camera stays off.
         const second = render( <><CallScreen rt={ rt } /><CallSpot rt={ rt } call="meeting:daily" join="video" joinWith="microphone" /></> );
         await act( async () => {} );
         expect( asked() ).toEqual( [ 'audio video', 'audio' ] );
-        await act( async () => fireEvent.click( second.container.querySelector( '.bm-exit-room' )! ) );
+        await act( async () => fireEvent.click( second.container.querySelector( '.wplus-exit-room' )! ) );
         second.unmount();
 
-        // A click on the meeting's button turns on both, as before: whoever clicks means to come in on camera.
+        // A click on the meeting's button joins with both off, and says so with Check Devices: no camera is asked for.
+        // "You are muted" opens none either, before the microphone was on in the call.
         const third = render( <><CallScreen rt={ rt } /><GroupCallButton rt={ rt } room="meeting:daily" type="video">Join</GroupCallButton></> );
         await act( async () => {} );
         await act( async () => fireEvent.click( third.getByText( 'Join' ) ) );
-        expect( asked() ).toEqual( [ 'audio video', 'audio', 'audio video' ] );
+        await act( async () => {} );
+        expect( asked().slice( 2 ).filter( ( what ) => what.includes( 'video' ) ), 'the button asked for the camera' ).toEqual( [] );
+        expect( third.container.querySelector( '.wplus-call-join-prompt' ), 'the join did not offer the devices' ).not.toBeNull();
+        await act( async () => fireEvent.click( third.container.querySelector( '.wplus-exit-room' )! ) );
+        third.unmount();
+
+        // Without the devices (devicesOnJoin={ false }) it turns on both, as it always did.
+        const fourth = render( <><CallScreen rt={ rt } devicesOnJoin={ false } /><GroupCallButton rt={ rt } room="meeting:daily" type="video">Join</GroupCallButton></> );
+        await act( async () => {} );
+        const before = asked().length;
+        await act( async () => fireEvent.click( fourth.getByText( 'Join' ) ) );
+        expect( asked().slice( before ) ).toEqual( [ 'audio video' ] );
     } );
 
     it( 'joins a group call once while it is being joined: a second click, or a second spot, asks nothing more', async () => {
@@ -558,7 +570,7 @@ describe( 'a chat that holds its call', () => {
         await act( async () => fireEvent.click( chat.querySelector( '[aria-label="Video Call"]' )! ) );
         await settle();
         expect( calls.start ).toHaveBeenCalledWith( 'chat:34:42', { to: '42', type: 'video' } );
-        expect( chat.querySelector( '.realtime-chat-call .realtime-call-window .bm-private-call' ) ).not.toBeNull();
+        expect( chat.querySelector( '.realtime-chat-call .realtime-call-window .wplus-private-call' ) ).not.toBeNull();
         expect( chat.getAttribute( 'data-call' ) ).toBe( 'chat:34:42' );
         expect( chat.getAttribute( 'data-call-layout' ) ).toBe( 'beside' );
         expect( chat.getAttribute( 'data-call-chat' ) ).toBe( '1' );
@@ -566,9 +578,9 @@ describe( 'a chat that holds its call', () => {
         expect( chat.querySelector( '[aria-label="Audio Call"]' )?.getAttribute( 'aria-disabled' ) ).toBe( 'true' );
 
         // The call's controls hide the messages, and show them again.
-        await act( async () => fireEvent.click( chat.querySelector( '.bm-toggle-chat' )! ) );
+        await act( async () => fireEvent.click( chat.querySelector( '.wplus-toggle-chat' )! ) );
         expect( chat.getAttribute( 'data-call-chat' ) ).toBe( '0' );
-        await act( async () => fireEvent.click( chat.querySelector( '.bm-toggle-chat' )! ) );
+        await act( async () => fireEvent.click( chat.querySelector( '.wplus-toggle-chat' )! ) );
         expect( chat.getAttribute( 'data-call-chat' ) ).toBe( '1' );
 
         await act( async () => {
@@ -592,7 +604,7 @@ describe( 'a chat that holds its call', () => {
         const chat = container.querySelector( '.realtime-chat' )!;
         expect( chat.getAttribute( 'data-call-layout' ) ).toBe( 'over' );
         expect( chat.getAttribute( 'data-call-chat' ) ).toBe( '0' );
-        await act( async () => fireEvent.click( chat.querySelector( '.bm-toggle-chat' )! ) );
+        await act( async () => fireEvent.click( chat.querySelector( '.wplus-toggle-chat' )! ) );
         expect( chat.getAttribute( 'data-call-chat' ) ).toBe( '1' );
     } );
 
@@ -638,8 +650,8 @@ describe( 'a chat that holds its call', () => {
         expect( top.querySelector( '.realtime-chat-top__name' )?.textContent ).toBe( 'Lena' );
         expect( top.querySelector( 'img' )?.getAttribute( 'src' ) ).toBe( '/photos/99' );
         // Her messages by the same name and picture.
-        const stack = container.querySelector( '.bm-msg-stack:not([data-is-me="1"])' )!;
-        expect( stack.querySelector( '.bm-name' )?.textContent ).toBe( 'Lena' );
+        const stack = container.querySelector( '.wplus-msg-stack:not([data-is-me="1"])' )!;
+        expect( stack.querySelector( '.wplus-name' )?.textContent ).toBe( 'Lena' );
         expect( stack.querySelector( 'img' )?.getAttribute( 'src' ) ).toBe( '/photos/99' );
 
         await act( async () => fireEvent.click( top.querySelector( '[aria-label="Video Call"]' )! ) );
@@ -692,11 +704,18 @@ describe( 'a host in a group call', () => {
         ];
         return Object.assign( new Emitter(), { state: 'connected', can, people: () => people, setTrack: vi.fn( async () => {} ), leave: vi.fn(), moderate: vi.fn( async () => true ) } );
     };
-    const labels = ( container: HTMLElement, key: string ) =>
-        [ ...container.querySelectorAll( `[data-key="${ key }"] .bm-admin-controls [aria-label]` ) ].map( ( e ) => e.getAttribute( 'aria-label' ) );
+    // A person's panel, opened from the ⋯ on their tile: what it offers, and a press on one of its rows.
+    const open = async ( container: HTMLElement, key: string ) => {
+        const button = container.querySelector( `[data-key="${ key }"] .wplus-manage-participant` )!;
+        if ( button.getAttribute( 'aria-expanded' ) !== 'true' ) await act( async () => fireEvent.click( button ) );
+    };
+    const labels = async ( container: HTMLElement, key: string ) => {
+        await open( container, key );
+        return [ ...container.querySelectorAll( '.wplus-call-moderation-person .wplus-call-moderation-row' ) ].map( ( e ) => e.getAttribute( 'aria-label' ) );
+    };
 
     it( 'gets the moderator controls the cloud takes, each asked of the app through group.moderate()', async () => {
-        // The rule's admin: Better Messages' controls on the others' tiles, but none the cloud has no act for: no pin, no
+        // The rule's admin: Better Messages' controls for the others, but none the cloud has no act for: no pin, no
         // microphone turned on for someone, no room muted or locked for everyone, and no switch to broadcast mode.
         const calls = fakeCalls();
         const group = meeting( { publish: true, subscribe: true, admin: true } );
@@ -705,21 +724,27 @@ describe( 'a host in a group call', () => {
         const { container } = render( <CallsApp controller={ controller } /> );
         await act( async () => controller.join( 'meeting:daily', 'audio', 'Daily' ) );
 
-        expect( labels( container, 'user_42' ) ).toEqual( [ 'Kick User', 'Block Broadcast' ] );
-        expect( labels( container, 'user_43' ) ).toEqual( [ 'Kick User', 'Allow Broadcast' ] );
-        expect( container.querySelectorAll( '.bm-mute-all, .bm-unmute-all, .bm-lock-room, .bm-unlock-room, .bm-set-broadcast-mode, .bm-set-participatory-mode' ) ).toHaveLength( 0 );
+        expect( await labels( container, 'user_42' ) ).toEqual( [ 'Mute Microphone', 'Demote to Viewer', 'Remove from Call' ] );
+        expect( await labels( container, 'user_43' ) ).toEqual( [ 'Promote to Speaker', 'Remove from Call' ] );
+        // Host Controls holds only what this side can do: tell who joins, and end the call for everyone.
+        await act( async () => fireEvent.click( container.querySelector( '.wplus-host-controls' )! ) );
+        expect( [ ...container.querySelectorAll( '.wplus-call-moderation-room .wplus-call-moderation-label' ) ].map( ( l ) => l.textContent ) ).toEqual( [ 'Join Alerts', 'End for Everyone' ] );
+        await act( async () => fireEvent.click( container.querySelector( '.wplus-host-controls' )! ) );
+        // A microphone simply off, which the app's call has no moderator's hold on: not said to be a moderator's doing.
+        expect( container.querySelectorAll( '.wplus-mic-locked-chip' ) ).toHaveLength( 0 );
 
-        const click = async ( key: string, label: string ) => act( async () => {
-            fireEvent.click( container.querySelector( `[data-key="${ key }"] [aria-label="${ label }"]` )! );
-        } );
-        await click( 'user_43', 'Allow Broadcast' );
-        await click( 'user_42', 'Block Broadcast' );
-        await click( 'user_42', 'Kick User' );
+        const click = async ( key: string, label: string ) => {
+            await open( container, key );
+            await act( async () => fireEvent.click( container.querySelector( `.wplus-call-moderation-person [aria-label="${ label }"]` )! ) );
+        };
+        await click( 'user_43', 'Promote to Speaker' );
+        await click( 'user_42', 'Demote to Viewer' );
+        await click( 'user_42', 'Remove from Call' );
         expect( group.moderate.mock.calls ).toEqual( [ [ 'speak', 43 ], [ 'listen', 42 ], [ 'remove', 42 ] ] );
 
         // Hosting taken back: the controls go.
         await act( async () => group.fire( 'permissions', { publish: true, subscribe: true } ) );
-        expect( container.querySelectorAll( '.bm-admin-controls' ) ).toHaveLength( 0 );
+        expect( container.querySelectorAll( '.wplus-admin-controls' ) ).toHaveLength( 0 );
     } );
 
     it( 'mutes a microphone from a video tile, named by its identity, and asks nothing the cloud has no act for', async () => {
@@ -734,11 +759,17 @@ describe( 'a host in a group call', () => {
         await act( async () => {} );
 
         expect( context.adminMode ).toBe( true );
-        expect( context.moderation ).toEqual( [ 'remove_participant', 'mute_participant', 'unmute_participant', 'mute_mic' ] );
+        expect( context.moderation ).toEqual( [ 'remove_participant', 'mute_participant', 'unmute_participant', 'mute_mic', 'end_call' ] );
         await context.moderate( { act: 'mute_mic', identity: 'user_42', type: 'video' } );
         expect( group.moderate ).toHaveBeenCalledWith( 'mute', 42 );
         await expect( context.moderate( { act: 'pin_participant', identity: 'user_42' } ) ).rejects.toMatchObject( { code: 'not_moderated' } );
         await expect( context.moderate( { act: 'mute_mic', identity: 'user_99' } ) ).rejects.toMatchObject( { code: 'not_moderated' } );
+
+        // End for Everyone: each of the others taken out, then this page leaves.
+        group.moderate.mockClear();
+        await act( async () => context.endForEveryone() );
+        expect( group.moderate.mock.calls.sort() ).toEqual( group.people().filter( ( p: SdkPerson ) => p.user !== null ).map( ( p: SdkPerson ) => [ 'remove', p.user ] ).sort() );
+        expect( group.leave ).toHaveBeenCalled();
     } );
 
     it( 'draws no moderator control for anyone the rule made no host', async () => {
@@ -748,7 +779,7 @@ describe( 'a host in a group call', () => {
         const { container } = render( <CallsApp controller={ controller } /> );
         await act( async () => controller.join( 'meeting:daily', 'audio', 'Daily' ) );
         expect( container.querySelectorAll( '[data-key="user_42"]' ).length ).toBeGreaterThan( 0 );
-        expect( container.querySelectorAll( '.bm-admin-controls' ) ).toHaveLength( 0 );
+        expect( container.querySelectorAll( '.wplus-admin-controls' ) ).toHaveLength( 0 );
     } );
 
     it( 'marks on the tiles a camera or screen the media server paused for this page\'s download', async () => {

@@ -1,17 +1,17 @@
 // Who is online: the list, its rows and the live count. Better Messages' chat-room members column (its
-// chat-online-users.tsx, v2's 200px bm-chat-online-users sidebar) and its member rows (conversation-admin.tsx), whose
+// chat-online-users.tsx, v2's 200px wplus-chat-online-users sidebar) and its member rows (conversation-admin.tsx), whose
 // class names stay so its styles and its customers' keep matching.
 //
 // Source: src/components/presence/online-list.tsx. Better Messages imports this file into its stylesheet.
 
-.bm-chat-online {
+.wplus-chat-online {
     flex: 0 0 auto;
     width: 210px;
     min-height: 0;
     display: flex;
     flex-direction: column;
-    border-inline-start: 1px solid rgba(var(--bm-color-border), 1);
-    background: rgba(var(--bm-color-chat-bg), 1);
+    border-inline-start: 1px solid rgba(var(--wplus-color-border), 1);
+    background: rgba(var(--wplus-color-chat-bg), 1);
 
     &[data-overlay="1"] {
         position: absolute;
@@ -33,8 +33,8 @@
         font-weight: 700;
         text-transform: uppercase;
         letter-spacing: 0.04em;
-        color: rgba(var(--bm-color-text-tertiary), 1);
-        border-bottom: 1px solid rgba(var(--bm-color-border), 1);
+        color: rgba(var(--wplus-color-text-tertiary), 1);
+        border-bottom: 1px solid rgba(var(--wplus-color-border), 1);
         user-select: none;
     }
 
@@ -46,14 +46,14 @@
         border: 0;
         padding: 0;
         background: transparent;
-        &:not(#\9) { border-radius: var(--bm-radius-button); }
-        color: rgba(var(--bm-color-text-tertiary), 1);
+        &:not(#\9) { border-radius: var(--wplus-radius-button); }
+        color: rgba(var(--wplus-color-text-tertiary), 1);
         cursor: pointer;
         transition: background 0.12s, color 0.12s;
 
         &:hover {
-            background: rgba(var(--bm-color-bg-hover), 1);
-            color: rgba(var(--bm-color-text-primary), 1);
+            background: rgba(var(--wplus-color-bg-hover), 1);
+            color: rgba(var(--wplus-color-text-primary), 1);
         }
     }
 
@@ -71,8 +71,8 @@
     &__empty {
         padding: 20px 10px;
         text-align: center;
-        font-size: var(--bm-font-size-xs);
-        color: rgba(var(--bm-color-text-tertiary), 1);
+        font-size: var(--wplus-font-size-xs);
+        color: rgba(var(--wplus-color-text-tertiary), 1);
     }
 }
 
@@ -80,7 +80,7 @@
 // what may be done with them at the end. Interactive rows use the inset-hover
 // pattern (10px negative inline margin + matching padding): content stays
 // aligned to the gutter while the hover pill bleeds symmetrically into it.
-.bm-conv-admin {
+.wplus-conv-admin {
     &__member {
         display: flex;
         align-items: center;
@@ -88,10 +88,10 @@
         margin-inline: -10px;
         padding: 6px 10px;
         position: relative;
-        &:not(#\9) { border-radius: var(--bm-radius-md); }
+        &:not(#\9) { border-radius: var(--wplus-radius-md); }
         transition: background 0.12s;
 
-        &:hover { background: rgba(var(--bm-color-bg-hover), 1); }
+        &:hover { background: rgba(var(--wplus-color-bg-hover), 1); }
     }
 
     &__member-avatar { flex: 0 0 auto; }
@@ -106,9 +106,9 @@
     }
 
     &__member-name {
-        font-size: var(--bm-font-size-sm);
+        font-size: var(--wplus-font-size-sm);
         font-weight: 600;
-        color: rgba(var(--bm-color-text-primary), 1);
+        color: rgba(var(--wplus-color-text-primary), 1);
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
@@ -123,8 +123,8 @@
     }
 
     &__member-sub {
-        font-size: var(--bm-font-size-xs);
-        color: rgba(var(--bm-color-text-tertiary), 1);
+        font-size: var(--wplus-font-size-xs);
+        color: rgba(var(--wplus-color-text-tertiary), 1);
     }
 
     // Status badges beside the member name: anonymous guest (incognito) and
@@ -133,14 +133,14 @@
         display: inline-flex;
         align-items: center;
         margin-inline-start: 5px;
-        color: rgba(var(--bm-color-text-tertiary), 1);
+        color: rgba(var(--wplus-color-text-tertiary), 1);
         vertical-align: -2px;
 
-        &--muted { color: rgba(var(--bm-color-danger), 1); }
+        &--muted { color: rgba(var(--wplus-color-danger), 1); }
     }
 
     &__member-banned {
-        color: rgba(var(--bm-color-danger), 1);
+        color: rgba(var(--wplus-color-danger), 1);
         font-weight: 600;
     }
 
@@ -161,9 +161,9 @@
         width: 28px;
         height: 28px;
         border: 0;
-        &:not(#\9) { border-radius: var(--bm-radius-md); }
+        &:not(#\9) { border-radius: var(--wplus-radius-md); }
         background: transparent;
-        color: rgba(var(--bm-color-text-tertiary), 1);
+        color: rgba(var(--wplus-color-text-tertiary), 1);
         cursor: pointer;
         // Visible by default so touch screens (no hover to reveal it) can
         // reach member actions at all; pointer devices get the tidier
@@ -173,7 +173,7 @@
 
         @media (hover: hover) { opacity: 0; }
 
-        &:hover { background: rgba(var(--bm-color-bg-elevated), 1); }
+        &:hover { background: rgba(var(--wplus-color-bg-elevated), 1); }
         &:focus-visible { opacity: 1; }
     }
 
@@ -181,15 +181,15 @@
 }
 
 // Something to do with a person at the end of their row (a call): the look of
-// Better Messages' directory row actions (its .bm-directory__row-action).
-.bm-row-action {
+// Better Messages' directory row actions (its .wplus-directory__row-action).
+.wplus-row-action {
     width: 28px;
     height: 28px;
     border: 0;
     padding: 0;
     background: transparent;
-    color: rgba(var(--bm-color-text-tertiary), 1);
-    &:not(#\9) { border-radius: var(--bm-radius-button); }
+    color: rgba(var(--wplus-color-text-tertiary), 1);
+    &:not(#\9) { border-radius: var(--wplus-radius-button); }
     display: grid;
     place-items: center;
     cursor: pointer;
@@ -197,25 +197,25 @@
     transition: background-color 0.12s, color 0.12s;
 
     &:hover {
-        background: rgba(var(--bm-color-bg-active), 1);
-        color: rgba(var(--bm-color-text-primary), 1);
+        background: rgba(var(--wplus-color-bg-active), 1);
+        color: rgba(var(--wplus-color-text-primary), 1);
     }
 
     &:active {
-        color: rgba(var(--bm-color-accent), 1);
+        color: rgba(var(--wplus-color-accent), 1);
     }
 }
 
 // A live count: how many are online, or in a room. Better Messages' header
 // badge on its online-users toggle takes this look and places it on the button.
-.bm-online-count {
+.wplus-online-count {
     display: inline-block;
     min-width: 15px;
     height: 15px;
     padding: 0 4px;
     &:not(#\9) { border-radius: 8px; }
-    background: rgba(var(--bm-color-accent), 1);
-    color: rgba(var(--bm-color-text-on-accent), 1);
+    background: rgba(var(--wplus-color-accent), 1);
+    color: rgba(var(--wplus-color-text-on-accent), 1);
     font-size: 9.5px;
     font-weight: 700;
     line-height: 15px;
@@ -225,7 +225,7 @@
 
 // The in-tree OnlineList of @wordplus/realtime-ui/react stands on its own, as <online-list> does: its list fills the
 // place the app gives it, not Better Messages' column beside a chat, with that column's width, border and ground.
-.realtime-online .bm-chat-online {
+.realtime-online .wplus-chat-online {
     width: auto;
     border-inline-start: 0;
     background: transparent;

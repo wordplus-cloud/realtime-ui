@@ -14,7 +14,7 @@ const settle = async () => {
     for ( let i = 0; i < 3; i++ ) await act( async () => {} );
 };
 
-const texts = ( container: HTMLElement ) => [ ...container.querySelectorAll( '.bm-chat-text' ) ].map( ( t ) => t.textContent );
+const texts = ( container: HTMLElement ) => [ ...container.querySelectorAll( '.wplus-chat-text' ) ].map( ( t ) => t.textContent );
 
 describe( 'the chat', () => {
     it( 'shows the room\'s recent messages, each sender\'s together, and the start of the conversation', async () => {
@@ -70,14 +70,14 @@ describe( 'the chat', () => {
         const { container } = render( <Chat rt={ fakeRooms( { 'chat:34:42': chat } ) } room="chat:34:42" reactions={ [ '1f44d', '2764' ] } /> );
         await settle();
 
-        await act( async () => { fireEvent.mouseEnter( container.querySelector( '.bm-reaction-trigger' )! ); } );
-        await act( async () => { fireEvent.click( document.body.querySelectorAll( '.bm-reaction-strip__item' )[ 0 ] ); } );
+        await act( async () => { fireEvent.mouseEnter( container.querySelector( '.wplus-reaction-trigger' )! ); } );
+        await act( async () => { fireEvent.click( document.body.querySelectorAll( '.wplus-reaction-strip__item' )[ 0 ] ); } );
         await settle();
         expect( chat.emitted ).toEqual( [ [ 'reaction', { id: 'h1', key: '1f44d' } ] ] );
 
-        await act( async () => { fireEvent.click( container.querySelector( '.bm-reaction-pill' )! ); } );
+        await act( async () => { fireEvent.click( container.querySelector( '.wplus-reaction-pill' )! ); } );
         await settle();
         expect( chat.emitted.at( -1 ) ).toEqual( [ 'reaction', { id: 'h1', key: '' } ] );
-        expect( container.querySelector( '.bm-reaction-pill' ) ).toBeNull();
+        expect( container.querySelector( '.wplus-reaction-pill' ) ).toBeNull();
     } );
 } );

@@ -202,9 +202,9 @@ describe( 'the chat', () => {
 
     it( 'marks a Better Messages room in its place as the stream\'s own, which it stays when Better Messages takes it over the whole page', () => {
         const { asClient } = fakeClient( live );
-        const { container } = render( <EasyStreamApp client={ asClient } room={ '<div class="bm-chat-wrap" data-thread-id="7"></div>' } /> );
+        const { container } = render( <EasyStreamApp client={ asClient } room={ '<div class="wplus-chat-wrap" data-thread-id="7"></div>' } /> );
 
-        const room = container.querySelector( '.estream-bm-room > .bm-chat-wrap' )!;
+        const room = container.querySelector( '.estream-bm-room > .wplus-chat-wrap' )!;
         expect( room.getAttribute( 'data-thread-id' ) ).toBe( '7' );
         expect( room.hasAttribute( 'data-estream-room' ) ).toBe( true );
 

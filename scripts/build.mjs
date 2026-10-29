@@ -10,14 +10,14 @@
 // - dist/THIRD-PARTY-NOTICES.txt: every package that script bundles, with its licence in full. Every copy of the script
 //   carries it beside it. A bundled package without a licence file stops the build.
 //
-// The stylesheets carry Better Messages' design tokens (styles/_tokens.scss, a copy of its assets/css/_tokens.scss),
-// but only those the screens read, and those they read in turn: the whole file is its design customiser's colour
+// The stylesheets carry the design tokens (styles/_tokens.scss: Better Messages' assets/css/_tokens.scss under the
+// package's prefix, `--wplus-` for `--bm-`), but only those the screens read, and those they read in turn: the whole file is its design customiser's colour
 // matrices too, 220 KB that no screen of this package uses.
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { build } from 'esbuild';
+import { build, transformSync } from 'esbuild';
 import * as sass from 'sass';
 
 const root = join( dirname( fileURLToPath( import.meta.url ) ), '..' );
@@ -31,14 +31,15 @@ mkdirSync( join( root, 'dist' ), { recursive: true } );
 const compile = ( file ) => sass.compile( join( root, file ), { style: 'expanded', silenceDeprecations: [ 'import', 'global-builtin', 'color-functions' ] } ).css;
 const screens = [ 'styles/calls/_call-stage.scss', 'styles/calls/_incoming-call.scss', 'styles/calls/_add-person.scss' ].map( compile ).join( '\n' );
 const presence = [ 'styles/presence/_presence.scss', 'styles/presence/_online-list.scss' ].map( compile ).join( '\n' );
-// The chat's stylesheets use the tokens' mixins (bm-zone-surface), which Better Messages' stylesheet has in scope
-// from its own _tokens.scss before it imports them: here they get the package's copy's mixins first, and nothing
+// The chat's stylesheets use the tokens' mixins (wplus-zone-surface), which Better Messages' stylesheet has in scope
+// from its own _tokens.scss before it imports them (its build reads `wplus-` as its own `bm-`): here they get the
+// package's copy's mixins first, and nothing
 // else of it (a mixin writes nothing until it is included).
 const tokenMixins = mixinsOf( readFileSync( join( root, 'styles/_tokens.scss' ), 'utf8' ) );
 const withMixins = ( file ) => sass.compileString( tokenMixins + `\n@import "${ file.replace( /^styles\//, '' ).replace( /\/_/, '/' ).replace( /\.scss$/, '' ) }";`, {
     loadPaths: [ join( root, 'styles' ) ], style: 'expanded', silenceDeprecations: [ 'import', 'global-builtin', 'color-functions' ],
 } ).css;
-const chat = [ 'styles/chat/_messages.scss', 'styles/chat/_reactions.scss', 'styles/chat/_composer.scss', 'styles/chat/_chat.scss' ].map( withMixins ).join( '\n' );
+const chat = [ 'styles/chat/_messages.scss', 'styles/chat/_reactions.scss', 'styles/chat/_composer.scss', 'styles/chat/_attachments.scss', 'styles/chat/_chat.scss' ].map( withMixins ).join( '\n' );
 const chrome = compile( 'styles/_elements.scss' );
 const tokens = compile( 'styles/_tokens.scss' );
 
@@ -56,8 +57,10 @@ writeFileSync( join( root, 'dist/chat.css' ), usedTokens( tokens, chat + markup 
 const streamsCss = compile( 'styles/streams/_streams.scss' );
 writeFileSync( join( root, 'dist/streams.css' ), streamsCss );
 
-// In a shadow root there is no :root, and no body to read a theme from: the tokens go on the host.
-const elementsCss = hostOf( usedTokens( tokens, screens + presence + chat + chrome + markup ) ) + '\n' + screens + '\n' + presence + '\n' + chat + '\n' + chrome;
+// In a shadow root there is no :root, and no body to read a theme from: the tokens go on the host. The script carries
+// it as text, its white space taken out (13% of it), nothing else changed.
+const elementsCss = transformSync( hostOf( usedTokens( tokens, screens + presence + chat + chrome + markup ) ) + '\n' + screens + '\n' + presence + '\n' + chat + '\n' + chrome,
+    { loader: 'css', minifyWhitespace: true } ).code;
 
 // The entries over shared chunks, so the host, the pieces and the device registry are one each however many entries a
 // page imports: the root, which Better Messages' free build uses too, the call screens, which it never does, the React
@@ -141,8 +144,19 @@ if ( engineInputs.length ) throw new Error( `realtime-ui-streams.min.js takes in
 // (<call-spot>) and in its chat (<chat-room to call>), with the chat's bar for the other person (10 KB more, 805 KB in
 // all), and 820,000 until a spot could join its meeting with the camera and microphone off or as `join-with` says, and
 // the call screen said Turn sound on where the browser held the others' sound back, in the eight languages (2.2 KB
-// more, 821 KB in all).
-const BUDGETS = { 'realtime-ui.min.js': 840_000, 'realtime-ui-streams.min.js': 780_000 };
+// more, 821 KB in all), and 840,000 until the chat took files: picked, pasted or dropped, going up to the app's route,
+// its pictures in a grid with a viewer of its own, its other files as rows, in the eight languages (31.5 KB more,
+// 25 KB of it given back by carrying the stylesheet without its white space, 844.5 KB in all), and 860,000 until a
+// group call was checked before joining: the own picture or avatar, the microphone's level, the devices, the camera
+// and microphone on or off, in the eight languages (21.2 KB more, 865.7 KB in all), and 880,000 until a call said "You
+// are muted" to someone talking with the microphone off, and told a moderator who joined and who raised a hand and let
+// them end the call for everyone, in the eight languages (20.3 KB more, 886.0 KB in all), and 900,000 until the check
+// before joining gave way to the device settings over the call in every call, a private preview or test of each
+// device and a line saying who sees and hears them, offered by a card as a group call is joined, and the SDK's own
+// calls took them and the hint, in the eight languages (19.8 KB more, 905.8 KB in all), and 920,000 until every class
+// and token took the package's prefix, `wplus-` for Better Messages' `bm-`, three letters more in each of some six
+// thousand names (19.0 KB more, 924.9 KB in all).
+const BUDGETS = { 'realtime-ui.min.js': 940_000, 'realtime-ui-streams.min.js': 780_000 };
 for ( const [ file, most ] of Object.entries( BUDGETS ) ) {
     const size = statSync( join( root, 'dist', file ) ).size;
     if ( size > most ) throw new Error( `dist/${ file } is ${ size } bytes, over its ${ most }. Nothing more was built.` );
@@ -286,6 +300,6 @@ function mixinsOf( source ) {
 function hostOf( css ) {
     return css
         .replace( /:root\b/g, ':host' )
-        .replace( /body:not\(\.bm-messages-light\)/g, ':host(:not([data-scheme="light"]))' )
-        .replace( /body\.bm-messages-dark/g, ':host([data-scheme="dark"])' );
+        .replace( /body:not\(\.wplus-messages-light\)/g, ':host(:not([data-scheme="light"]))' )
+        .replace( /body\.wplus-messages-dark/g, ':host([data-scheme="dark"])' );
 }

@@ -14,12 +14,12 @@ describe( 'presence on the SDK\'s rooms', () => {
         await act( async () => {} );
 
         expect( rt.join ).toHaveBeenCalledWith( 'shop' );
-        expect( container.querySelector( '.bm-chat-online__title' )?.textContent ).toBe( 'Online (2)' );
-        const rows = [ ...container.querySelectorAll( '.bm-conv-admin__member' ) ];
-        expect( rows.map( ( r ) => r.querySelector( '.bm-conv-admin__member-name' )?.textContent ) ).toEqual( [ 'Ann', 'Ben' ] );
-        expect( rows.map( ( r ) => r.querySelector( '.bm-conv-admin__member-sub' )?.textContent ) ).toEqual( [ 'You', 'Customer' ] );
+        expect( container.querySelector( '.wplus-chat-online__title' )?.textContent ).toBe( 'Online (2)' );
+        const rows = [ ...container.querySelectorAll( '.wplus-conv-admin__member' ) ];
+        expect( rows.map( ( r ) => r.querySelector( '.wplus-conv-admin__member-name' )?.textContent ) ).toEqual( [ 'Ann', 'Ben' ] );
+        expect( rows.map( ( r ) => r.querySelector( '.wplus-conv-admin__member-sub' )?.textContent ) ).toEqual( [ 'You', 'Customer' ] );
         expect( rows[ 1 ].querySelector( 'img' )?.getAttribute( 'src' ) ).toBe( '/avatars/ben.svg' );
-        expect( rows[ 1 ].querySelector( '.bm-presence-dot' ) ).not.toBeNull();
+        expect( rows[ 1 ].querySelector( '.wplus-presence-dot' ) ).not.toBeNull();
         expect( [ ...container.querySelectorAll( '.call' ) ].map( ( b ) => b.textContent ) ).toEqual( [ 'Call Ben' ] );
 
         // Someone comes in.
@@ -27,7 +27,7 @@ describe( 'presence on the SDK\'s rooms', () => {
             shop.members.set( '43', { name: 'Cara', role: 'Warehouse' } );
             shop.fire( 'join', { id: '43' } );
         } );
-        expect( container.querySelector( '.bm-chat-online__title' )?.textContent ).toBe( 'Online (3)' );
+        expect( container.querySelector( '.wplus-chat-online__title' )?.textContent ).toBe( 'Online (3)' );
 
         // The room it joined itself is left with it.
         unmount();
@@ -89,7 +89,7 @@ describe( 'the in-tree screens, as a React app draws them (an SDK review, 2026-1
 
         const { container } = render( <OnlineList rt={ rt } room="shop" call="support:{pair}" type="audio video" /> );
         await act( async () => {} );
-        const buttons = [ ...container.querySelectorAll( '.bm-row-action' ) ];
+        const buttons = [ ...container.querySelectorAll( '.wplus-row-action' ) ];
         expect( buttons.map( ( b ) => b.getAttribute( 'aria-label' ) ) ).toEqual( [ 'Audio Call', 'Video Call' ] );   // Ben alone
 
         await act( async () => { fireEvent.click( buttons[ 1 ] ); } );
@@ -106,8 +106,8 @@ describe( 'the in-tree screens, as a React app draws them (an SDK review, 2026-1
 
         const { container } = render( <OnlineList rt={ rt } room="shop" call="support:{pair}" type="video" /> );
         for ( let i = 0; i < 4; i++ ) await act( async () => { await new Promise( ( r ) => setTimeout( r, 0 ) ); } );
-        const rows = [ ...container.querySelectorAll( '.bm-conv-admin__member' ) ];
-        const buttonsOf = ( name: string ) => rows.find( ( r ) => r.textContent?.includes( name ) )!.querySelectorAll( '.bm-row-action' ).length;
+        const rows = [ ...container.querySelectorAll( '.wplus-conv-admin__member' ) ];
+        const buttonsOf = ( name: string ) => rows.find( ( r ) => r.textContent?.includes( name ) )!.querySelectorAll( '.wplus-row-action' ).length;
         expect( buttonsOf( 'Ben' ) ).toBe( 1 );
         expect( buttonsOf( 'Cara' ) ).toBe( 0 );
         expect( may ).toHaveBeenCalledTimes( 1 );
@@ -122,7 +122,7 @@ describe( 'the in-tree screens, as a React app draws them (an SDK review, 2026-1
 
         const { container } = render( <OnlineList rt={ rt } room="shop" call="support:{pair}" type="video" /> );
         for ( let i = 0; i < 4; i++ ) await act( async () => { await new Promise( ( r ) => setTimeout( r, 0 ) ); } );
-        expect( container.querySelectorAll( '.bm-row-action' ).length ).toBe( 1 );
+        expect( container.querySelectorAll( '.wplus-row-action' ).length ).toBe( 1 );
     } );
 
     it( 'draw the call buttons with a look of their own, kept by an app CSS reset, and the call screen in no place of the layout', async () => {

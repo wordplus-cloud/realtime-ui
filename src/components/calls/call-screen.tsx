@@ -1,4 +1,5 @@
-import React, { type Dispatch, type SetStateAction } from "react";
+import React, { useState, type Dispatch, type SetStateAction } from "react";
+import { CallViewContext, useLiftedCall, useWindowedPage } from "./call-view.tsx";
 import { CallContext, type CallContextInterface } from "./context.ts";
 import Tooltip from "../helpers/tooltip.tsx";
 import Icon from "../../primitives/icon.tsx";
@@ -6,6 +7,7 @@ import { _x } from "../../inc/globals.ts";
 import PrivateCallLayout from "./private-call.tsx";
 import GroupVideoCallLayout from "./group-video-call.tsx";
 import GroupAudioCallLayout from "./group-audio-call.tsx";
+import { MutedHintScope } from "./muted-hint.tsx";
 import { PiecesProvider, type Pieces } from "../../pieces.tsx";
 
 export type CallLayout = 'private' | 'group-video' | 'group-audio';
@@ -31,38 +33,51 @@ function CallLayoutOf( { call, layout, chatToggle: toggleProp }: {
     chatToggle?: Dispatch<SetStateAction<boolean>> | null,
 } ) {
     const chatToggle = toggleProp ?? call.chatToggle ?? null;
-    let containerClass = 'bm-call-wrap';
+    // The call filling the browser window (call-view.tsx): from Expand until Collapse, Escape or the call's end.
+    const [ windowed, setWindowed ] = useState( false );
+    const shown = windowed && !! layout;
+    useWindowedPage( shown, () => setWindowed( false ) );
+    useLiftedCall( call.wrapper, shown && ! call.fullScreenEnabled );
+    let containerClass = 'wplus-call-wrap';
 
     if( layout === 'group-video' ){
-        containerClass += ' bm-call-wrap-group';
+        containerClass += ' wplus-call-wrap-group';
     }
 
     if( layout === 'group-audio' ){
-        containerClass += ' bm-group-audio-call-container';
+        containerClass += ' wplus-group-audio-call-container';
     }
 
-    return <CallContext.Provider value={ call }>
+    if( shown ){
+        containerClass += ' wplus-call-wrap--window';
+    }
+
+    return <CallContext.Provider value={ call }><CallViewContext.Provider value={ { windowed: shown, setWindowed } }>
         <div className={containerClass} ref={ call.wrapper }>
-            {/* The handle on the call's bottom edge in the single-column
-                layout, where the chat stacks under the call. Beside the chat
-                the toggle is the dock's Show Chat / Hide Chat instead, and
-                Better Messages' _call-surface.scss keeps this one out of that
-                layout: at the middle of the call's edge it lay over whatever
-                reached it, a tile's moderator row, a roster avatar, the own
-                picture. Not in full screen in either: the call is the
-                full-screen element, and the chat it would open is outside it. */}
-            { ( chatToggle && ! call.fullScreenEnabled ) &&
+            {/* A chevron on the call's edge that hides and shows the chat, for
+                a page whose stylesheet draws it. Better Messages' does not
+                (_call-surface.scss): there the dock's Show Chat / Hide Chat is
+                the toggle beside the chat and under it on a phone alike, as the
+                chevron lay over whatever reached the edge, a tile's moderator
+                row, a roster avatar, the own picture, and sat under the dock on
+                a phone. Not while the call fills the window or the screen: the
+                chat it would open is outside it. */}
+            { ( chatToggle && ! call.fullScreenEnabled && ! shown ) &&
                 <Tooltip content={_x('Toggle Chat Screen', 'Calling Features - Toggle Chat Screen', 'bp-better-messages')}>
                 <span onClick={() => {
                     chatToggle((prev: boolean) => !prev);
-                }} className={"bm-switch-chat"}>
+                }} className={"wplus-switch-chat"}>
                     <Icon name="chevronL" size={ 14 } />
                 </span>
             </Tooltip> }
 
-            { layout === 'private' && <PrivateCallLayout /> }
-            { layout === 'group-video' && <GroupVideoCallLayout /> }
-            { layout === 'group-audio' && <GroupAudioCallLayout /> }
+            {/* "You are muted" over the dock, and in the devices while they lie over it, where the context asks for it
+                (muted-hint.tsx). */}
+            <MutedHintScope layout={ layout }>
+                { layout === 'private' && <PrivateCallLayout /> }
+                { layout === 'group-video' && <GroupVideoCallLayout /> }
+                { layout === 'group-audio' && <GroupAudioCallLayout /> }
+            </MutedHintScope>
         </div>
-    </CallContext.Provider>;
+    </CallViewContext.Provider></CallContext.Provider>;
 }

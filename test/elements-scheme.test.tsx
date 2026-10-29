@@ -18,16 +18,16 @@ it( 'takes the light or dark the page says, from its body class or a color-schem
         await act( () => new Promise( ( done ) => setTimeout( done ) ) );
         return online.getAttribute( 'data-scheme' );
     };
-    expect( await changed( () => document.body.classList.add( 'bm-messages-light' ) ) ).toBe( 'light' );
-    expect( await changed( () => document.body.classList.replace( 'bm-messages-light', 'bm-messages-dark' ) ) ).toBe( 'dark' );
-    expect( await changed( () => document.body.classList.remove( 'bm-messages-dark' ) ) ).toBe( null );
+    expect( await changed( () => document.body.classList.add( 'wplus-messages-light' ) ) ).toBe( 'light' );
+    expect( await changed( () => document.body.classList.replace( 'wplus-messages-light', 'wplus-messages-dark' ) ) ).toBe( 'dark' );
+    expect( await changed( () => document.body.classList.remove( 'wplus-messages-dark' ) ) ).toBe( null );
 
     // Off the page, it is left alone.
     online.remove();
-    document.body.classList.add( 'bm-messages-light' );
+    document.body.classList.add( 'wplus-messages-light' );
     await act( () => new Promise( ( done ) => setTimeout( done ) ) );
     expect( online.hasAttribute( 'data-scheme' ) ).toBe( false );
-    document.body.classList.remove( 'bm-messages-light' );
+    document.body.classList.remove( 'wplus-messages-light' );
 
     // A page drawn only light, as the Example Shop is (a browser hands the page's color-scheme down to the element; this
     // test's page doesn't, so the element has it), and one offering both, where the system decides again.

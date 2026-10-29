@@ -49,11 +49,20 @@ import { CallScreen, CallButton, GroupCallButton, OnlineList, OnlineCount, Typin
 - **The rooms and calls** are your app's, as its server declares them: the names above are examples.
 - **The hooks under them** are yours too: `useRoom( rt, name )`, `useOnline( rt, ids )`, `useProfiles( rt, ids )`
   and `useTyping( rt, room )`.
-- **`<CallScreen>`** takes `lang`, `strings` and `add`:
+- **`<CallScreen>`** takes `lang`, `strings`, `add`, `mutedHint` and `devicesOnJoin`:
   - `lang` picks the words of the screens in English, German, Spanish, French, Italian, Dutch, Polish, Croatian or
     Hebrew. The page's language is the default.
   - `strings` puts your words over any of theirs, by the English text.
   - `add` offers Add Person.
+  - `mutedHint` says "You are muted" to someone who talks with the microphone off. It keeps a microphone open while
+    muted, measured on the device and never sent, so the browser shows it in use. On unless `false`.
+  - `devicesOnJoin` joins a group call with the camera and the microphone off, and says so over the dock: its buttons
+    turn them on. Its Preview asks the browser for both once and opens the device settings with a picture of the
+    camera and the microphone's level, only the person's. There each stops on its own, the speaker plays a test sound,
+    and each device has its list. Nothing asks the browser until the person presses something. On unless `false`,
+    where a group call starts with the microphone and, on a video call, the camera.
+  - A moderator of a group call is told who raises a hand, and who joins where Host Controls has Join Alerts on (on
+    that device), and Host Controls has End for Everyone, asked again through the host's `confirm` first.
 - **`<Chat>`** pages back through the conversation your server keeps (`load`), and the room's last 5 minutes fill in
   what came since. It has typing, reactions and read ticks. `onSent` hears each message the room took, with its id, for
   your server to keep it and tell the other person (`sent`, an event on `<chat-room>`). In a chat between two, `to`
@@ -62,22 +71,24 @@ import { CallScreen, CallButton, GroupCallButton, OnlineList, OnlineCount, Typin
 
 ## The look
 
-The Better Messages class names (`bm-…`) and design tokens are kept. Set the tokens on the page to make the screens
-your app's own:
+Every class name starts with `wplus-` and every design token with `--wplus-`. Set the tokens on the page to make the
+screens your app's own:
 
 ```css
 :root {
-    --bm-color-accent: 37, 99, 235;                 /* red, green and blue */
-    --bm-messenger-font: Inter, system-ui, sans-serif;
-    --bm-radius-card: 12px;
+    --wplus-color-accent: 37, 99, 235;              /* red, green and blue */
+    --wplus-messenger-font: Inter, system-ui, sans-serif;
+    --wplus-radius-card: 12px;
 }
 ```
 
+An app that styled the screens before 1.0.6 named them `bm-…` and `--bm-…`: the same names after the prefix.
+
 The elements keep their own tokens in their shadow roots, so `:root` does not reach them: set the tokens on the
-elements themselves (`call-screen, chat-room, online-list { --bm-color-accent: 37, 99, 235; }`), where
+elements themselves (`call-screen, chat-room, online-list { --wplus-color-accent: 37, 99, 235; }`), where
 they hold in light and dark alike.
 
-Light and dark follow the system. `bm-messages-light` on `<body>` keeps the light look, and `bm-messages-dark` the
+Light and dark follow the system. `wplus-messages-light` on `<body>` keeps the light look, and `wplus-messages-dark` the
 dark one. The elements also keep the one a page names alone in its `color-scheme`, so a page drawn only light
 (`color-scheme: light`) has them light. Right-to-left pages mirror.
 
@@ -93,6 +104,7 @@ configureUi( {
     translate: ( text, context, domain ) => …, // your translations; the package's own by default
     accentColor: () => '#2563eb',             // the ring around whoever speaks
     showError: ( error ) => …,                // how your app shows an error
+    confirm: ( question ) => …,               // asks before End for Everyone, in your dialog: true goes ahead
     Avatar, Name,                             // a user's picture and name, as your app draws them
 } );
 ```

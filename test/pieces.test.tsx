@@ -38,11 +38,11 @@ describe( 'a call\'s pieces', () => {
     it( 'draws ours untouched with no piece of the app\'s, each named for ::part()', () => {
         const { container } = screen( inCall(), 'private', {} );
 
-        expect( container.querySelector( '[part="video-tile"].bm-main-video' ) ).not.toBeNull();
-        expect( container.querySelector( '[part="call-status"] .bm-timer' ) ).not.toBeNull();
-        expect( container.querySelector( '[part="self-view"].bm-call-small-video' ) ).not.toBeNull();
-        expect( container.querySelector( '[part="call-controls"] .bm-call-buttons' ) ).not.toBeNull();
-        expect( container.querySelector( '.bm-main-video audio.audio1' ) ).not.toBeNull();
+        expect( container.querySelector( '[part="video-tile"].wplus-main-video' ) ).not.toBeNull();
+        expect( container.querySelector( '[part="call-status"] .wplus-timer' ) ).not.toBeNull();
+        expect( container.querySelector( '[part="self-view"].wplus-call-small-video' ) ).not.toBeNull();
+        expect( container.querySelector( '[part="call-controls"] .wplus-call-buttons' ) ).not.toBeNull();
+        expect( container.querySelector( '.wplus-main-video audio.audio1' ) ).not.toBeNull();
     } );
 
     it( 'wraps ours in the app\'s tile, given the other side, or replaces it and keeps their sound', () => {
@@ -51,11 +51,11 @@ describe( 'a call\'s pieces', () => {
             VideoTile: ( { participant: p, children } ) => ( seen.push( p?.identity ), <div className="my-frame">{ children }</div> ),
         } );
         expect( seen ).toContain( 'user_34' );
-        expect( framed.container.querySelector( '.my-frame > .bm-main-video' ) ).not.toBeNull();
+        expect( framed.container.querySelector( '.my-frame > .wplus-main-video' ) ).not.toBeNull();
         cleanup();
 
         const own = screen( inCall(), 'private', { VideoTile: ( { participant: p } ) => <div className="my-tile">{ p?.identity }</div> } );
-        expect( own.container.querySelector( '.bm-main-video' ) ).toBeNull();
+        expect( own.container.querySelector( '.wplus-main-video' ) ).toBeNull();
         expect( own.container.querySelector( '.my-tile' )?.textContent ).toBe( 'user_34' );
         // The call stays audible: the other side's sound is drawn beside the app's tile.
         expect( own.container.querySelector( 'audio.audio1' ) ).not.toBeNull();
@@ -66,7 +66,7 @@ describe( 'a call\'s pieces', () => {
         const call = fakeCall( { action: 'outgoing_call' } );
         const { container } = screen( call, 'private', { CallStatus: status } );
         expect( container.querySelector( '.my-status' ) ).not.toBeNull();
-        expect( container.querySelector( '.bm-placeholder-outgoing-text' ) ).toBeNull();
+        expect( container.querySelector( '.wplus-placeholder-outgoing-text' ) ).toBeNull();
         expect( status.mock.calls[ 0 ][ 0 ] ).toMatchObject( { layout: 'private', action: 'outgoing_call', text: '' } );
         cleanup();
 
@@ -75,7 +75,7 @@ describe( 'a call\'s pieces', () => {
             SelfView: ( { track } ) => <div className="my-self" data-mine={ track === camera ? 1 : 0 } />,
         } );
         expect( self.container.querySelector( '.my-self' )?.getAttribute( 'data-mine' ) ).toBe( '1' );
-        expect( self.container.querySelector( '.bm-call-small-video' ) ).toBeNull();
+        expect( self.container.querySelector( '.wplus-call-small-video' ) ).toBeNull();
     } );
 
     it( 'lets the app add a button of its own to the dock, before hanging up, and take one of ours away', () => {
@@ -88,19 +88,19 @@ describe( 'a call\'s pieces', () => {
             ],
         } );
 
-        const dock = container.querySelector( '.bm-call-buttons' )!;
+        const dock = container.querySelector( '.wplus-call-buttons' )!;
         const classes = [ ...dock.children ].map( ( c ) => ( c.querySelector( '[class]' ) ?? c ).className );
-        expect( classes.at( -1 ) ).toContain( 'bm-cancel' );
+        expect( classes.at( -1 ) ).toContain( 'wplus-cancel' );
         expect( classes.at( -2 ) ).toContain( 'my-raise' );
-        expect( dock.querySelector( '.bm-configure-call' ) ).toBeNull();
+        expect( dock.querySelector( '.wplus-configure-call' ) ).toBeNull();
 
         const mine = dock.querySelector( '.my-raise' )!;
         expect( mine.getAttribute( 'aria-label' ) ).toBe( 'Raise hand' );
-        expect( mine.className ).toContain( 'bm-call-control' );
+        expect( mine.className ).toContain( 'wplus-call-control' );
         fireEvent.click( mine );
         expect( raise ).toHaveBeenCalledTimes( 1 );
 
-        fireEvent.click( dock.querySelector( '.bm-cancel' )! );
+        fireEvent.click( dock.querySelector( '.wplus-cancel' )! );
         expect( call.calls ).toContain( 'endCall' );
     } );
 
@@ -163,7 +163,7 @@ describe( 'the ring\'s card', () => {
         await act( async () => ( handlers.get( 'incoming' ) ?? [] ).forEach( ( fn ) => fn( incoming ) ) );
 
         expect( container.querySelector( '[part="ring-card"] .my-ring' )?.textContent ).toBe( 'Ann (audio)' );
-        expect( container.querySelector( '.bm-toast-site-call-container' ) ).toBeNull();
+        expect( container.querySelector( '.wplus-toast-site-call-container' ) ).toBeNull();
         await act( async () => { fireEvent.click( container.querySelector( '.my-ring' )! ); } );
         expect( decline ).toHaveBeenCalled();
     } );
@@ -179,7 +179,7 @@ describe( 'presence and chat pieces', () => {
         const rows = [ ...container.querySelectorAll( '.my-row' ) ];
         expect( rows.map( ( r ) => r.textContent ) ).toEqual( [ 'Ann ()', 'Ben (Customer)Call Ben' ] );
         expect( rows.map( ( r ) => r.getAttribute( 'data-mine' ) ) ).toEqual( [ '1', '0' ] );
-        expect( container.querySelector( '.bm-conv-admin__member' ) ).toBeNull();
+        expect( container.querySelector( '.wplus-conv-admin__member' ) ).toBeNull();
     } );
 
     it( 'names the online row for ::part() without a piece', async () => {
@@ -217,6 +217,6 @@ describe( 'presence and chat pieces', () => {
         expect( message.getAttribute( 'data-mine' ) ).toBe( '1' );
         expect( message.getAttribute( 'data-from' ) ).toBe( 'Ann' );
         // Ours inside it, named for ::part().
-        expect( message.querySelector( '[part="message"] .bm-chat-text' )?.textContent ).toBe( 'It left this morning' );
+        expect( message.querySelector( '[part="message"] .wplus-chat-text' )?.textContent ).toBe( 'It left this morning' );
     } );
 } );

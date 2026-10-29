@@ -25,7 +25,7 @@ export interface IconButtonProps {
     tone?      : string;
     disabled?  : boolean;
     // Pressed/latched state (e.g. a filter toggle) — accent-tinted via the
-    // global .bm-icon-btn[data-active="1"] rule.
+    // global .wplus-icon-btn[data-active="1"] rule.
     active?    : boolean;
     badge?     : ReactNode;
     title?     : string;
@@ -41,7 +41,7 @@ export interface IconButtonProps {
     target?    : string;
     // Extra class for a surface's own positioning hook (the inbox header's
     // leading compose button, the empty state's floating sidebar toggle).
-    // The button chrome itself stays .bm-icon-btn's.
+    // The button chrome itself stays .wplus-icon-btn's.
     className? : string;
     // Don't take focus from a pointer press — for chrome that acts ON a
     // field the press must not disturb (the composer's paperclip, whose
@@ -69,7 +69,7 @@ export default function IconButton( {
     className,
     keepFocus,
 }: IconButtonProps ) {
-    // The button chrome lives in CSS (.bm-icon-btn, _icon-button.scss)
+    // The button chrome lives in CSS (.wplus-icon-btn, _icon-button.scss)
     // so a single block restyles every instance — including non-React
     // markup that opts in by carrying the class (the voice recorder
     // controls). Inline style is reserved for per-call overrides.
@@ -87,7 +87,7 @@ export default function IconButton( {
         "data-emphasis": emphasis,
         "data-action-key": actionKey,
         "data-active": active ? 1 : undefined,
-        className: "bm-icon-btn" + ( isSpinner ? " bm-icon-spin" : "" ) + ( className ? " " + className : "" ),
+        className: "wplus-icon-btn" + ( isSpinner ? " wplus-icon-spin" : "" ) + ( className ? " " + className : "" ),
         style,
     } as const;
 

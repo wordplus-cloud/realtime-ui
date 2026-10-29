@@ -23,13 +23,13 @@ describe( 'presence: the avatar', () => {
         const ann = { user_id: 34, name: 'Ann', avatar: '/avatars/ann.svg' };
         const { container, rerender } = render( <Avatar user={ ann } size={ 32 } presence="online" /> );
 
-        const img = container.querySelector( 'img.bm-avatar' )!;
+        const img = container.querySelector( 'img.wplus-avatar' )!;
         expect( img.getAttribute( 'src' ) ).toBe( '/avatars/ann.svg' );
         expect( img.getAttribute( 'alt' ) ).toBe( 'Ann' );
-        expect( container.querySelector( '.bm-presence-dot' )?.getAttribute( 'data-presence' ) ).toBe( 'online' );
+        expect( container.querySelector( '.wplus-presence-dot' )?.getAttribute( 'data-presence' ) ).toBe( 'online' );
 
         rerender( <Avatar user={ ann } size={ 32 } presence="offline" /> );
-        expect( container.querySelector( '.bm-presence-dot' ) ).toBeNull();
+        expect( container.querySelector( '.wplus-presence-dot' ) ).toBeNull();
     } );
 
     it( 'keeps a name a user typed as text: no markup of it becomes an element by default', () => {
@@ -44,7 +44,7 @@ describe( 'presence: the avatar', () => {
 
     it( 'draws the blank of its shape for a person with no picture, where the app gives no default one', () => {
         const { container } = render( <Avatar user={ { user_id: 43, name: 'Cara' } } size={ 28 } /> );
-        const blank = container.querySelector( '.bm-avatar-blank' ) as HTMLElement;
+        const blank = container.querySelector( '.wplus-avatar-blank' ) as HTMLElement;
         expect( blank.getAttribute( 'aria-label' ) ).toBe( 'Cara' );
         expect( blank.style.width ).toBe( '28px' );
         expect( container.querySelector( 'img' ) ).toBeNull();
@@ -55,8 +55,8 @@ describe( 'presence: the avatar', () => {
             applyFilters: <T,>( name: string, value: T ) => ( name === 'avatar_class' ? `${ value } vip-frame` : name === 'avatar_attributes' ? { 'data-level': 'gold' } : value ) as T,
         } );
         const { container } = render( <Avatar user={ { user_id: 34, name: 'Ann', avatar: '/a.svg' } } /> );
-        const wrap = container.querySelector( '.bm-avatar-wrap' )!;
-        expect( wrap.className ).toBe( 'bm-avatar-wrap vip-frame' );
+        const wrap = container.querySelector( '.wplus-avatar-wrap' )!;
+        expect( wrap.className ).toBe( 'wplus-avatar-wrap vip-frame' );
         expect( wrap.getAttribute( 'data-level' ) ).toBe( 'gold' );
     } );
 
@@ -64,12 +64,12 @@ describe( 'presence: the avatar', () => {
         const people = [ 34, 42, 43, 44, 45 ].map( ( id ) => ( { user_id: id, name: 'P' + id, avatar: `/p${ id }.svg` } ) );
 
         const group = render( <GroupAvatar users={ people.slice( 0, 3 ) } /> ).container;
-        expect( group.querySelectorAll( '.bm-group-avatar__tile' ) ).toHaveLength( 3 );
-        expect( ( group.querySelector( '.bm-group-avatar__tile' ) as HTMLElement ).style.gridRow ).toBe( 'span 2' );
+        expect( group.querySelectorAll( '.wplus-group-avatar__tile' ) ).toHaveLength( 3 );
+        expect( ( group.querySelector( '.wplus-group-avatar__tile' ) as HTMLElement ).style.gridRow ).toBe( 'span 2' );
 
         const stack = render( <AvatarStack users={ people } max={ 3 } /> ).container;
-        expect( stack.querySelectorAll( '.bm-avatar-stack__item' ) ).toHaveLength( 3 );
-        expect( stack.querySelector( '.bm-avatar-stack__more' )?.textContent ).toBe( '+2' );
+        expect( stack.querySelectorAll( '.wplus-avatar-stack__item' ) ).toHaveLength( 3 );
+        expect( stack.querySelector( '.wplus-avatar-stack__more' )?.textContent ).toBe( '+2' );
 
         const read = render( <ReadBy users={ [ people[ 0 ], null, people[ 1 ] ] } /> ).container;
         expect( [ ...read.querySelectorAll( 'img' ) ].map( ( i ) => i.getAttribute( 'alt' ) ) ).toEqual( [ 'P34', 'P42' ] );
@@ -83,7 +83,7 @@ describe( 'presence: typing and the label', () => {
 
         rerender( <ActivityIndicator /> );
         expect( container.textContent ).toBe( 'typing' );
-        expect( container.querySelector( '.bm-typing-dots' ) ).not.toBeNull();
+        expect( container.querySelector( '.wplus-typing-dots' ) ).not.toBeNull();
 
         rerender( <ActivityIndicator entries={ [ { name: 'Ann', activity: 'typing' }, { name: 'Ben', activity: 'typing' }, { name: 'Cara', activity: 'recording' } ] } /> );
         expect( container.textContent ).toBe( 'Ann, Ben typing, Cara recording' );
@@ -113,7 +113,7 @@ describe( 'presence: typing and the label', () => {
         expect( container.textContent ).toBe( '' );
 
         rerender( <PresenceLabel presence="online" label="In a meeting" color="#d97706" detail="since 10:00" /> );
-        const label = container.querySelector( '.bm-presence-label' ) as HTMLElement;
+        const label = container.querySelector( '.wplus-presence-label' ) as HTMLElement;
         expect( label.textContent ).toBe( 'In a meetingsince 10:00' );
         expect( label.style.color ).toBe( '#d97706' );
     } );
@@ -128,17 +128,17 @@ describe( 'presence: who is online', () => {
                            actions={ <button className="call">Call</button> } />
             </OnlineList>,
         );
-        expect( container.querySelector( '.bm-chat-online__title' )?.textContent ).toBe( 'Online (1)' );
-        expect( container.querySelector( '.bm-conv-admin__member-name' )?.textContent ).toBe( 'Ann' );
-        expect( container.querySelector( '.bm-conv-admin__member-sub' )?.textContent ).toBe( 'Support' );
-        expect( container.querySelector( '.bm-conv-admin__member .call' ) ).not.toBeNull();
+        expect( container.querySelector( '.wplus-chat-online__title' )?.textContent ).toBe( 'Online (1)' );
+        expect( container.querySelector( '.wplus-conv-admin__member-name' )?.textContent ).toBe( 'Ann' );
+        expect( container.querySelector( '.wplus-conv-admin__member-sub' )?.textContent ).toBe( 'Support' );
+        expect( container.querySelector( '.wplus-conv-admin__member .call' ) ).not.toBeNull();
 
-        fireEvent.click( container.querySelector( '.bm-chat-online__close' )! );
+        fireEvent.click( container.querySelector( '.wplus-chat-online__close' )! );
         expect( onClose ).toHaveBeenCalled();
 
         rerender( <OnlineList count={ 0 } /> );
-        expect( container.querySelector( '.bm-chat-online__empty' )?.textContent ).toBe( 'No users online' );
-        expect( container.querySelector( '.bm-chat-online__close' ) ).toBeNull();
+        expect( container.querySelector( '.wplus-chat-online__empty' )?.textContent ).toBe( 'No users online' );
+        expect( container.querySelector( '.wplus-chat-online__close' ) ).toBeNull();
     } );
 
     it( 'counts live, showing nothing at none and 99+ past 99', () => {

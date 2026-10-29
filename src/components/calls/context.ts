@@ -9,6 +9,8 @@ export interface CallTrack {
     attach( element: HTMLMediaElement ): HTMLMediaElement;
     detach( element: HTMLMediaElement ): HTMLMediaElement;
     readonly attachedElements: HTMLMediaElement[];
+    /** The browser's track under it, where whoever runs the call has one: the check before joining reads the microphone's level from it. */
+    readonly mediaStreamTrack?: MediaStreamTrack;
 }
 
 /** How big a published picture is, once its sender said: what a grid divides its room by before anything is drawn. */
@@ -89,6 +91,9 @@ export interface CallModeration {
     act: string,
     identity?: string,
     type?: 'audio' | 'video',
+    // For `mute_all` and `unmute_all`: whose microphones, everyone in the call but its moderators, so the app can mute
+    // each microphone rather than ask the call server to silence the room.
+    identities?: string[],
 }
 
 export interface CallContextInterface {
@@ -191,6 +196,26 @@ export interface CallContextInterface {
 
     iconsReverted: boolean,
     fullScreenAvailable?: boolean,
+
+    /**
+     * Tell the user, once a group call is joined with their microphone and camera off, that they are and that the dock
+     * turns them on, with Preview (Test Microphone on an audio call), which opens the device settings with that running
+     * for them alone (device-panel.tsx). Missing or false: nothing is said, and the settings open from the dock.
+     */
+    devicesOnJoin?: boolean,
+
+    /**
+     * Tell the user who talks with their microphone muted that they are muted, with Unmute (muted-hint.tsx). It keeps a
+     * microphone open while muted to hear them, measured on the device and never sent, so the browser shows the
+     * microphone in use all through the call. Missing or false: muting lets go of the microphone and says nothing.
+     */
+    mutedHint?: boolean,
+
+    /**
+     * Ends a group call for everyone in it, the moderator too: Host Controls offers it where it is set and the call
+     * takes `end_call` (moderation-panels.tsx), and asks once more before it runs. Missing: no such row.
+     */
+    endForEveryone?: () => Promise<unknown>,
 
     // The conversation beside the call, for the dock's Show Chat / Hide Chat. No toggle where the call has no chat
     // beside it to show, as for an app's call screen.

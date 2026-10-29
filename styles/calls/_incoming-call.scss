@@ -3,14 +3,14 @@
 // imports from here. Drawn on the WordPlus SDK's toast card in Better Messages (--wplus-toast-fg is the card's ink);
 // the elements' ring gives the card the same look of its own.
 
-@mixin bm-toast-rich-row {
+@mixin wplus-toast-rich-row {
   display: flex;
   align-items: flex-start;
   gap: 10px;
   min-width: 0;
 }
 
-@mixin bm-toast-rich-avatar {
+@mixin wplus-toast-rich-avatar {
   flex: 0 0 auto;
   min-width: 40px;
   max-width: 40px;
@@ -30,13 +30,13 @@
     width: 40px;
     height: 40px;
     object-fit: cover;
-    &:not(#\9) { border-radius: var(--bm-radius-avatar) !important; }
+    &:not(#\9) { border-radius: var(--wplus-radius-avatar) !important; }
   }
 }
 
-@mixin bm-toast-rich-title {
-  font-weight: var(--bm-font-weight-bold);
-  font-size: var(--bm-font-size-base);
+@mixin wplus-toast-rich-title {
+  font-weight: var(--wplus-font-weight-bold);
+  font-size: var(--wplus-font-size-base);
   line-height: 1.3;
   color: rgba(var(--wplus-toast-fg), 1);
 }
@@ -45,55 +45,55 @@
 // the start side, the two round actions sit as a vertically centered pair
 // on the end side, clear of the text at any width (the info column
 // reserves their lane with padding, so nothing can collide).
-.bm-toast-site-call {
+.wplus-toast-site-call {
   // The body's content wrapper shrink-wraps by default, so the absolutely
   // positioned action pair anchored to the container stopped wherever the
   // text ended instead of the toast's right edge. Stretch it.
-  .bm-toast__body > div {
+  .wplus-toast__body > div {
     flex: 1;
     min-width: 0;
   }
 
-  .bm-toast-site-call-container {
-    @include bm-toast-rich-row;
+  .wplus-toast-site-call-container {
+    @include wplus-toast-rich-row;
     position: relative;
     align-items: center;
     padding-inline-end: 92px;
   }
 
-  .bm-toast-site-call-avatar { @include bm-toast-rich-avatar; }
+  .wplus-toast-site-call-avatar { @include wplus-toast-rich-avatar; }
 
-  .bm-toast-site-call-info {
+  .wplus-toast-site-call-info {
     flex: 1;
     min-width: 0;
   }
 
-  .bm-toast-site-call-title { @include bm-toast-rich-title; }
+  .wplus-toast-site-call-title { @include wplus-toast-rich-title; }
 
-  .bm-toast-site-call-content {
+  .wplus-toast-site-call-content {
     margin-top: 2px;
 
-    .bm-toast-site-call-text {
-      font-size: var(--bm-font-size-sm);
+    .wplus-toast-site-call-text {
+      font-size: var(--wplus-font-size-sm);
       color: rgba(var(--wplus-toast-fg), 0.78);
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
     }
 
-    .bm-toast-site-call-action-answer,
-    .bm-toast-site-call-action-reject {
+    .wplus-toast-site-call-action-answer,
+    .wplus-toast-site-call-action-reject {
       position: absolute;
       top: 50%;
       transform: translateY(-50%);
       cursor: pointer;
       width: 38px;
       height: 38px;
-      &:not(#\9) { border-radius: var(--bm-radius-circle); }
+      &:not(#\9) { border-radius: var(--wplus-radius-circle); }
       color: #fff;
       box-shadow: 0 2px 6px rgba(0, 0, 0, 0.18);
-      transition: filter var(--bm-duration-fast, 0.12s) var(--bm-ease-out, ease-out),
-                  scale var(--bm-duration-fast, 0.12s) var(--bm-ease-out, ease-out);
+      transition: filter var(--wplus-duration-fast, 0.12s) var(--wplus-ease-out, ease-out),
+                  scale var(--wplus-duration-fast, 0.12s) var(--wplus-ease-out, ease-out);
 
       &:hover { filter: brightness(1.08); scale: 1.06; }
       &:active { scale: 0.96; }
@@ -107,16 +107,16 @@
       }
     }
 
-    .bm-toast-site-call-action-answer {
+    .wplus-toast-site-call-action-answer {
       inset-inline-end: 46px;
-      background: rgba(var(--bm-color-success), 1);
+      background: rgba(var(--wplus-color-success), 1);
 
       > svg { transform: rotate(260deg); }
     }
 
-    .bm-toast-site-call-action-reject {
+    .wplus-toast-site-call-action-reject {
       inset-inline-end: 0;
-      background: rgba(var(--bm-color-danger), 1);
+      background: rgba(var(--wplus-color-danger), 1);
 
       > svg { transform: rotate(135deg); }
     }

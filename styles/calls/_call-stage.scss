@@ -12,44 +12,82 @@
 // ring, latched toggles, hang up, answer) come from the messenger tokens
 // so a site's palette carries through.
 
-.bm-call-surface {
-    --bm-call-canvas: 17, 19, 24;
-    --bm-call-tile: 30, 33, 41;
-    --bm-call-fg: 255, 255, 255;
+.wplus-call-surface {
+    --wplus-call-canvas: 17, 19, 24;
+    --wplus-call-tile: 30, 33, 41;
+    --wplus-call-fg: 255, 255, 255;
     // 2.0's dock button, to the pixel (bp-messages.scss: the group controls
     // drew 34×34 with a 15px glyph). 3.0 had taken it to 40, which reads as a
     // row of buttons rather than as call chrome — and on the stages that
     // matter, a phone or the call column beside the chat, four of those are
     // most of the width.
-    --bm-call-btn: 34px;
+    --wplus-call-btn: 34px;
 }
 
 // A translucent black fill, no backdrop blur: blurring live video behind
 // every chip costs a compositor pass per frame, and WebKit has drawn the
 // blurred region square behind rounded corners.
-@mixin bm-call-glass($alpha: 0.5) {
+@mixin wplus-call-glass($alpha: 0.5) {
     background: rgba(0, 0, 0, $alpha);
     border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+// The scroller of a dark panel taller than its room: thin, light on dark, and
+// on screen as long as the panel scrolls, where macOS draws its overlay bars
+// only while it moves. Blink and WebKit draw it from ::-webkit-scrollbar, which
+// keeps it on screen. Firefox draws it from scrollbar-width and
+// scrollbar-color, which Blink would take over the -webkit- rules with: so
+// those are put back to auto where -webkit- is drawn, over a page's own thin
+// scrollbars (Better Messages hides its own until a hover).
+@mixin wplus-call-scrollbar {
+    @supports selector(::-webkit-scrollbar) {
+        scrollbar-width: auto;
+        scrollbar-color: auto;
+    }
+
+    &::-webkit-scrollbar {
+        width: 6px;
+        height: 6px;
+    }
+
+    &::-webkit-scrollbar-track {
+        margin: 12px 0;
+        background: transparent;
+    }
+
+    &::-webkit-scrollbar-thumb {
+        border-radius: 3px;
+        background: rgba(255, 255, 255, 0.24);
+    }
+
+    &::-webkit-scrollbar-thumb:hover {
+        background: rgba(255, 255, 255, 0.4);
+    }
+
+    @supports not selector(::-webkit-scrollbar) {
+        scrollbar-width: thin;
+        scrollbar-color: rgba(255, 255, 255, 0.24) transparent;
+    }
 }
 
 // One round stage control. 2.0 renders every call button as a bare span
 // with a class per action; the tone comes from the class or, for the
 // latched extras (sharing, picture in picture), from data-active.
-@mixin bm-call-btn {
+@mixin wplus-call-btn {
     position: relative;
     display: inline-flex;
     align-items: center;
     justify-content: center;
     flex: none;
     box-sizing: border-box;
-    width: var(--bm-call-btn);
-    height: var(--bm-call-btn);
+    width: var(--wplus-call-btn);
+    height: var(--wplus-call-btn);
     margin: 0;
     padding: 0;
     border: 0;
-    &:not(#\9) { border-radius: var(--bm-radius-circle); }
+    &:not(#\9) { border-radius: var(--wplus-radius-circle); }
     background: rgba(255, 255, 255, 0.12);
-    color: rgba(var(--bm-call-fg), 1);
+    color: rgba(var(--wplus-call-fg), 1);
     font-size: 0;
     line-height: 0;
     text-transform: none;
@@ -61,8 +99,8 @@
 
     > svg {
         position: static;
-        width: calc(var(--bm-call-btn) * 0.5);
-        height: calc(var(--bm-call-btn) * 0.5);
+        width: calc(var(--wplus-call-btn) * 0.5);
+        height: calc(var(--wplus-call-btn) * 0.5);
         margin: 0 !important;
         // A touch heavier than the header's hairline: a thin white stroke
         // on a solid dark disc reads wiry at this size.
@@ -74,41 +112,41 @@
 }
 
 // The medium is off: white button, the glyph in the recording red.
-@mixin bm-call-btn-off {
+@mixin wplus-call-btn-off {
     background: rgba(255, 255, 255, 0.92);
-    color: rgba(var(--bm-color-recording), 1);
+    color: rgba(var(--wplus-color-recording), 1);
     &:hover { background: rgba(255, 255, 255, 1); }
 }
 
 // A latched extra: accent.
-@mixin bm-call-btn-on {
-    background: rgba(var(--bm-color-accent), 1);
-    color: rgba(var(--bm-color-text-on-accent), 1);
-    &:hover { background: rgba(var(--bm-color-accent-hover), 1); }
+@mixin wplus-call-btn-on {
+    background: rgba(var(--wplus-color-accent), 1);
+    color: rgba(var(--wplus-color-text-on-accent), 1);
+    &:hover { background: rgba(var(--wplus-color-accent-hover), 1); }
 }
 
 // A restriction the admin holds (hand up, room locked, everyone muted).
-@mixin bm-call-btn-warning {
-    background: rgba(var(--bm-color-warning), 1);
+@mixin wplus-call-btn-warning {
+    background: rgba(var(--wplus-color-warning), 1);
     color: rgba(17, 19, 24, 1);
-    &:hover { background: rgba(var(--bm-color-warning), 0.88); }
+    &:hover { background: rgba(var(--wplus-color-warning), 0.88); }
 }
 
 // Hang up / leave: a wider red pill so it can't be mistaken for a toggle.
-@mixin bm-call-btn-danger {
-    width: calc(var(--bm-call-btn) + 16px);
-    &:not(#\9) { border-radius: var(--bm-radius-pill); }
-    background: rgba(var(--bm-color-recording), 1);
+@mixin wplus-call-btn-danger {
+    width: calc(var(--wplus-call-btn) + 16px);
+    &:not(#\9) { border-radius: var(--wplus-radius-pill); }
+    background: rgba(var(--wplus-color-recording), 1);
     color: rgba(255, 255, 255, 1);
-    &:hover { background: rgba(var(--bm-color-recording), 1); filter: brightness(1.08); }
+    &:hover { background: rgba(var(--wplus-color-recording), 1); filter: brightness(1.08); }
 }
 
-@mixin bm-call-btn-answer {
-    width: calc(var(--bm-call-btn) + 16px);
-    &:not(#\9) { border-radius: var(--bm-radius-pill); }
-    background: rgba(var(--bm-color-success), 1);
+@mixin wplus-call-btn-answer {
+    width: calc(var(--wplus-call-btn) + 16px);
+    &:not(#\9) { border-radius: var(--wplus-radius-pill); }
+    background: rgba(var(--wplus-color-success), 1);
     color: rgba(255, 255, 255, 1);
-    &:hover { background: rgba(var(--bm-color-success), 1); filter: brightness(1.08); }
+    &:hover { background: rgba(var(--wplus-color-success), 1); filter: brightness(1.08); }
 }
 
 // A translucent pill of controls, centered, and ONE row high at every width:
@@ -119,7 +157,7 @@
 // the dock wraps the way it used to instead of clipping controls out of
 // reach, which is also why there is no `overflow: hidden` here. The sheet is
 // positioned against this box, hence the relative.
-@mixin bm-call-dock {
+@mixin wplus-call-dock {
     position: relative;
     display: inline-flex;
     flex-wrap: wrap;
@@ -131,7 +169,7 @@
     padding: 5px;
     max-width: 100%;
     box-sizing: border-box;
-    @include bm-call-glass(0.5);
+    @include wplus-call-glass(0.5);
     &:not(#\9) { border-radius: 26px; }
     pointer-events: auto;
 }
@@ -140,46 +178,56 @@
 // Included wherever those buttons are drawn — the dock itself, and the More
 // sheet they fold into — so a control looks the same in either place and one
 // list decides it.
-@mixin bm-call-dock-items {
+@mixin wplus-call-dock-items {
     > span {
-        @include bm-call-btn;
+        @include wplus-call-btn;
     }
 
     // Camera / microphone off.
-    > .bm-enable-video,
-    > .bm-enable-mic {
-        @include bm-call-btn-off;
+    > .wplus-enable-video,
+    > .wplus-enable-mic {
+        @include wplus-call-btn-off;
     }
 
     // Sharing, picture in picture, full screen on, the chat shown beside.
-    > .bm-switch-share-screen[data-active],
-    > .bm-pic-in-pic[data-active],
-    > .bm-toggle-chat[data-active],
-    > .bm-call-more[data-active],
-    > .bm-fs-disable,
-    > .bm-set-participatory-mode {
-        @include bm-call-btn-on;
+    > .wplus-switch-share-screen[data-active],
+    > .wplus-pic-in-pic[data-active],
+    > .wplus-toggle-chat[data-active],
+    > .wplus-call-more[data-active],
+    > .wplus-fs-disable,
+    > .wplus-set-participatory-mode {
+        @include wplus-call-btn-on;
     }
 
-    > .bm-hand-active,
-    > .bm-unlock-room,
-    > .bm-unmute-all {
-        @include bm-call-btn-warning;
+    > .wplus-hand-active,
+    > .wplus-host-controls[data-ruled] {
+        @include wplus-call-btn-warning;
     }
 
-    > .bm-cancel,
-    > .bm-exit-room {
-        @include bm-call-btn-danger;
+    // Host Controls with its panel open, as the More button with its sheet.
+    > .wplus-host-controls[data-active] {
+        @include wplus-call-btn-on;
+    }
+
+    // The microphone a moderator keeps off: the silenced glyph on the amber
+    // of a restriction a moderator holds.
+    > .wplus-mic-locked {
+        @include wplus-call-btn-warning;
+    }
+
+    > .wplus-cancel,
+    > .wplus-exit-room {
+        @include wplus-call-btn-danger;
     }
 
     // The handset tilted into the hang-up glyph — the same turn the
     // incoming-call toast gives its reject button.
-    > .bm-cancel > svg {
+    > .wplus-cancel > svg {
         transform: rotate(135deg);
     }
 
-    > .bm-answer {
-        @include bm-call-btn-answer;
+    > .wplus-answer {
+        @include wplus-call-btn-answer;
     }
 
     // Waiting on its request: the glyph is a spinner and a second press is
@@ -190,16 +238,16 @@
 }
 
 // A small round badge on a tile or a roster row.
-@mixin bm-call-chip {
+@mixin wplus-call-chip {
     display: inline-flex;
     align-items: center;
     justify-content: center;
     flex: none;
     width: 24px;
     height: 24px;
-    &:not(#\9) { border-radius: var(--bm-radius-circle); }
+    &:not(#\9) { border-radius: var(--wplus-radius-circle); }
     background: rgba(0, 0, 0, 0.55);
-    color: rgba(var(--bm-call-fg), 1);
+    color: rgba(var(--wplus-call-fg), 1);
     line-height: 0;
 
     > svg {
@@ -210,12 +258,12 @@
     }
 }
 
-@keyframes bm-call-ring {
+@keyframes wplus-call-ring {
     0%   { transform: scale(0.96); opacity: 0.9; }
     100% { transform: scale(1.38); opacity: 0; }
 }
 
-@keyframes bm-call-hand {
+@keyframes wplus-call-hand {
     0%, 100% { transform: scale(1); }
     50%      { transform: scale(1.12); }
 }
@@ -223,7 +271,7 @@
 // The own camera's picture a little larger than its chip or its group tile,
 // which clips it: a resize for WebKit on iOS to fit the camera's turned frame
 // by (see the ready chip below).
-@keyframes bm-call-self-refit {
+@keyframes wplus-call-self-refit {
     from, to {
         width: calc(100% + 2px);
         height: calc(100% + 2px);
@@ -233,23 +281,23 @@
 
 // ─── The wrap: dark canvas under everything ───────────────────────────────
 
-.bm-call-wrap {
+.wplus-call-wrap {
     position: relative;
     width: 100%;
     height: 100%;
     overflow: hidden;
-    background: rgba(var(--bm-call-canvas), 1);
-    color: rgba(var(--bm-call-fg), 1);
+    background: rgba(var(--wplus-call-canvas), 1);
+    color: rgba(var(--wplus-call-fg), 1);
     // The dock sizes its buttons to the stage's own width (see the
     // container query at the end), not the viewport's.
     container-type: inline-size;
 
     &:fullscreen,
     &:-webkit-full-screen {
-        background: rgba(var(--bm-call-canvas), 1);
+        background: rgba(var(--wplus-call-canvas), 1);
     }
 
-    .bm-call-container {
+    .wplus-call-container {
         position: relative;
         width: 100%;
         height: 100%;
@@ -259,23 +307,23 @@
 
 // ─── Shared: buttons, docks, device panel, connection badge ───────────────
 
-.bm-call-wrap {
-    .bm-call-buttons,
-    .bm-group-call-controls-buttons {
-        @include bm-call-dock;
-        @include bm-call-dock-items;
+.wplus-call-wrap {
+    .wplus-call-buttons,
+    .wplus-group-call-controls-buttons {
+        @include wplus-call-dock;
+        @include wplus-call-dock-items;
 
         // The sheet hangs off this button in the markup but is placed against
         // the DOCK — every dock button is relative by default, and anchored to
         // this one the sheet ran off the near edge of a narrow stage, because
         // the button sits a hang-up pill short of the dock's own edge.
-        > .bm-call-more {
+        > .wplus-call-more {
             position: static;
         }
 
         // The registry's ellipsis is drawn vertically (it is the thread row's
         // menu glyph); a horizontal row of controls wants it lying down.
-        > .bm-call-more > svg {
+        > .wplus-call-more > svg {
             transform: rotate(90deg);
         }
 
@@ -284,7 +332,7 @@
         // here both shrinks it and makes this button its containing block,
         // moving it mid-press. Nothing to show anyway: the button is already
         // latched while its sheet is open.
-        > .bm-call-more[data-active]:active {
+        > .wplus-call-more[data-active]:active {
             transform: none;
         }
     }
@@ -294,7 +342,7 @@
     // of the dock's edge, and a sheet hung off it would run past the opposite
     // edge on a phone. Above the dock, because the dock is already at the
     // stage floor.
-    .bm-call-dock-sheet {
+    .wplus-call-dock-sheet {
         position: absolute;
         bottom: calc(100% + 8px);
         inset-inline-end: 0;
@@ -307,7 +355,7 @@
         min-width: 180px;
         max-width: 260px;
         // …and never wider than the stage it hangs over. The stage is the
-        // query container (see .bm-call-wrap), so this is its width, not the
+        // query container (see .wplus-call-wrap), so this is its width, not the
         // window's. Second declarations, so a browser without container units
         // keeps the flat pair above.
         //
@@ -317,29 +365,29 @@
         min-width: min(180px, calc(100cqw - 32px));
         max-width: min(260px, calc(100cqw - 32px));
         padding: 6px;
-        @include bm-call-glass(0.82);
-        &:not(#\9) { border-radius: var(--bm-radius-card); }
-        box-shadow: var(--bm-shadow-card);
+        @include wplus-call-glass(0.82);
+        &:not(#\9) { border-radius: var(--wplus-radius-card); }
+        box-shadow: var(--wplus-shadow-card);
         // The dock's buttons are glyph-only, so the mixin zeroes the text
         // metrics — the sheet spells its actions out and needs them back.
-        font-size: var(--bm-font-size-sm);
-        line-height: var(--bm-line-height-normal);
+        font-size: var(--wplus-font-size-sm);
+        line-height: var(--wplus-line-height-normal);
         text-align: start;
         cursor: default;
 
-        @include bm-call-dock-items;
+        @include wplus-call-dock-items;
 
         // Same button, same tone, unrolled from a circle into a line. The
         // element IS the control that was in the row — it keeps its handler
         // and its class — so nothing here may narrow it back to a disc.
-        > .bm-call-dock-sheet__row {
+        > .wplus-call-dock-sheet__row {
             width: 100%;
             height: auto;
             min-height: 34px;
             justify-content: flex-start;
             gap: 10px;
             padding: 0 10px;
-            &:not(#\9) { border-radius: var(--bm-radius-button); }
+            &:not(#\9) { border-radius: var(--wplus-radius-button); }
             font-size: inherit;
             line-height: inherit;
 
@@ -351,18 +399,19 @@
         }
     }
 
-    .bm-call-dock-sheet__label {
+    .wplus-call-dock-sheet__label {
         flex: 1 1 auto;
         min-width: 0;
         overflow: hidden;
-        font-weight: var(--bm-font-weight-medium);
+        font-weight: var(--wplus-font-weight-medium);
         white-space: nowrap;
         text-overflow: ellipsis;
         text-align: start;
     }
 
-    // Device pickers and traffic — a sheet above the dock.
-    .bm-call-settings {
+    // A sheet above the dock: the devices (device-panel.tsx, styled further
+    // down), or a host's own DeviceSwitch pickers.
+    .wplus-call-settings {
         display: flex;
         flex-wrap: wrap;
         align-items: flex-start;
@@ -374,13 +423,13 @@
         height: auto;
         padding: 12px 14px;
         text-align: start;
-        @include bm-call-glass(0.55);
-        &:not(#\9) { border-radius: var(--bm-radius-card); }
-        color: rgba(var(--bm-call-fg), 1);
-        line-height: var(--bm-line-height-normal);
+        @include wplus-call-glass(0.55);
+        &:not(#\9) { border-radius: var(--wplus-radius-card); }
+        color: rgba(var(--wplus-call-fg), 1);
+        line-height: var(--wplus-line-height-normal);
         pointer-events: auto;
 
-        > .bm-call-setting {
+        > .wplus-call-setting {
             flex: 1 1 150px;
             min-width: 0;
             max-width: 240px;
@@ -400,32 +449,10 @@
                 text-transform: uppercase;
                 color: rgba(255, 255, 255, 0.62);
             }
-
-            .bm-call-statistics {
-                margin: 0;
-                padding: 0;
-                background: none;
-                &:not(#\9) { border-radius: 0; }
-                font-size: var(--bm-font-size-sm);
-                color: rgba(var(--bm-call-fg), 1);
-
-                .bm-call-traffic {
-                    display: flex;
-                    flex-wrap: wrap;
-                    gap: 4px 14px;
-                    font-variant-numeric: tabular-nums;
-
-                    span {
-                        display: inline-block;
-                        margin: 0;
-                        white-space: nowrap;
-                    }
-                }
-            }
         }
     }
 
-    .bm-switch-device-select-wrap {
+    .wplus-switch-device-select-wrap {
         display: grid;
         grid-template-areas: "select";
         align-items: center;
@@ -434,11 +461,11 @@
         box-sizing: border-box;
         padding: 0 10px;
         border: 1px solid rgba(255, 255, 255, 0.16);
-        &:not(#\9) { border-radius: var(--bm-radius-input); }
+        &:not(#\9) { border-radius: var(--wplus-radius-input); }
         background: rgba(255, 255, 255, 0.08);
-        color: rgba(var(--bm-call-fg), 1);
-        font-size: var(--bm-font-size-sm);
-        line-height: var(--bm-line-height-tight);
+        color: rgba(var(--wplus-call-fg), 1);
+        font-size: var(--wplus-font-size-sm);
+        line-height: var(--wplus-line-height-tight);
         cursor: pointer;
         pointer-events: auto;
         transition: border-color 0.12s ease, background 0.12s ease;
@@ -449,7 +476,7 @@
         }
 
         &:focus-within {
-            border-color: rgba(var(--bm-color-accent), 1);
+            border-color: rgba(var(--wplus-color-accent), 1);
         }
 
         select,
@@ -498,7 +525,7 @@
         }
     }
 
-    .bm-connection-control {
+    .wplus-connection-control {
         display: flex;
         align-items: center;
         min-width: 0;
@@ -506,8 +533,8 @@
 
     // Connection badge: a state dot while connected, the spinner or the
     // cross otherwise, the state text after it. Sits back at 72% and comes
-    // forward on hover and for three seconds after a change (.bm-opacity).
-    .bm-connection-quality {
+    // forward on hover and for three seconds after a change (.wplus-opacity).
+    .wplus-connection-quality {
         display: inline-flex;
         align-items: center;
         gap: 6px;
@@ -515,32 +542,32 @@
         height: 28px;
         max-width: 100%;
         padding: 0 10px 0 9px;
-        @include bm-call-glass(0.42);
-        &:not(#\9) { border-radius: var(--bm-radius-pill); }
+        @include wplus-call-glass(0.42);
+        &:not(#\9) { border-radius: var(--wplus-radius-pill); }
         color: rgba(255, 255, 255, 0.88);
-        font-size: var(--bm-font-size-xs);
+        font-size: var(--wplus-font-size-xs);
         font-weight: 600;
         letter-spacing: 0.02em;
         white-space: nowrap;
         overflow: hidden;
         opacity: 0.72;
         cursor: default;
-        transition: opacity var(--bm-duration-base) ease;
+        transition: opacity var(--wplus-duration-base) ease;
 
         &::before {
             content: "";
             flex: none;
             width: 7px;
             height: 7px;
-            border-radius: var(--bm-radius-circle);
-            background: rgba(var(--bm-color-success), 1);
+            border-radius: var(--wplus-radius-circle);
+            background: rgba(var(--wplus-color-success), 1);
         }
 
-        &.bm-quality-poor::before { background: rgba(var(--bm-color-warning), 1); }
-        &.bm-quality-lost::before { background: rgba(var(--bm-color-danger), 1); }
+        &.wplus-quality-poor::before { background: rgba(var(--wplus-color-warning), 1); }
+        &.wplus-quality-lost::before { background: rgba(var(--wplus-color-danger), 1); }
 
-        &:not(.bm-state-connected)::before { display: none; }
-        &.bm-state-connected > svg { display: none; }
+        &:not(.wplus-state-connected)::before { display: none; }
+        &.wplus-state-connected > svg { display: none; }
 
         > svg {
             flex: none;
@@ -558,7 +585,7 @@
         }
 
         &:hover,
-        &.bm-opacity {
+        &.wplus-opacity {
             opacity: 1;
         }
     }
@@ -566,7 +593,7 @@
 
 // ─── 1:1 call ─────────────────────────────────────────────────────────────
 
-.bm-call-wrap .bm-video-container {
+.wplus-call-wrap .wplus-video-container {
     position: relative;
     display: block;
     width: 100%;
@@ -576,7 +603,7 @@
 
     // Pre-connect and no-remote-media: the peer's avatar and a status line,
     // centered, with room under them for the dock.
-    .bm-main-placeholder {
+    .wplus-main-placeholder {
         position: relative;
         display: flex;
         flex-direction: column;
@@ -597,7 +624,7 @@
     // The own camera (or screen) fills the stage while the call rings.
     // Never mirrored: you see yourself the way the others do, as 2.0
     // showed it, and as the picture stays once the call connects.
-    .bm-placeholder-video {
+    .wplus-placeholder-video {
         position: absolute;
         inset: 0;
         z-index: 0;
@@ -611,14 +638,14 @@
             object-fit: cover;
         }
 
-        &.bm-video-contain video {
+        &.wplus-video-contain video {
             object-fit: contain;
             background: rgba(0, 0, 0, 1);
         }
     }
 
     // A scrim over the live preview keeps the labels readable on it.
-    .bm-main-placeholder:has(.bm-placeholder-video)::after {
+    .wplus-main-placeholder:has(.wplus-placeholder-video)::after {
         content: "";
         position: absolute;
         inset: 0;
@@ -627,7 +654,7 @@
         pointer-events: none;
     }
 
-    .bm-call-animation {
+    .wplus-call-animation {
         position: relative;
         z-index: 1;
         flex: none;
@@ -647,7 +674,7 @@
             position: static;
             width: 100px;
             height: 100px;
-            &:not(#\9) { border-radius: var(--bm-radius-avatar) !important; }
+            &:not(#\9) { border-radius: var(--wplus-radius-avatar) !important; }
             animation: none;
         }
 
@@ -657,9 +684,9 @@
             content: "";
             position: absolute;
             inset: -4px;
-            border-radius: calc(var(--bm-radius-avatar) + 4px);
+            border-radius: calc(var(--wplus-radius-avatar) + 4px);
             border: 2px solid rgba(255, 255, 255, 0.35);
-            animation: bm-call-ring 2.2s ease-out infinite;
+            animation: wplus-call-ring 2.2s ease-out infinite;
             pointer-events: none;
         }
 
@@ -667,14 +694,14 @@
             animation-delay: 1.1s;
         }
 
-        &.bm-animation-pause::before,
-        &.bm-animation-pause::after {
+        &.wplus-animation-pause::before,
+        &.wplus-animation-pause::after {
             animation: none;
             opacity: 0;
         }
     }
 
-    .bm-placeholder-message {
+    .wplus-placeholder-message {
         position: relative;
         z-index: 1;
         display: flex;
@@ -682,20 +709,20 @@
         align-items: center;
         gap: 4px;
         margin: 0;
-        color: rgba(var(--bm-call-fg), 1);
+        color: rgba(var(--wplus-call-fg), 1);
         text-align: center;
         pointer-events: none;
 
-        .bm-placeholder-status,
-        .bm-placeholder-incoming-text,
-        .bm-placeholder-outgoing-text {
-            font-size: var(--bm-font-size-md);
+        .wplus-placeholder-status,
+        .wplus-placeholder-incoming-text,
+        .wplus-placeholder-outgoing-text {
+            font-size: var(--wplus-font-size-md);
             font-weight: 500;
             color: rgba(255, 255, 255, 0.8);
         }
 
-        .bm-timer {
-            font-family: var(--bm-font-family-mono);
+        .wplus-timer {
+            font-family: var(--wplus-font-family-mono);
             font-variant-numeric: tabular-nums;
             font-size: 20px;
             font-weight: 600;
@@ -705,10 +732,10 @@
 
     // Notices: no media access, nothing coming from the other side, the
     // other side dropped or muted — glass cards on the stage.
-    .bm-placeholder-no-access-message,
-    .bm-placeholder-no-source-message,
-    .bm-placeholder-participant-lost-message,
-    .bm-placeholder-participant-muted-message {
+    .wplus-placeholder-no-access-message,
+    .wplus-placeholder-no-source-message,
+    .wplus-placeholder-participant-lost-message,
+    .wplus-placeholder-participant-muted-message {
         position: relative;
         z-index: 2;
         display: flex;
@@ -719,10 +746,10 @@
         max-width: min(100% - 32px, 420px);
         margin: 0 auto;
         padding: 10px 14px;
-        @include bm-call-glass(0.55);
-        &:not(#\9) { border-radius: var(--bm-radius-card); }
-        color: rgba(var(--bm-call-fg), 1);
-        font-size: var(--bm-font-size-sm);
+        @include wplus-call-glass(0.55);
+        &:not(#\9) { border-radius: var(--wplus-radius-card); }
+        color: rgba(var(--wplus-call-fg), 1);
+        font-size: var(--wplus-font-size-sm);
         line-height: 1.35;
         text-align: start;
         opacity: 1;
@@ -744,11 +771,11 @@
         }
     }
 
-    .bm-placeholder-no-access-message {
-        background: rgba(var(--bm-color-danger), 0.88);
+    .wplus-placeholder-no-access-message {
+        background: rgba(var(--wplus-color-danger), 0.88);
         border-color: transparent;
 
-        .bm-placeholder-no-access-message-icon {
+        .wplus-placeholder-no-access-message-icon {
             flex: none;
             font-size: 0;
             line-height: 0;
@@ -759,23 +786,23 @@
             }
         }
 
-        .bm-placeholder-no-access-message-text {
+        .wplus-placeholder-no-access-message-text {
             margin: 0;
-            font-size: var(--bm-font-size-sm);
+            font-size: var(--wplus-font-size-sm);
         }
     }
 
-    .bm-placeholder-no-source-message .bm-placeholder-participant-no-source-message-text,
-    .bm-placeholder-participant-lost-message .bm-placeholder-participant-lost-message-text,
-    .bm-placeholder-participant-muted-message .bm-placeholder-participant-muted-message-text {
+    .wplus-placeholder-no-source-message .wplus-placeholder-participant-no-source-message-text,
+    .wplus-placeholder-participant-lost-message .wplus-placeholder-participant-lost-message-text,
+    .wplus-placeholder-participant-muted-message .wplus-placeholder-participant-muted-message-text {
         display: block;
-        font-size: var(--bm-font-size-sm);
+        font-size: var(--wplus-font-size-sm);
     }
 
     // The other side's microphone is off while their camera or screen is
     // on: a chip in the top start corner of the picture. Without a picture
     // the placeholder card above carries the message instead.
-    .bm-placeholder-participant-muted-message {
+    .wplus-placeholder-participant-muted-message {
         position: absolute;
         z-index: 2;
         top: 14px;
@@ -786,7 +813,7 @@
     }
 
     // Floats over the remote video, or above the avatar when there is none.
-    .bm-placeholder-participant-lost-message {
+    .wplus-placeholder-participant-lost-message {
         position: absolute;
         top: 14px;
         left: 50%;
@@ -798,7 +825,7 @@
     }
 
     // Connected: the remote camera or screen on the canvas.
-    .bm-main-video {
+    .wplus-main-video {
         position: absolute;
         inset: 0;
         display: block;
@@ -807,7 +834,7 @@
         margin: 0;
         padding: 0;
         overflow: hidden;
-        background: rgba(var(--bm-call-canvas), 1);
+        background: rgba(var(--wplus-call-canvas), 1);
 
         > video {
             display: block;
@@ -819,7 +846,7 @@
         }
     }
 
-    .bm-video-contain video {
+    .wplus-video-contain video {
         object-fit: contain !important;
     }
 
@@ -828,24 +855,24 @@
     //
     // The chip is given a width (Resizable, before the first paint) and takes
     // its height from the shape of the media, which the layouts hand over as
-    // --bm-chip-ratio once the stream reports it. The picture is then pinned
+    // --wplus-chip-ratio once the stream reports it. The picture is then pinned
     // to the chip rather than sized by it. Letting the two size each other —
     // a height:auto box around a height:100% video — leaves the browsers to
     // break the circle their own way: Safari settled on a box a different
     // shape from the picture, so `cover` quietly cropped the own camera.
-    .bm-call-small-video,
-    .bm-call-small-video-2,
-    .bm-call-small-video-3 {
+    .wplus-call-small-video,
+    .wplus-call-small-video-2,
+    .wplus-call-small-video-3 {
         position: absolute;
         z-index: 9;
         height: auto;
-        aspect-ratio: var(--bm-chip-ratio, 16 / 9);
+        aspect-ratio: var(--wplus-chip-ratio, 16 / 9);
         min-width: 72px;
         min-height: 48px;
         max-width: 45%;
         max-height: 45%;
         overflow: hidden;
-        &:not(#\9) { border-radius: var(--bm-radius-card); }
+        &:not(#\9) { border-radius: var(--wplus-radius-card); }
         border: 1px solid rgba(255, 255, 255, 0.16);
         background: rgba(0, 0, 0, 1);
         box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
@@ -865,7 +892,7 @@
         }
     }
 
-    .bm-call-small-video {
+    .wplus-call-small-video {
         bottom: 84px;
         inset-inline-end: 12px;
         // Invisible until the browser has drawn a frame of the own camera
@@ -880,7 +907,7 @@
         // frame came in kept a 16:9 frame fitted to the chip's width, a
         // picture about half the chip's width sitting in a black frame, until
         // something else happened to resize it.
-        &:not(.bm-call-small-video--ready) > video {
+        &:not(.wplus-call-small-video--ready) > video {
             width: 50%;
             height: 50%;
         }
@@ -891,12 +918,12 @@
         // frames its video layer has taken, so a count that comes later says
         // the layer took its first frame after the picture grew, and the
         // resize back is what fits that frame.
-        &.bm-call-small-video--ready:not(.bm-call-small-video--counted) > video {
+        &.wplus-call-small-video--ready:not(.wplus-call-small-video--counted) > video {
             height: calc(100% + 1px);
         }
     }
 
-    .bm-call-small-video--ready {
+    .wplus-call-small-video--ready {
         opacity: 1;
     }
 
@@ -920,27 +947,27 @@
     // Only iOS and iPadOS WebKit, which is every browser there, supports
     // -webkit-touch-callout.
     @supports (-webkit-touch-callout: none) {
-        .bm-call-small-video--ready {
+        .wplus-call-small-video--ready {
             transition-delay: 1s;
         }
 
-        .bm-call-small-video--ready > video {
-            animation: bm-call-self-refit 1s 0.5s;
+        .wplus-call-small-video--ready > video {
+            animation: wplus-call-self-refit 1s 0.5s;
         }
     }
 
-    .bm-call-small-video-2 {
+    .wplus-call-small-video-2 {
         bottom: 84px;
         inset-inline-start: 12px;
     }
 
-    .bm-call-small-video-3 {
+    .wplus-call-small-video-3 {
         top: 12px;
         inset-inline-end: 12px;
     }
 
-    .bm-switch-videos {
-        @include bm-call-chip;
+    .wplus-switch-videos {
+        @include wplus-call-chip;
         position: absolute;
         z-index: 3;
         bottom: 6px;
@@ -961,7 +988,7 @@
 // comes back to the call (or, on touch, until a tap), and it also stays
 // while a device sheet is open, so choosing from a native list can't
 // hide it mid-pick.
-.bm-call-wrap .bm-call-controls {
+.wplus-call-wrap .wplus-call-controls {
     position: absolute;
     inset-inline: 0;
     bottom: 0;
@@ -980,7 +1007,7 @@
     pointer-events: none;
     transition: opacity 0.18s ease, transform 0.18s ease;
 
-    &.bm-show-on-hover,
+    &.wplus-show-on-hover,
     &.show-on-tap {
         opacity: 0;
         visibility: hidden;
@@ -988,7 +1015,7 @@
         transition: opacity 0.18s ease, transform 0.18s ease, visibility 0s linear 0.18s;
     }
 
-    &:has(.bm-call-settings) {
+    &:has(.wplus-call-settings) {
         opacity: 1;
         visibility: visible;
         transform: none;
@@ -996,8 +1023,8 @@
     }
 }
 
-.bm-call-wrap .bm-private-call:hover > .bm-call-controls.bm-show-on-hover,
-.bm-call-wrap .bm-private-call.bm-tapped > .bm-call-controls.show-on-tap {
+.wplus-call-wrap .wplus-private-call:hover > .wplus-call-controls.wplus-show-on-hover,
+.wplus-call-wrap .wplus-private-call.wplus-tapped > .wplus-call-controls.show-on-tap {
     opacity: 1;
     visibility: visible;
     transform: none;
@@ -1007,8 +1034,8 @@
 // A keyboard on the call, on its window or one of its controls, brings the dock back as a pointer over it does: a
 // hidden dock keeps its controls out of the Tab order and from screen readers (an SDK review, 2026-10-14). A focus a
 // script moved after a click stays no keyboard focus, so a pointer user sees the dock as before.
-.bm-call-wrap .bm-private-call:focus-visible > .bm-call-controls,
-.bm-call-wrap .bm-private-call:has(:focus-visible) > .bm-call-controls {
+.wplus-call-wrap .wplus-private-call:focus-visible > .wplus-call-controls,
+.wplus-call-wrap .wplus-private-call:has(:focus-visible) > .wplus-call-controls {
     opacity: 1;
     visibility: visible;
     transform: none;
@@ -1016,7 +1043,7 @@
 }
 
 // The window as a whole needs no ring of its own: the dock it brings back is what shows the keyboard is there.
-.bm-call-wrap .bm-private-call:focus-visible {
+.wplus-call-wrap .wplus-private-call:focus-visible {
     outline: none;
 }
 
@@ -1024,8 +1051,8 @@
 // or taps — so the dock a real call reveals on either would be absent from
 // every store screenshot of a call, which is most of what makes it a call.
 // Shown outright, and only while the preview is the one driving.
-.bm-call-wrap--preview .bm-call-controls.bm-show-on-hover,
-.bm-call-wrap--preview .bm-call-controls.show-on-tap {
+.wplus-call-wrap--preview .wplus-call-controls.wplus-show-on-hover,
+.wplus-call-wrap--preview .wplus-call-controls.show-on-tap {
     opacity: 1;
     visibility: visible;
     transform: none;
@@ -1033,11 +1060,11 @@
 }
 
 // ─── Group calls: what the chat is waiting for ───────────────────────────
-// The 1:1 screen says it under the avatar (.bm-placeholder-status). A group
+// The 1:1 screen says it under the avatar (.wplus-placeholder-status). A group
 // chat has its tiles or its roster there, so the same words float over the
 // top of the stage as a glass chip, the way the 1:1 screen's notices do.
 
-.bm-call-wrap .bm-group-call-container .bm-group-call-status {
+.wplus-call-wrap .wplus-group-call-container .wplus-group-call-status {
     position: absolute;
     z-index: 3;
     top: 14px;
@@ -1048,10 +1075,10 @@
     max-width: min(100% - 28px, 420px);
     margin: 0;
     padding: 10px 14px;
-    @include bm-call-glass(0.55);
-    &:not(#\9) { border-radius: var(--bm-radius-card); }
+    @include wplus-call-glass(0.55);
+    &:not(#\9) { border-radius: var(--wplus-radius-card); }
     color: rgba(255, 255, 255, 0.8);
-    font-size: var(--bm-font-size-md);
+    font-size: var(--wplus-font-size-md);
     font-weight: 500;
     line-height: 1.35;
     text-align: center;
@@ -1060,7 +1087,7 @@
 
 // ─── Group calls: the bar under the grid or the roster ───────────────────
 
-.bm-call-wrap .bm-group-call-controls-v2 {
+.wplus-call-wrap .wplus-group-call-controls-v2 {
     position: absolute;
     inset-inline: 0;
     bottom: 0;
@@ -1079,22 +1106,22 @@
     // 12px clear of the dock as the dock is clear of the stage floor.
     padding: 8px 14px 12px;
     border: 0;
-    background: linear-gradient(to top, rgba(var(--bm-call-canvas), 0.96) 0%, rgba(var(--bm-call-canvas), 0.6) 70%, rgba(var(--bm-call-canvas), 0) 100%);
+    background: linear-gradient(to top, rgba(var(--wplus-call-canvas), 0.96) 0%, rgba(var(--wplus-call-canvas), 0.6) 70%, rgba(var(--wplus-call-canvas), 0) 100%);
     text-align: start;
     flex-wrap: nowrap;
 
-    .bm-connection-control {
+    .wplus-connection-control {
         flex: none;
     }
 
-    .bm-group-call-controls-buttons {
+    .wplus-group-call-controls-buttons {
         flex: 0 1 auto;
         min-width: 0;
         margin-inline-start: auto;
         justify-content: flex-end;
     }
 
-    .bm-call-settings {
+    .wplus-call-settings {
         position: absolute;
         bottom: 100%;
         inset-inline-end: 14px;
@@ -1109,29 +1136,29 @@
 
 // ─── Group video: the tiles ───────────────────────────────────────────────
 
-.bm-call-wrap.bm-call-wrap-group {
-    .bm-group-call-container {
+.wplus-call-wrap.wplus-call-wrap-group {
+    .wplus-group-call-container {
         position: relative;
         width: 100%;
         height: 100%;
         overflow: hidden;
     }
 
-    .bm-group-call-videos-grid {
+    .wplus-group-call-videos-grid {
         position: relative;
         box-sizing: border-box;
         width: 100%;
         margin: 0;
         padding: 4px;
-        transition: height var(--bm-duration-slow) ease;
+        transition: height var(--wplus-duration-slow) ease;
 
-        .bm-group-call-videos-grid-primary,
-        .bm-group-call-videos-grid-secondary {
+        .wplus-group-call-videos-grid-primary,
+        .wplus-group-call-videos-grid-secondary {
             position: relative;
-            transition: height var(--bm-duration-slow) ease, width var(--bm-duration-slow) ease;
+            transition: height var(--wplus-duration-slow) ease, width var(--wplus-duration-slow) ease;
         }
 
-        .bm-group-call-videos-grid-secondary {
+        .wplus-group-call-videos-grid-secondary {
             overflow-x: auto;
             overflow-y: hidden;
         }
@@ -1146,24 +1173,24 @@
             flex-direction: row;
             align-items: stretch;
 
-            > .bm-group-call-videos-grid-primary,
-            > .bm-group-call-videos-grid-secondary {
+            > .wplus-group-call-videos-grid-primary,
+            > .wplus-group-call-videos-grid-secondary {
                 flex: none;
             }
         }
     }
 
-    .bm-group-call-input-video {
+    .wplus-group-call-input-video {
         display: block;
         position: absolute;
         z-index: 1;
         box-sizing: border-box;
         margin: 0;
         padding: 4px;
-        color: rgba(var(--bm-call-fg), 1);
-        transition: top var(--bm-duration-slow) ease, left var(--bm-duration-slow) ease, height var(--bm-duration-slow) ease, width var(--bm-duration-slow) ease;
+        color: rgba(var(--wplus-call-fg), 1);
+        transition: top var(--wplus-duration-slow) ease, left var(--wplus-duration-slow) ease, height var(--wplus-duration-slow) ease, width var(--wplus-duration-slow) ease;
 
-        &.bm-cover-video > .bm-group-call-input-video-inner video {
+        &.wplus-cover-video > .wplus-group-call-input-video-inner video {
             object-fit: cover;
         }
 
@@ -1176,19 +1203,19 @@
     // by ::before as a centered avatar the size of the tile allows —
     // background: inherit carries the image over. When a camera or a
     // screen is on, the media covers the tile and the avatar steps aside.
-    .bm-group-call-input-video-inner {
+    .wplus-group-call-input-video-inner {
         position: relative;
         box-sizing: border-box;
         width: 100%;
         height: 100%;
         overflow: hidden;
-        &:not(#\9) { border-radius: var(--bm-radius-card); }
+        &:not(#\9) { border-radius: var(--wplus-radius-card); }
         border: 1px solid rgba(255, 255, 255, 0.06);
-        background-color: rgba(var(--bm-call-tile), 1);
+        background-color: rgba(var(--wplus-call-tile), 1);
         background-repeat: no-repeat;
         background-position: center;
         background-size: 0 0;
-        transition: box-shadow var(--bm-duration-slow) ease-in-out, border-color var(--bm-duration-slow) ease-in-out;
+        transition: box-shadow var(--wplus-duration-slow) ease-in-out, border-color var(--wplus-duration-slow) ease-in-out;
 
         &::before {
             content: "";
@@ -1203,27 +1230,27 @@
             background-color: transparent;
             background-size: cover;
             background-position: center;
-            border-radius: var(--bm-radius-avatar);
+            border-radius: var(--wplus-radius-avatar);
             pointer-events: none;
         }
 
-        &:has(.bm-media-container video)::before {
+        &:has(.wplus-media-container video)::before {
             display: none;
         }
 
         // A camera with nothing of theirs arriving that never showed a
         // frame here (stalled.tsx): the avatar over its empty picture,
         // under "Reconnecting...", as on a tile away.
-        &.bm-call-pictureless:has(.bm-media-container video)::before {
+        &.wplus-call-pictureless:has(.wplus-media-container video)::before {
             display: block;
             z-index: 2;
         }
 
-        &.bm-active-speaker {
-            border-color: rgba(var(--bm-color-accent), 0.9);
+        &.wplus-active-speaker {
+            border-color: rgba(var(--wplus-color-accent), 0.9);
         }
 
-        .bm-media-container {
+        .wplus-media-container {
             position: absolute;
             inset: 0;
             z-index: 1;
@@ -1236,18 +1263,18 @@
             &:not(#\9) { border-radius: inherit; }
             transform: translate3d(0, 0, 0);
 
-            &.bm-screen-shared .bm-small-video {
+            &.wplus-screen-shared .wplus-small-video {
                 position: absolute;
                 bottom: 8px;
                 inset-inline-end: 8px;
                 max-height: 72px;
                 overflow: hidden;
-                &:not(#\9) { border-radius: var(--bm-radius-md); }
+                &:not(#\9) { border-radius: var(--wplus-radius-md); }
                 border: 1px solid rgba(255, 255, 255, 0.16);
                 background: rgba(0, 0, 0, 1);
                 opacity: 0.85;
                 cursor: grab;
-                transition: opacity var(--bm-duration-fast) ease-in-out;
+                transition: opacity var(--wplus-duration-fast) ease-in-out;
 
                 &:hover {
                     opacity: 1;
@@ -1265,14 +1292,14 @@
         }
 
         // The own camera, held back the way the 1:1 call's own chip is and
-        // for the same reason (see .bm-call-small-video): invisible and half
+        // for the same reason (see .wplus-call-small-video): invisible and half
         // the tile until the browser has drawn a frame of it, so that becoming
         // ready resizes it, and a pixel larger until a frame is counted, so
         // the count is one more resize. It spans the whole tile, both ways,
         // where the picture is contained as before: a box that grew in height
         // alone, past a width already at the tile's, gave WebKit the same
         // contained frame and so nothing to fit again.
-        video.bm-group-call-self-video {
+        video.wplus-group-call-self-video {
             flex: none;
             width: 100%;
             height: 100%;
@@ -1280,16 +1307,16 @@
             opacity: 0;
             transition: opacity 0.2s ease;
 
-            &:not(.bm-group-call-self-video--ready) {
+            &:not(.wplus-group-call-self-video--ready) {
                 width: 50%;
                 height: 50%;
             }
 
-            &.bm-group-call-self-video--ready {
+            &.wplus-group-call-self-video--ready {
                 opacity: 1;
             }
 
-            &.bm-group-call-self-video--ready:not(.bm-group-call-self-video--counted) {
+            &.wplus-group-call-self-video--ready:not(.wplus-group-call-self-video--counted) {
                 width: calc(100% + 1px);
                 height: calc(100% + 1px);
             }
@@ -1298,9 +1325,9 @@
         // On iOS the later resize and the fade that waits for it, as the
         // chip's.
         @supports (-webkit-touch-callout: none) {
-            video.bm-group-call-self-video--ready {
+            video.wplus-group-call-self-video--ready {
                 transition-delay: 1s;
-                animation: bm-call-self-refit 1s 0.5s;
+                animation: wplus-call-self-refit 1s 0.5s;
             }
         }
 
@@ -1309,7 +1336,7 @@
         }
 
         // Name, bottom start.
-        .bm-group-call-input-video-inner-info {
+        .wplus-group-call-input-video-inner-info {
             position: absolute;
             inset-inline: 0;
             bottom: 0;
@@ -1322,11 +1349,11 @@
             pointer-events: none;
             transform: translate3d(0, 0, 0);
 
-            .bm-info-avatar {
+            .wplus-info-avatar {
                 display: none;
             }
 
-            .bm-caller-info {
+            .wplus-caller-info {
                 display: flex;
                 align-items: center;
                 gap: 6px;
@@ -1339,38 +1366,38 @@
                     padding: 0;
                 }
 
-                .bm-info-name {
+                .wplus-info-name {
                     display: inline-flex;
                     align-items: center;
                     min-width: 0;
                     max-width: 100%;
                     padding: 3px 9px;
-                    @include bm-call-glass(0.55);
+                    @include wplus-call-glass(0.55);
                     border-color: transparent;
-                    &:not(#\9) { border-radius: var(--bm-radius-pill); }
-                    color: rgba(var(--bm-call-fg), 1);
-                    font-size: var(--bm-font-size-xs);
+                    &:not(#\9) { border-radius: var(--wplus-radius-pill); }
+                    color: rgba(var(--wplus-call-fg), 1);
+                    font-size: var(--wplus-font-size-xs);
                     font-weight: 600;
                     line-height: 1.3;
                     white-space: nowrap;
                     overflow: hidden;
                     text-overflow: ellipsis;
 
-                    .bm-caller-name {
+                    .wplus-caller-name {
                         min-width: 0;
                         overflow: hidden;
                         text-overflow: ellipsis;
                     }
 
                     a {
-                        color: rgba(var(--bm-call-fg), 1) !important;
+                        color: rgba(var(--wplus-call-fg), 1) !important;
                     }
                 }
             }
         }
 
         // Microphone off: bottom end.
-        .bm-caller-status {
+        .wplus-caller-status {
             position: absolute;
             z-index: 2;
             bottom: 8px;
@@ -1386,14 +1413,14 @@
                 margin: 0;
             }
 
-            .bm-mic-disabled {
-                @include bm-call-chip;
-                background: rgba(var(--bm-color-recording), 0.92);
+            .wplus-mic-disabled {
+                @include wplus-call-chip;
+                background: rgba(var(--wplus-color-recording), 0.92);
             }
         }
 
         // Raised hand: top end.
-        .bm-hand-raised-status {
+        .wplus-hand-raised-status {
             position: absolute;
             z-index: 2;
             top: 8px;
@@ -1401,18 +1428,18 @@
             padding: 0;
             text-align: start;
 
-            .bm-hand-raised {
-                @include bm-call-chip;
-                background: rgba(var(--bm-color-warning), 1);
+            .wplus-hand-raised {
+                @include wplus-call-chip;
+                background: rgba(var(--wplus-color-warning), 1);
                 color: rgba(17, 19, 24, 1);
                 font-size: 0;
-                animation: bm-call-hand 1.5s ease-in-out infinite;
+                animation: wplus-call-hand 1.5s ease-in-out infinite;
             }
         }
 
         // Listener in a broadcast: top end, sliding under the raised-hand
         // chip when the listener has a hand up.
-        .bm-viewer-badge {
+        .wplus-viewer-badge {
             position: absolute;
             z-index: 2;
             top: 8px;
@@ -1420,18 +1447,18 @@
             display: inline-flex;
         }
 
-        .bm-hand-raised-status + .bm-viewer-badge {
+        .wplus-hand-raised-status + .wplus-viewer-badge {
             top: 40px;
         }
 
-        .bm-viewer-badge {
+        .wplus-viewer-badge {
 
             > span {
                 display: inline-block;
                 padding: 3px 8px;
-                @include bm-call-glass(0.55);
+                @include wplus-call-glass(0.55);
                 border-color: transparent;
-                &:not(#\9) { border-radius: var(--bm-radius-pill); }
+                &:not(#\9) { border-radius: var(--wplus-radius-pill); }
                 color: rgba(255, 255, 255, 0.82);
                 font-size: 10px;
                 font-weight: 700;
@@ -1440,45 +1467,49 @@
             }
         }
 
-        // Moderation: top start, on hover (and on show for touch, which
-        // has no hover).
-        .bm-admin-controls {
+        // Moderation: the ⋯ that opens the person's menu, top start, on
+        // hover (and on show for touch, which has no hover).
+        .wplus-admin-controls {
             position: absolute;
             z-index: 3;
             top: 8px;
             inset-inline-start: 8px;
             display: flex;
             gap: 4px;
-            padding: 4px;
-            @include bm-call-glass(0.55);
-            &:not(#\9) { border-radius: var(--bm-radius-pill); }
+            padding: 0;
+            border: 0;
+            background: none;
             text-align: start;
             opacity: 0;
             visibility: hidden;
             transition: opacity 0.15s ease, visibility 0s linear 0.15s;
 
             > span {
-                @include bm-call-chip;
-                width: 26px;
-                height: 26px;
+                @include wplus-call-chip;
+                box-sizing: border-box;
+                width: 30px;
+                height: 30px;
                 margin: 0;
-                background: rgba(255, 255, 255, 0.12);
+                border: 1px solid rgba(255, 255, 255, 0.14);
+                background: rgba(0, 0, 0, 0.55);
+                box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
                 cursor: pointer;
-                transition: background 0.12s ease;
+                transition: background 0.12s ease, border-color 0.12s ease;
 
                 > svg {
-                    width: 14px;
-                    height: 14px;
+                    width: 16px;
+                    height: 16px;
                 }
 
                 &:hover {
-                    background: rgba(255, 255, 255, 0.26);
+                    background: rgba(0, 0, 0, 0.75);
+                    border-color: rgba(255, 255, 255, 0.24);
                 }
 
-                &.bm-promote-highlighted {
-                    background: rgba(var(--bm-color-warning), 1);
+                &.wplus-promote-highlighted {
+                    background: rgba(var(--wplus-color-warning), 1);
                     color: rgba(17, 19, 24, 1);
-                    animation: bm-call-hand 1.5s ease-in-out infinite;
+                    animation: wplus-call-hand 1.5s ease-in-out infinite;
                 }
 
                 &[data-busy] {
@@ -1487,8 +1518,8 @@
             }
         }
 
-        &:hover .bm-admin-controls,
-        .bm-admin-controls:focus-within {
+        &:hover .wplus-admin-controls,
+        .wplus-admin-controls:focus-within {
             opacity: 1;
             visibility: visible;
             transition-delay: 0s;
@@ -1499,28 +1530,46 @@
         // moderator would not see the action land. A rule of its own: a
         // browser that does not know :has() drops the whole rule it is in,
         // and in the one above it took the hover and focus reveal with it.
-        .bm-admin-controls:has([data-busy]) {
+        .wplus-admin-controls:has([data-busy]) {
             opacity: 1;
             visibility: visible;
             transition-delay: 0s;
+        }
+
+        // The ⋯ of the person whose panel is open stays up, latched, and the
+        // tile is outlined: the panel sits above the dock, away from the tile.
+        .wplus-admin-controls[data-open] {
+            opacity: 1;
+            visibility: visible;
+            transition-delay: 0s;
+
+            > span[data-active] {
+                background: rgba(var(--wplus-color-accent), 1);
+                color: rgba(var(--wplus-color-text-on-accent), 1);
+            }
+        }
+
+        &.wplus-moderating {
+            outline: 2px solid rgba(var(--wplus-color-accent), 1);
+            outline-offset: -2px;
         }
     }
 }
 
 // ─── Group audio: the roster ──────────────────────────────────────────────
 
-.bm-call-wrap.bm-group-audio-call-container {
+.wplus-call-wrap.wplus-group-audio-call-container {
     height: 100%;
     overflow: hidden;
 
-    .bm-group-call-container {
+    .wplus-group-call-container {
         position: relative;
         width: 100%;
         height: 100%;
         overflow: hidden;
     }
 
-    .bm-group-call-audios-grid {
+    .wplus-group-call-audios-grid {
         position: absolute;
         inset: 0;
         bottom: 64px;
@@ -1534,7 +1583,7 @@
         overflow-y: auto;
     }
 
-    .bm-group-call-input-audio {
+    .wplus-group-call-input-audio {
         display: block;
         flex: none;
         z-index: 1;
@@ -1562,12 +1611,12 @@
     // `flex` rather than being written down. A roster long enough to fill the
     // stage by itself scrolls, and `min-height` is what stops the share being
     // squeezed to nothing on the way — the grid scrolls, it does not compress.
-    .bm-group-call-input-audio.bm-group-call-input-audio-screen {
+    .wplus-group-call-input-audio.wplus-group-call-input-audio-screen {
         display: flex;
         flex: 1 1 auto;
         min-height: 45%;
 
-        > .bm-group-call-input-audio-inner {
+        > .wplus-group-call-input-audio-inner {
             display: flex;
             flex-direction: column;
             width: 100%;
@@ -1575,21 +1624,21 @@
         }
     }
 
-    .bm-group-call-input-audio-inner {
+    .wplus-group-call-input-audio-inner {
         position: relative;
         display: block;
         box-sizing: border-box;
         padding: 0;
         overflow: hidden;
-        &:not(#\9) { border-radius: var(--bm-radius-card); }
+        &:not(#\9) { border-radius: var(--wplus-radius-card); }
         border: 1px solid rgba(255, 255, 255, 0.06);
-        background: rgba(var(--bm-call-tile), 1);
-        color: rgba(var(--bm-call-fg), 1);
+        background: rgba(var(--wplus-call-tile), 1);
+        color: rgba(var(--wplus-call-fg), 1);
         box-shadow: none;
-        transition: box-shadow var(--bm-duration-slow) ease-in-out, background var(--bm-duration-slow) ease-in-out, border-color var(--bm-duration-slow) ease-in-out;
+        transition: box-shadow var(--wplus-duration-slow) ease-in-out, background var(--wplus-duration-slow) ease-in-out, border-color var(--wplus-duration-slow) ease-in-out;
 
-        &.bm-active-speaker {
-            border-color: rgba(var(--bm-color-accent), 0.9);
+        &.wplus-active-speaker {
+            border-color: rgba(var(--wplus-color-accent), 0.9);
         }
 
         // The picture, at its own shape, as large as the stage allows.
@@ -1610,7 +1659,7 @@
         // then right either way up. The width/height pair above is what a
         // browser without them falls back to: the picture letterboxed rather
         // than hugged, which is the old behaviour minus the 320px ceiling.
-        .bm-group-call-input-audio-screen-wrapper {
+        .wplus-group-call-input-audio-screen-wrapper {
             display: flex;
             align-items: center;
             justify-content: center;
@@ -1628,24 +1677,24 @@
                 background: rgba(0, 0, 0, 1);
 
                 width: auto;
-                aspect-ratio: var(--bm-screen-ratio, 1.7777);
-                height: min(100cqh, calc(100cqw / var(--bm-screen-ratio, 1.7777)));
+                aspect-ratio: var(--wplus-screen-ratio, 1.7777);
+                height: min(100cqh, calc(100cqw / var(--wplus-screen-ratio, 1.7777)));
             }
         }
 
-        .bm-group-call-input-audio-inner-info {
+        .wplus-group-call-input-audio-inner-info {
             display: block;
             flex: none;
             padding: 8px 10px;
         }
 
-        .bm-caller-info {
+        .wplus-caller-info {
             display: flex;
             align-items: center;
             gap: 10px;
             min-width: 0;
 
-            .bm-info-avatar {
+            .wplus-info-avatar {
                 flex: none;
                 padding: 0;
                 line-height: 0;
@@ -1658,25 +1707,25 @@
                     display: block;
                     width: 40px;
                     height: 40px;
-                    &:not(#\9) { border-radius: var(--bm-radius-avatar) !important; }
+                    &:not(#\9) { border-radius: var(--wplus-radius-avatar) !important; }
                 }
             }
 
-            .bm-info-name {
+            .wplus-info-name {
                 flex: 1 1 auto;
                 min-width: 0;
-                font-size: var(--bm-font-size-sm);
+                font-size: var(--wplus-font-size-sm);
                 font-weight: 600;
                 white-space: nowrap;
                 overflow: hidden;
                 text-overflow: ellipsis;
 
                 a {
-                    color: rgba(var(--bm-call-fg), 1) !important;
+                    color: rgba(var(--wplus-call-fg), 1) !important;
                 }
             }
 
-            .bm-caller-actions {
+            .wplus-caller-actions {
                 display: flex;
                 align-items: center;
                 flex: none;
@@ -1684,7 +1733,7 @@
                 margin-inline-start: auto;
                 padding: 0;
 
-                > .bm-admin-controls {
+                > .wplus-admin-controls {
                     display: flex;
                     gap: 4px;
                     opacity: 0;
@@ -1692,7 +1741,7 @@
                     transition: opacity 0.15s ease, visibility 0s linear 0.15s;
 
                     > span {
-                        @include bm-call-chip;
+                        @include wplus-call-chip;
                         width: 28px;
                         height: 28px;
                         margin: 0;
@@ -1701,18 +1750,18 @@
                         transition: background 0.12s ease;
 
                         > svg {
-                            width: 14px;
-                            height: 14px;
+                            width: 16px;
+                            height: 16px;
                         }
 
                         &:hover {
                             background: rgba(255, 255, 255, 0.26);
                         }
 
-                        &.bm-promote-highlighted {
-                            background: rgba(var(--bm-color-warning), 1);
+                        &.wplus-promote-highlighted {
+                            background: rgba(var(--wplus-color-warning), 1);
                             color: rgba(17, 19, 24, 1);
-                            animation: bm-call-hand 1.5s ease-in-out infinite;
+                            animation: wplus-call-hand 1.5s ease-in-out infinite;
                         }
 
                         &[data-busy] {
@@ -1721,39 +1770,39 @@
                     }
                 }
 
-                .bm-mic-status {
+                .wplus-mic-status {
                     line-height: 0;
 
                     > span {
-                        @include bm-call-chip;
+                        @include wplus-call-chip;
                         width: 28px;
                         height: 28px;
                     }
 
-                    .bm-mic-disabled {
-                        background: rgba(var(--bm-color-recording), 0.92);
+                    .wplus-mic-disabled {
+                        background: rgba(var(--wplus-color-recording), 0.92);
                     }
 
-                    .bm-mic-enabled {
-                        background: rgba(var(--bm-color-success), 0.22);
-                        color: rgba(var(--bm-color-success), 1);
+                    .wplus-mic-enabled {
+                        background: rgba(var(--wplus-color-success), 0.22);
+                        color: rgba(var(--wplus-color-success), 1);
                     }
                 }
 
-                .bm-hand-raised {
-                    @include bm-call-chip;
+                .wplus-hand-raised {
+                    @include wplus-call-chip;
                     width: 28px;
                     height: 28px;
-                    background: rgba(var(--bm-color-warning), 1);
+                    background: rgba(var(--wplus-color-warning), 1);
                     color: rgba(17, 19, 24, 1);
-                    animation: bm-call-hand 1.5s ease-in-out infinite;
+                    animation: wplus-call-hand 1.5s ease-in-out infinite;
                 }
 
-                .bm-viewer-badge {
+                .wplus-viewer-badge {
                     display: inline-block;
                     margin: 0;
                     padding: 3px 8px;
-                    &:not(#\9) { border-radius: var(--bm-radius-pill); }
+                    &:not(#\9) { border-radius: var(--wplus-radius-pill); }
                     background: rgba(255, 255, 255, 0.1);
                     color: rgba(255, 255, 255, 0.72);
                     font-size: 10px;
@@ -1764,8 +1813,8 @@
             }
         }
 
-        &:hover .bm-caller-actions > .bm-admin-controls,
-        .bm-caller-actions > .bm-admin-controls:focus-within {
+        &:hover .wplus-caller-actions > .wplus-admin-controls,
+        .wplus-caller-actions > .wplus-admin-controls:focus-within {
             opacity: 1;
             visibility: visible;
             transition-delay: 0s;
@@ -1773,19 +1822,427 @@
 
         // Kept up while a control waits, as on a video tile, in a rule of its
         // own for the same reason.
-        .bm-caller-actions > .bm-admin-controls:has([data-busy]) {
+        .wplus-caller-actions > .wplus-admin-controls:has([data-busy]) {
             opacity: 1;
             visibility: visible;
             transition-delay: 0s;
         }
+
+        // The person whose panel is open, as on a video tile.
+        .wplus-caller-actions > .wplus-admin-controls[data-open] {
+            opacity: 1;
+            visibility: visible;
+            transition-delay: 0s;
+
+            > span[data-active] {
+                background: rgba(var(--wplus-color-accent), 1);
+                color: rgba(var(--wplus-color-text-on-accent), 1);
+            }
+        }
+
+        &.wplus-moderating {
+            outline: 2px solid rgba(var(--wplus-color-accent), 1);
+            outline-offset: -2px;
+        }
     }
+}
+
+// ─── The call filling the browser window (Expand, call-view.tsx) ──────────
+//
+// Over the page at the window's size, above a site's header and the
+// messenger's own overlays and below its toasts (2147483601), with the page
+// under it held still. Full Screen from here makes the same element the whole
+// screen, and leaving that comes back to this.
+
+.wplus-call-wrap.wplus-call-wrap--window {
+    position: fixed;
+    inset: 0;
+    z-index: 2147483000;
+    box-sizing: border-box;
+    width: 100%;
+    height: 100%;
+    height: 100dvh;
+    max-width: none;
+    max-height: none;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    overflow: hidden;
+    &:not(#\9) { border-radius: 0; }
+}
+
+// Shown as a popover (the top layer, call-view.tsx), over the browser's own
+// look for one: no backdrop.
+.wplus-call-wrap.wplus-call-wrap--window::backdrop {
+    background: none;
+}
+
+html.wplus-call-windowed,
+html.wplus-call-windowed body {
+    overflow: hidden;
+}
+
+// ─── Moderation: Host Controls, a person's menu, a locked microphone ──────
+//
+// Menus at the button that opened them, placed in the stage by
+// components/calls/moderation-panels.tsx: a solid dark card, a header (Host
+// Controls with its badge, or the person's picture, name and what is on for
+// them as pills), then rows that spell out what each does, the room's rules
+// as switches. Every size is set here, in pixels: the stage sits inside a
+// site's page, and a theme's large body text made the rows twice as tall.
+
+@keyframes wplus-call-popover-down {
+    from { opacity: 0; transform: translateY(-4px) scale(0.98); }
+    to   { opacity: 1; transform: none; }
+}
+
+@keyframes wplus-call-popover-up {
+    from { opacity: 0; transform: translateY(4px) scale(0.98); }
+    to   { opacity: 1; transform: none; }
+}
+
+.wplus-call-wrap .wplus-call-popover {
+    position: absolute;
+    z-index: 6;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    box-sizing: border-box;
+    max-width: calc(100% - 16px);
+    margin: 0;
+    padding: 6px;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    @include wplus-call-scrollbar;
+    border: 1px solid rgba(255, 255, 255, 0.09);
+    &:not(#\9) { border-radius: 14px; }
+    background: rgba(22, 24, 30, 0.97);
+    box-shadow: 0 18px 48px rgba(0, 0, 0, 0.5), 0 2px 8px rgba(0, 0, 0, 0.35);
+    color: rgba(255, 255, 255, 0.94);
+    font-size: 13px;
+    font-weight: 400;
+    line-height: 1.35;
+    letter-spacing: normal;
+    text-align: start;
+    text-transform: none;
+    pointer-events: auto;
+    transform-origin: top left;
+    animation: wplus-call-popover-down 0.14s ease-out;
+
+    // A menu taller than its room scrolls: its rows keep their height rather
+    // than being squeezed into each other.
+    > * {
+        flex-shrink: 0;
+    }
+
+    &[data-side="above"] {
+        transform-origin: bottom right;
+        animation-name: wplus-call-popover-up;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        animation: none;
+    }
+}
+
+.wplus-call-wrap .wplus-call-moderation-person { width: 248px; }
+.wplus-call-wrap .wplus-call-moderation-room   { width: 340px; }
+
+.wplus-call-wrap .wplus-call-moderation {
+    .wplus-call-moderation-head {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin: 0 0 4px;
+        padding: 8px 8px 10px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+    }
+
+    .wplus-call-moderation-badge {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        flex: none;
+        width: 28px;
+        height: 28px;
+        &:not(#\9) { border-radius: 8px; }
+        background: rgba(var(--wplus-color-accent), 0.2);
+        color: rgba(var(--wplus-color-accent), 1);
+
+        > svg { width: 16px; height: 16px; }
+    }
+
+    .wplus-call-moderation-avatar {
+        flex: none;
+        width: 32px;
+        height: 32px;
+        overflow: hidden;
+        &:not(#\9) { border-radius: var(--wplus-radius-circle); }
+        line-height: 0;
+
+        img,
+        .avatar,
+        .wplus-placeholder-wrapper {
+            width: 32px !important;
+            height: 32px !important;
+            margin: 0;
+            &:not(#\9) { border-radius: var(--wplus-radius-circle); }
+            object-fit: cover;
+        }
+    }
+
+    .wplus-call-moderation-who {
+        display: flex;
+        flex: 1 1 auto;
+        flex-direction: column;
+        gap: 4px;
+        min-width: 0;
+    }
+
+    .wplus-call-moderation-title {
+        overflow: hidden;
+        font-size: 14px;
+        font-weight: 600;
+        line-height: 1.3;
+        white-space: nowrap;
+        text-overflow: ellipsis;
+        color: rgba(255, 255, 255, 1);
+    }
+
+    .wplus-call-moderation-state {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4px;
+    }
+
+    // What is on for the person: a microphone a moderator holds in red, a
+    // raised hand in amber, anything else plain.
+    .wplus-call-moderation-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        padding: 2px 8px 2px 6px;
+        &:not(#\9) { border-radius: var(--wplus-radius-pill); }
+        background: rgba(255, 255, 255, 0.1);
+        color: rgba(255, 255, 255, 0.78);
+        font-size: 11px;
+        font-weight: 600;
+        line-height: 16px;
+        white-space: nowrap;
+
+        > svg { flex: none; width: 11px; height: 11px; }
+
+        &[data-tone="danger"] {
+            background: rgba(var(--wplus-color-recording), 0.2);
+            color: rgba(255, 150, 140, 1);
+        }
+
+        &[data-tone="warning"] {
+            background: rgba(var(--wplus-color-warning), 0.2);
+            color: rgba(var(--wplus-color-warning), 1);
+        }
+    }
+
+    .wplus-call-moderation-row {
+        all: unset;
+        box-sizing: border-box;
+        display: flex;
+        flex-shrink: 0;
+        align-items: center;
+        gap: 10px;
+        width: 100%;
+        min-height: 36px;
+        padding: 6px 8px;
+        &:not(#\9) { border-radius: 9px; }
+        color: rgba(255, 255, 255, 0.92);
+        font-size: 13px;
+        line-height: 1.35;
+        text-align: start;
+        cursor: pointer;
+        transition: background 0.12s ease;
+
+        &:hover { background: rgba(255, 255, 255, 0.08); }
+        &:focus-visible {
+            background: rgba(255, 255, 255, 0.08);
+            outline: 2px solid rgba(var(--wplus-color-accent), 0.8);
+            outline-offset: -2px;
+        }
+        &[data-busy] { cursor: progress; }
+    }
+
+    .wplus-call-moderation-icon {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        flex: none;
+        width: 20px;
+        height: 20px;
+        color: rgba(255, 255, 255, 0.7);
+        line-height: 0;
+
+        > svg { width: 16px; height: 16px; }
+    }
+
+    .wplus-call-moderation-text {
+        display: flex;
+        flex: 1 1 auto;
+        flex-direction: column;
+        gap: 2px;
+        min-width: 0;
+    }
+
+    .wplus-call-moderation-label {
+        font-weight: 500;
+        color: rgba(255, 255, 255, 1);
+    }
+
+    .wplus-call-moderation-note {
+        font-size: 11.5px;
+        line-height: 1.4;
+        color: rgba(255, 255, 255, 0.55);
+    }
+
+    .wplus-call-moderation-divider {
+        display: block;
+        flex: none;
+        height: 1px;
+        margin: 4px 8px;
+        background: rgba(255, 255, 255, 0.08);
+    }
+
+    // On / off, for the room's rules.
+    .wplus-call-moderation-switch {
+        position: relative;
+        flex: none;
+        width: 34px;
+        height: 20px;
+        &:not(#\9) { border-radius: var(--wplus-radius-pill); }
+        background: rgba(255, 255, 255, 0.2);
+        transition: background 0.15s ease;
+
+        &::after {
+            content: "";
+            position: absolute;
+            top: 3px;
+            inset-inline-start: 3px;
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 1);
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+            transition: inset-inline-start 0.15s ease;
+        }
+    }
+
+    .wplus-call-moderation-row[data-on] .wplus-call-moderation-switch {
+        background: rgba(var(--wplus-color-accent), 1);
+
+        &::after { inset-inline-start: 17px; }
+    }
+
+    .wplus-call-moderation-danger {
+        color: rgba(255, 150, 140, 1);
+
+        .wplus-call-moderation-label,
+        .wplus-call-moderation-icon { color: inherit; }
+
+        &:hover { background: rgba(var(--wplus-color-recording), 0.16); }
+    }
+
+    // Promoting someone whose hand is up: what they asked for.
+    .wplus-call-moderation-highlight {
+        background: rgba(var(--wplus-color-warning), 0.14);
+
+        .wplus-call-moderation-icon { color: rgba(var(--wplus-color-warning), 1); }
+    }
+}
+
+// The room's rules: each glyph on a tile of its own, lit while the rule holds,
+// at the top of its row with the switch, the title level with both and the
+// description running on below it.
+.wplus-call-wrap .wplus-call-popover.wplus-call-moderation-room {
+    gap: 4px;
+    padding: 8px;
+}
+
+.wplus-call-wrap .wplus-call-moderation-room {
+    // The header's badge and title on the rows' columns: the badge the size
+    // of their tiles, at their inset and gap.
+    .wplus-call-moderation-head {
+        gap: 14px;
+        margin: 0 0 4px;
+        padding: 6px 10px 12px;
+    }
+
+    .wplus-call-moderation-badge {
+        width: 34px;
+        height: 34px;
+        &:not(#\9) { border-radius: 10px; }
+
+        > svg { width: 18px; height: 18px; }
+    }
+
+    .wplus-call-moderation-row {
+        align-items: flex-start;
+        gap: 14px;
+        padding: 10px 10px 12px;
+        &:not(#\9) { border-radius: 11px; }
+    }
+
+    // A row with no description has its title level with the middle of its
+    // tile instead.
+    .wplus-call-moderation-row:not(:has(.wplus-call-moderation-note)) {
+        align-items: center;
+    }
+
+    .wplus-call-moderation-icon {
+        width: 34px;
+        height: 34px;
+        &:not(#\9) { border-radius: 10px; }
+        background: rgba(255, 255, 255, 0.07);
+    }
+
+    // The text starts level with the tile's top, the switch level with the
+    // title.
+    .wplus-call-moderation-text {
+        gap: 3px;
+        padding-top: 0;
+    }
+
+    .wplus-call-moderation-switch {
+        margin-top: 0;
+    }
+
+    .wplus-call-moderation-row[data-on] .wplus-call-moderation-icon {
+        background: rgba(var(--wplus-color-accent), 0.2);
+        color: rgba(var(--wplus-color-accent), 1);
+    }
+}
+
+// A microphone a moderator keeps off: the user's own, which a press only
+// explains, and on a tile or a roster row the round red chip of a microphone
+// off with the silenced glyph, a touch larger than the crossed microphone it
+// stands for (the `:not(#\9)` is above the chip's own size for its glyph).
+.wplus-call-wrap .wplus-group-call-controls-buttons > .wplus-mic-locked {
+    cursor: not-allowed;
+}
+
+.wplus-call-wrap .wplus-mic-locked-chip > svg:not(#\9) {
+    width: 14px;
+    height: 14px;
+}
+
+// The room's rules hug the stage's end edge as the dock does, with its margins on both sides.
+.wplus-call-wrap .wplus-call-popover.wplus-call-moderation-room {
+    max-width: calc(100% - 28px);
 }
 
 // Touch has no hover: moderation controls stay on show, as they do on
 // every other hover-only affordance in 3.0.
 @media (pointer: coarse) {
-    .bm-call-wrap.bm-call-wrap-group .bm-group-call-input-video-inner .bm-admin-controls,
-    .bm-call-wrap.bm-group-audio-call-container .bm-group-call-input-audio-inner .bm-caller-actions > .bm-admin-controls {
+    .wplus-call-wrap.wplus-call-wrap-group .wplus-group-call-input-video-inner .wplus-admin-controls,
+    .wplus-call-wrap.wplus-group-audio-call-container .wplus-group-call-input-audio-inner .wplus-caller-actions > .wplus-admin-controls {
         opacity: 1;
         visibility: visible;
     }
@@ -1793,7 +2250,7 @@
 
 // Narrow stages (a 350px call column beside the chat, a tablet split, a
 // phone): the controls ease down a little, and the connection badge folds to
-// its dot once its label would crowd the dock. The stage (.bm-call-wrap) is
+// its dot once its label would crowd the dock. The stage (.wplus-call-wrap) is
 // the container.
 //
 // This ladder used to be how the dock fitted — it shrank the buttons for as
@@ -1801,23 +2258,23 @@
 // CallDock's job now, so the steps are small ones for the look of a cramped
 // stage rather than a chase after room that stops at a 32px target.
 @container (max-width: 719px) {
-    .bm-call-container {
-        --bm-call-btn: 32px;
+    .wplus-call-container {
+        --wplus-call-btn: 32px;
     }
 }
 
 @container (max-width: 559px) {
-    .bm-call-container {
-        --bm-call-btn: 30px;
+    .wplus-call-container {
+        --wplus-call-btn: 30px;
     }
 
-    .bm-call-buttons,
-    .bm-group-call-controls-buttons {
+    .wplus-call-buttons,
+    .wplus-group-call-controls-buttons {
         gap: 4px;
         padding: 5px;
     }
 
-    .bm-connection-quality {
+    .wplus-connection-quality {
         width: 28px;
         padding: 0;
         justify-content: center;
@@ -1835,7 +2292,7 @@
 // as people speak, React moves the reordered nodes with insertBefore, and
 // moving a node restarts any CSS animation on it — which made every tile
 // collapse to scale(0) and grow back on each re-sort. group-audio-grid-item
-// carries .bm-call-tile-entering for the first 300ms of a tile's life only, so
+// carries .wplus-call-tile-entering for the first 300ms of a tile's life only, so
 // a tile that is merely changing places has no animation left to restart.
 //
 // `backwards` rather than `both`: the tile must already be at scale(0) on the
@@ -1846,23 +2303,23 @@
 //
 // There is no leaving animation. Fading a tile out means holding its LiveKit
 // participant alive for the length of the fade, which is not worth it.
-@keyframes bm-call-tile-in {
+@keyframes wplus-call-tile-in {
   from { opacity: 0; transform: scale(0); }
   to   { opacity: 1; transform: none; }
 }
 
-.bm-group-call-input-audio.bm-call-tile-entering {
-  animation: bm-call-tile-in 300ms linear backwards;
+.wplus-group-call-input-audio.wplus-call-tile-entering {
+  animation: wplus-call-tile-in 300ms linear backwards;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .bm-group-call-input-audio.bm-call-tile-entering { animation-duration: 1ms; }
+  .wplus-group-call-input-audio.wplus-call-tile-entering { animation-duration: 1ms; }
 }
 
 // A participant away for a moment (call-container's participantAway): the
 // tile keeps its place, dimmed over the avatar, and says so, so the layout
 // doesn't shift while they reconnect or move between servers.
-.bm-call-wrap .bm-call-reconnecting {
+.wplus-call-wrap .wplus-call-reconnecting {
   position: absolute;
   inset: 0;
   z-index: 3;
@@ -1886,7 +2343,7 @@
 // pointer, for its explanation; the tile's controls stay reachable. Over the
 // tile's media (z-index 1), under its name, microphone and controls, which
 // come after it.
-.bm-call-wrap .bm-call-paused {
+.wplus-call-wrap .wplus-call-paused {
   position: absolute;
   inset: 0;
   z-index: 2;
@@ -1897,17 +2354,17 @@
   &:not(#\9) { border-radius: inherit; }
   background: rgba(0, 0, 0, 0.45);
   pointer-events: none;
-  animation: bm-call-paused-in 0.3s ease both;
+  animation: wplus-call-paused-in 0.3s ease both;
 
-  .bm-call-paused-notice {
+  .wplus-call-paused-notice {
     display: inline-flex;
     align-items: center;
     gap: 6px;
     max-width: 100%;
     box-sizing: border-box;
     padding: 6px 10px;
-    @include bm-call-glass(0.55);
-    &:not(#\9) { border-radius: var(--bm-radius-card); }
+    @include wplus-call-glass(0.55);
+    &:not(#\9) { border-radius: var(--wplus-radius-card); }
     color: #fff;
     font-size: 13px;
     font-weight: 500;
@@ -1919,7 +2376,7 @@
     > svg {
       flex: none;
       margin: 0 !important;
-      color: rgba(var(--bm-color-warning), 1);
+      color: rgba(var(--wplus-color-warning), 1);
     }
 
     p {
@@ -1936,26 +2393,26 @@
   // The call between two people: the whole stage, room for the explanation.
   // Over the picture, under the chips before it (the other side's muted
   // microphone, z-index 2).
-  &.bm-call-paused-main {
+  &.wplus-call-paused-main {
     z-index: 1;
   }
 
-  &.bm-call-paused-main .bm-call-paused-notice {
+  &.wplus-call-paused-main .wplus-call-paused-notice {
     gap: 10px;
     max-width: min(100% - 32px, 420px);
     padding: 10px 14px;
-    font-size: var(--bm-font-size-sm);
+    font-size: var(--wplus-font-size-sm);
     line-height: 1.35;
   }
 }
 
-@keyframes bm-call-paused-in {
+@keyframes wplus-call-paused-in {
   from { opacity: 0; }
   to { opacity: 1; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .bm-call-wrap .bm-call-paused { animation: none; }
+  .wplus-call-wrap .wplus-call-paused { animation: none; }
 }
 
 // Their camera moving to another codec during the call (optimizing.tsx): their
@@ -1965,7 +2422,7 @@
 // out once the new picture's first frame is drawn, so nobody sees the black
 // frame between. Where it is, the tile's paused notice isn't; it sits where that
 // one would (z-index 2, the stage's 1), under the name, microphone and controls.
-.bm-call-wrap .bm-call-optimizing {
+.wplus-call-wrap .wplus-call-optimizing {
   position: absolute;
   inset: 0;
   z-index: 2;
@@ -1977,15 +2434,15 @@
   &:not(#\9) { border-radius: inherit; }
   background: rgba(0, 0, 0, 0.5);
   pointer-events: none;
-  animation: bm-call-paused-in 0.3s ease both;
+  animation: wplus-call-paused-in 0.3s ease both;
 
   // an animation, not a transition: the one coming in holds its opacity
-  &.bm-call-optimizing--leaving {
-    animation: bm-call-optimizing-out 0.3s ease both;
+  &.wplus-call-optimizing--leaving {
+    animation: wplus-call-optimizing-out 0.3s ease both;
   }
 
   // Past the edges, so the blur has no faded rim.
-  .bm-call-optimizing-backdrop {
+  .wplus-call-optimizing-backdrop {
     position: absolute;
     inset: -24px;
     background-position: center;
@@ -1993,7 +2450,7 @@
     filter: blur(16px) brightness(0.62) saturate(1.15);
   }
 
-  .bm-call-optimizing-notice {
+  .wplus-call-optimizing-notice {
     position: relative;
     display: inline-flex;
     align-items: center;
@@ -2001,9 +2458,9 @@
     max-width: 100%;
     box-sizing: border-box;
     padding: 7px 13px 7px 11px;
-    @include bm-call-glass(0.4);
-    &:not(#\9) { border-radius: var(--bm-radius-pill); }
-    color: rgba(var(--bm-call-fg), 1);
+    @include wplus-call-glass(0.4);
+    &:not(#\9) { border-radius: var(--wplus-radius-pill); }
+    color: rgba(var(--wplus-call-fg), 1);
     font-size: 13px;
     font-weight: 500;
     line-height: 1.3;
@@ -2012,65 +2469,65 @@
   }
 
   // A faint ring with an arc turning on it, as the call's busy controls spin.
-  .bm-call-optimizing-spinner {
+  .wplus-call-optimizing-spinner {
     flex: none;
     width: 16px;
     height: 16px;
     fill: none;
     stroke-width: 2.4;
     stroke-linecap: round;
-    animation: bm-call-optimizing-spin 0.9s linear infinite;
+    animation: wplus-call-optimizing-spin 0.9s linear infinite;
 
-    circle { stroke: rgba(var(--bm-call-fg), 0.25); }
-    path { stroke: rgba(var(--bm-call-fg), 1); }
+    circle { stroke: rgba(var(--wplus-call-fg), 0.25); }
+    path { stroke: rgba(var(--wplus-call-fg), 1); }
   }
 
   // The call between two people: the whole stage, a larger chip. Over the
   // picture, under the chips before it, as the paused notice there.
-  &.bm-call-optimizing-main {
+  &.wplus-call-optimizing-main {
     z-index: 1;
 
-    .bm-call-optimizing-backdrop {
+    .wplus-call-optimizing-backdrop {
       filter: blur(28px) brightness(0.6) saturate(1.15);
     }
 
-    .bm-call-optimizing-notice {
+    .wplus-call-optimizing-notice {
       gap: 11px;
       padding: 10px 18px 10px 15px;
-      font-size: var(--bm-font-size-sm);
+      font-size: var(--wplus-font-size-sm);
     }
 
-    .bm-call-optimizing-spinner {
+    .wplus-call-optimizing-spinner {
       width: 18px;
       height: 18px;
     }
   }
 }
 
-@keyframes bm-call-optimizing-spin {
+@keyframes wplus-call-optimizing-spin {
   to { transform: rotate(360deg); }
 }
 
-@keyframes bm-call-optimizing-out {
+@keyframes wplus-call-optimizing-out {
   from { opacity: 1; }
   to { opacity: 0; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .bm-call-wrap .bm-call-optimizing,
-  .bm-call-wrap .bm-call-optimizing.bm-call-optimizing--leaving {
+  .wplus-call-wrap .wplus-call-optimizing,
+  .wplus-call-wrap .wplus-call-optimizing.wplus-call-optimizing--leaving {
     animation: none;
 
-    .bm-call-optimizing-spinner { animation: none; }
+    .wplus-call-optimizing-spinner { animation: none; }
   }
 }
 
 // A picture that stopped arriving while its sender is still in the call
 // (stalled.tsx): its last frame stays, blurred and dimmed as the optimizing
 // placeholder's still is, so it doesn't pass for live, under "Video
-// interrupted" (the paused notice's chip, .bm-call-stalled) or the tile's
+// interrupted" (the paused notice's chip, .wplus-call-stalled) or the tile's
 // "Reconnecting...". It comes back sharp with its next frame.
-.bm-call-wrap video.bm-call-video-stalled {
+.wplus-call-wrap video.wplus-call-video-stalled {
   filter: blur(16px) brightness(0.62) saturate(1.15);
 }
 
@@ -2078,24 +2535,24 @@
 // face over the empty picture with the notice under it, nothing dimmed, as
 // there is nothing to dim (on a tile the size the tile's own avatar takes,
 // on the stage of a call between two its 100px one).
-.bm-call-wrap .bm-call-paused.bm-call-stalled-faced {
+.wplus-call-wrap .wplus-call-paused.wplus-call-stalled-faced {
   flex-direction: column;
   gap: 12px;
   background: transparent;
 }
 
-.bm-call-wrap .bm-call-stalled-face {
+.wplus-call-wrap .wplus-call-stalled-face {
   flex: none;
   width: min(38%, 96px);
   aspect-ratio: 1;
   background-size: cover;
   background-position: center;
-  &:not(#\9) { border-radius: var(--bm-radius-avatar); }
+  &:not(#\9) { border-radius: var(--wplus-radius-avatar); }
 }
 
 // Their sound stopped too: the face alone on the stage, "The other side lost
 // connection" over it.
-.bm-call-wrap .bm-call-stalled-face-main {
+.wplus-call-wrap .wplus-call-stalled-face-main {
   position: absolute;
   inset: 0;
   z-index: 1;
@@ -2103,4 +2560,749 @@
   align-items: center;
   justify-content: center;
   pointer-events: none;
+}
+
+// ─── The devices (device-panel.tsx) ───────────────────────────────────────
+//
+// Over the call above the dock, where the device pickers were, drawn as Host
+// Controls is: its title, then a row for each device with its glyph on a tile,
+// its name, the device in use under it, which opens the list of the others in
+// place, its Test on the end, the camera's preview while it is tested, and a
+// line saying whether the others see or hear it with what turns it on or off.
+// DevicePanel holds it to the stage above it, and it scrolls past that.
+
+.wplus-call-wrap .wplus-call-settings.wplus-call-devices {
+    flex-direction: column;
+    flex-wrap: nowrap;
+    align-items: stretch;
+    justify-content: flex-start;
+    gap: 2px;
+    width: 340px;
+    max-width: calc(100% - 28px);
+    padding: 8px;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    @include wplus-call-scrollbar;
+    border: 1px solid rgba(255, 255, 255, 0.09);
+    &:not(#\9) { border-radius: 16px; }
+    // Solid: the own tile's avatar showed through the empty preview.
+    background: rgba(22, 24, 30, 1);
+    box-shadow: 0 18px 48px rgba(0, 0, 0, 0.5), 0 2px 8px rgba(0, 0, 0, 0.35);
+    color: rgba(255, 255, 255, 0.94);
+    font-size: 13px;
+    line-height: 1.35;
+    animation: wplus-call-popover-up 0.14s ease-out;
+
+    > * { flex-shrink: 0; }
+
+    [role="button"]:focus-visible,
+    [role="option"]:focus-visible {
+        outline: 2px solid rgba(var(--wplus-color-accent), 0.8);
+        outline-offset: 2px;
+    }
+}
+
+@keyframes wplus-call-device-talking {
+    50% { background: rgba(var(--wplus-color-warning), 0.38); }
+}
+
+.wplus-call-wrap .wplus-call-devices {
+    .wplus-call-devices-title {
+        padding: 4px 6px 8px;
+        font-size: 14px;
+        font-weight: 600;
+        color: rgba(255, 255, 255, 1);
+    }
+
+    // The camera's test, in its row under its text: only while it runs. Not
+    // mirrored, as the own tile in the call is not: the user sees what the
+    // others would.
+    .wplus-call-device-preview {
+        position: relative;
+        aspect-ratio: 16 / 9;
+        margin: 0 8px 8px;
+        margin-inline-start: 56px;
+        overflow: hidden;
+        &:not(#\9) { border-radius: 10px; }
+        background: #000;
+
+        > video {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            max-width: none;
+            margin: 0;
+            object-fit: cover;
+        }
+    }
+
+    // On the preview: the user's alone.
+    .wplus-call-devices-badge {
+        position: absolute;
+        top: 8px;
+        inset-inline-start: 8px;
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        height: 22px;
+        padding: 0 9px;
+        &:not(#\9) { border-radius: var(--wplus-radius-pill); }
+        background: rgba(0, 0, 0, 0.6);
+        color: rgba(255, 255, 255, 0.92);
+        font-size: 11px;
+        font-weight: 600;
+        white-space: nowrap;
+
+        > svg { width: 12px; height: 12px; }
+    }
+
+    .wplus-call-device {
+        &:not(#\9) { border-radius: 11px; }
+        transition: background 0.12s ease;
+
+        &[data-open] { background: rgba(255, 255, 255, 0.04); }
+    }
+
+    .wplus-call-device-head {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 8px;
+    }
+
+    .wplus-call-device-icon {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        flex: none;
+        width: 36px;
+        height: 36px;
+        &:not(#\9) { border-radius: 10px; }
+        background: rgba(255, 255, 255, 0.07);
+        color: rgba(255, 255, 255, 0.7);
+        line-height: 0;
+        transition: background 0.15s ease, color 0.15s ease;
+
+        > svg { width: 18px; height: 18px; }
+    }
+
+    .wplus-call-device[data-on] .wplus-call-device-icon {
+        background: rgba(var(--wplus-color-accent), 0.2);
+        color: rgba(var(--wplus-color-accent), 1);
+    }
+
+    .wplus-call-device-text {
+        display: flex;
+        flex: 1 1 auto;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 2px;
+        min-width: 0;
+    }
+
+    .wplus-call-device-label {
+        font-weight: 600;
+        color: rgba(255, 255, 255, 1);
+    }
+
+    // The device in use, a quiet button that opens the others, its text
+    // level with the name over it.
+    .wplus-call-device-current {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        box-sizing: border-box;
+        max-width: calc(100% + 12px);
+        margin: 0 -6px;
+        padding: 1px 6px;
+        &:not(#\9) { border-radius: 6px; }
+        color: rgba(255, 255, 255, 0.6);
+        font-size: 12px;
+        cursor: pointer;
+        transition: background 0.12s ease, color 0.12s ease;
+
+        &:hover {
+            background: rgba(255, 255, 255, 0.08);
+            color: rgba(255, 255, 255, 0.9);
+        }
+
+        > svg {
+            flex: none;
+            width: 14px;
+            height: 14px;
+            transition: transform 0.15s ease;
+        }
+
+        &[aria-expanded="true"] > svg { transform: rotate(180deg); }
+
+        &[data-fixed],
+        &[data-fixed]:hover {
+            background: none;
+            color: rgba(255, 255, 255, 0.6);
+            cursor: default;
+        }
+    }
+
+    .wplus-call-device-name {
+        min-width: 0;
+        overflow: hidden;
+        white-space: nowrap;
+        text-overflow: ellipsis;
+    }
+
+    // The microphone's level: segments lighting from the left as it hears
+    // more.
+    .wplus-call-device-level {
+        display: flex;
+        align-items: center;
+        gap: 3px;
+        height: 18px;
+
+        > i {
+            display: block;
+            width: 10px;
+            height: 5px;
+            &:not(#\9) { border-radius: 2px; }
+            background: rgba(255, 255, 255, 0.16);
+            transition: background 0.08s linear;
+
+            &[data-on] { background: rgba(var(--wplus-color-success), 1); }
+        }
+    }
+
+    // Where the level would be: that the microphone is off, and why where a
+    // moderator or the browser holds it.
+    .wplus-call-device-note {
+        display: inline-flex;
+        align-items: flex-start;
+        gap: 5px;
+        box-sizing: border-box;
+        max-width: 100%;
+        margin-top: 2px;
+        padding: 3px 8px;
+        &:not(#\9) { border-radius: 6px; }
+        background: rgba(255, 255, 255, 0.07);
+        color: rgba(255, 255, 255, 0.72);
+        font-size: 11.5px;
+        line-height: 1.35;
+
+        > svg {
+            flex: none;
+            width: 13px;
+            height: 13px;
+            margin-top: 1px;
+        }
+
+        &[data-tone="off"] {
+            background: rgba(var(--wplus-color-recording), 0.16);
+            color: rgba(255, 170, 160, 1);
+        }
+
+        &[data-tone="warning"] {
+            background: rgba(var(--wplus-color-warning), 0.14);
+            color: rgba(255, 255, 255, 0.9);
+
+            > svg { color: rgba(var(--wplus-color-warning), 1); }
+        }
+
+        // Talking while muted: the pill over the dock, said here while the
+        // devices hide it.
+        &[data-tone="talking"] {
+            background: rgba(var(--wplus-color-warning), 0.22);
+            color: rgba(255, 255, 255, 1);
+            font-weight: 600;
+            animation: wplus-call-device-talking 1.2s ease-in-out infinite;
+
+            > svg { color: rgba(var(--wplus-color-warning), 1); }
+        }
+    }
+
+    // The microphone heard by the check: its level, said to be the user's alone.
+    .wplus-call-device-meter {
+        display: inline-flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 4px 8px;
+    }
+
+    .wplus-call-device-private {
+        color: rgba(255, 255, 255, 0.6);
+        font-size: 11.5px;
+    }
+
+    // Whether the others see or hear it, under the row's text: a hollow dot
+    // while nobody does, Live once everyone does.
+    .wplus-call-device-state {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 0 8px 8px;
+        padding-inline-start: 56px;
+    }
+
+    .wplus-call-device-status {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        min-width: 0;
+        color: rgba(255, 255, 255, 0.7);
+        font-size: 12px;
+    }
+
+    .wplus-call-device-dot {
+        display: block;
+        flex: none;
+        box-sizing: border-box;
+        width: 8px;
+        height: 8px;
+        border: 1.5px solid rgba(255, 255, 255, 0.5);
+        border-radius: 50%;
+    }
+
+    // Live: a small red badge in the dot's place. Centred in the line, its box
+    // sat 1.5px under the middle of the capitals beside it and its own
+    // capitals 0.5px low in it, as measured on their ink: a pixel up, and half
+    // a pixel more for its letters.
+    .wplus-call-device-live {
+        display: inline-flex;
+        align-items: center;
+        flex: none;
+        position: relative;
+        top: -1px;
+        box-sizing: border-box;
+        height: 16px;
+        padding: 0 5px 1px;
+        &:not(#\9) { border-radius: 4px; }
+        background: rgba(var(--wplus-color-recording), 1);
+        color: rgba(255, 255, 255, 1);
+        font-size: 10px;
+        font-weight: 700;
+        line-height: 1;
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
+    }
+
+    .wplus-call-device-state[data-live] {
+        .wplus-call-device-status { color: rgba(255, 255, 255, 0.95); }
+
+        .wplus-call-device-dot { display: none; }
+    }
+
+    .wplus-call-device-test {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        flex: none;
+        height: 28px;
+        padding: 0 11px;
+        &:not(#\9) { border-radius: var(--wplus-radius-pill); }
+        background: rgba(255, 255, 255, 0.1);
+        color: rgba(255, 255, 255, 0.92);
+        font-size: 12px;
+        font-weight: 500;
+        white-space: nowrap;
+        cursor: pointer;
+        transition: background 0.12s ease, color 0.12s ease;
+
+        &:hover { background: rgba(255, 255, 255, 0.16); }
+
+        &[data-active] {
+            background: rgba(var(--wplus-color-accent), 0.25);
+            color: rgba(var(--wplus-color-accent), 1);
+        }
+
+        > svg { width: 12px; height: 12px; }
+    }
+
+    // The others, in place under the row, under its text, the one in use
+    // ticked.
+    .wplus-call-device-list {
+        display: flex;
+        flex-direction: column;
+        gap: 1px;
+        padding: 0 8px 8px;
+        padding-inline-start: 50px;
+    }
+
+    .wplus-call-device-choice {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 7px 8px;
+        &:not(#\9) { border-radius: 8px; }
+        color: rgba(255, 255, 255, 0.82);
+        font-size: 12.5px;
+        cursor: pointer;
+        transition: background 0.12s ease;
+
+        &:hover { background: rgba(255, 255, 255, 0.08); }
+
+        &[aria-selected="true"] {
+            color: rgba(255, 255, 255, 1);
+            font-weight: 500;
+        }
+    }
+
+    .wplus-call-device-check {
+        display: inline-flex;
+        flex: none;
+        width: 14px;
+        color: rgba(var(--wplus-color-accent), 1);
+
+        > svg { width: 14px; height: 14px; }
+    }
+
+    // A call between two: how much it has sent and received.
+    .wplus-call-traffic {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4px 14px;
+        padding: 6px 8px 2px;
+        color: rgba(255, 255, 255, 0.55);
+        font-size: 11.5px;
+        font-variant-numeric: tabular-nums;
+
+        > span { white-space: nowrap; }
+    }
+
+    .wplus-call-devices-done {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        height: 38px;
+        margin-top: 6px;
+        &:not(#\9) { border-radius: var(--wplus-radius-pill); }
+        background: rgba(255, 255, 255, 0.1);
+        color: rgba(255, 255, 255, 0.95);
+        font-size: 13px;
+        font-weight: 600;
+        cursor: pointer;
+        user-select: none;
+        -webkit-tap-highlight-color: transparent;
+        transition: background 0.12s ease;
+
+        &:hover { background: rgba(255, 255, 255, 0.16); }
+    }
+}
+
+// ─── Talking while muted (muted-hint.tsx), and the prompt of a join ───────
+// (device-panel.tsx' JoinPrompt). A pill over the dock, centred, clear of it
+// in either layout: the 1:1 dock's top is 58px up (44px over its 14px floor),
+// the group bar is 64px. The hint's region stays while the pill comes and
+// goes, so a screen reader reads it out as it appears.
+
+.wplus-call-wrap .wplus-call-muted-hint-region,
+.wplus-call-wrap .wplus-call-join-prompt-region {
+    position: absolute;
+    inset-inline: 0;
+    bottom: 74px;
+    z-index: 11;
+    display: flex;
+    justify-content: center;
+    padding: 0 12px;
+    box-sizing: border-box;
+    pointer-events: none;
+}
+
+// Out of the way while a menu, the More sheet or the device settings are
+// open: they stand where it would, and it lay over Host Controls' last rows.
+.wplus-call-wrap:has(.wplus-call-popover, .wplus-call-dock-sheet, .wplus-call-settings) .wplus-call-muted-hint-region,
+.wplus-call-wrap:has(.wplus-call-popover, .wplus-call-dock-sheet) .wplus-call-join-prompt-region {
+    display: none;
+}
+
+// The prompt of a join stands in the hint's place for its few seconds: it says
+// the microphone is off already.
+.wplus-call-wrap:has(.wplus-call-join-prompt) .wplus-call-muted-hint-region {
+    display: none;
+}
+
+// One row where it fits. A longer translation on a narrow call puts Unmute and
+// the × on a second row, rather than squeezing the words into a column or
+// cutting them off.
+.wplus-call-wrap .wplus-call-muted-hint {
+    display: inline-flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 4px 8px;
+    max-width: 100%;
+    min-height: 40px;
+    box-sizing: border-box;
+    padding: 4px 4px 4px 12px;
+    @include wplus-call-glass(0.75);
+    &:not(#\9) { border-radius: 20px; }
+    color: rgba(var(--wplus-call-fg), 1);
+    font-size: 14px;
+    font-weight: 500;
+    line-height: 1.3;
+    pointer-events: auto;
+    animation: wplus-call-popover-up 0.18s ease-out;
+
+    // The microphone off, in the red of the dock's own.
+    > svg {
+        flex: none;
+        color: rgba(var(--wplus-color-recording), 1);
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        animation: none;
+    }
+
+    [role="button"]:focus-visible {
+        outline: 2px solid rgba(var(--wplus-color-accent), 1);
+        outline-offset: 2px;
+    }
+}
+
+.wplus-call-wrap .wplus-call-muted-hint-text {
+    min-width: 0;
+    overflow-wrap: break-word;
+}
+
+.wplus-call-wrap .wplus-call-muted-hint-unmute {
+    display: inline-flex;
+    align-items: center;
+    flex: none;
+    height: 32px;
+    padding: 0 14px;
+    &:not(#\9) { border-radius: var(--wplus-radius-pill); }
+    background: rgba(var(--wplus-color-accent), 1);
+    color: rgba(var(--wplus-color-text-on-accent), 1);
+    font-size: 13px;
+    font-weight: 600;
+    white-space: nowrap;
+    cursor: pointer;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+
+    &:hover { background: rgba(var(--wplus-color-accent-hover), 1); }
+}
+
+.wplus-call-wrap .wplus-call-muted-hint-close {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: none;
+    width: 32px;
+    height: 32px;
+    &:not(#\9) { border-radius: 50%; }
+    color: rgba(var(--wplus-call-fg), 0.7);
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+
+    &:hover {
+        background: rgba(255, 255, 255, 0.12);
+        color: rgba(var(--wplus-call-fg), 1);
+    }
+}
+
+// The prompt of a join: a card in the devices' look, the microphone off on a
+// red badge, its title and a quieter line under it, then Preview and the ×,
+// on one row where the stage has room. On a narrow stage the button
+// goes under the words, the × stays at the top end.
+.wplus-call-wrap .wplus-call-join-prompt {
+    display: inline-grid;
+    grid-template-columns: auto minmax(0, 1fr) auto auto;
+    grid-template-areas: "icon text check close";
+    align-items: center;
+    gap: 8px 12px;
+    box-sizing: border-box;
+    max-width: min(560px, 100%);
+    padding: 10px 8px 10px 12px;
+    border: 1px solid rgba(255, 255, 255, 0.09);
+    &:not(#\9) { border-radius: 14px; }
+    background: rgba(22, 24, 30, 0.96);
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45), 0 2px 8px rgba(0, 0, 0, 0.3);
+    color: rgba(255, 255, 255, 0.94);
+    text-align: start;
+    pointer-events: auto;
+    animation: wplus-call-popover-up 0.18s ease-out;
+
+    @media (prefers-reduced-motion: reduce) {
+        animation: none;
+    }
+
+    [role="button"]:focus-visible {
+        outline: 2px solid rgba(var(--wplus-color-accent), 1);
+        outline-offset: 2px;
+    }
+}
+
+.wplus-call-wrap .wplus-call-join-prompt-icon {
+    grid-area: icon;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    &:not(#\9) { border-radius: 50%; }
+    background: rgba(var(--wplus-color-recording), 0.18);
+    color: rgba(var(--wplus-color-recording), 1);
+    line-height: 0;
+
+    > svg { width: 16px; height: 16px; }
+}
+
+.wplus-call-wrap .wplus-call-join-prompt-text {
+    grid-area: text;
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    min-width: 0;
+}
+
+.wplus-call-wrap .wplus-call-join-prompt-title {
+    font-size: 13.5px;
+    font-weight: 600;
+    line-height: 1.3;
+    color: rgba(255, 255, 255, 1);
+}
+
+.wplus-call-wrap .wplus-call-join-prompt-note {
+    font-size: 12px;
+    line-height: 1.35;
+    color: rgba(255, 255, 255, 0.62);
+}
+
+.wplus-call-wrap .wplus-call-join-prompt-preview {
+    grid-area: check;
+    display: inline-flex;
+    align-items: center;
+    justify-self: start;
+    height: 32px;
+    padding: 0 14px;
+    &:not(#\9) { border-radius: var(--wplus-radius-pill); }
+    background: rgba(var(--wplus-color-accent), 1);
+    color: rgba(var(--wplus-color-text-on-accent), 1);
+    font-size: 13px;
+    font-weight: 600;
+    white-space: nowrap;
+    cursor: pointer;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+    transition: background 0.12s ease;
+
+    &:hover { background: rgba(var(--wplus-color-accent-hover), 1); }
+}
+
+.wplus-call-wrap .wplus-call-join-prompt-close {
+    grid-area: close;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    &:not(#\9) { border-radius: 50%; }
+    color: rgba(255, 255, 255, 0.6);
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    transition: background 0.12s ease, color 0.12s ease;
+
+    &:hover {
+        background: rgba(255, 255, 255, 0.1);
+        color: rgba(255, 255, 255, 1);
+    }
+}
+
+@container (max-width: 519px) {
+    .wplus-call-wrap .wplus-call-join-prompt {
+        grid-template-columns: auto minmax(0, 1fr) auto;
+        grid-template-areas:
+            "icon text close"
+            ".    check .";
+    }
+
+    .wplus-call-wrap .wplus-call-join-prompt-close {
+        align-self: start;
+    }
+}
+
+// ─── A moderator's toasts (host-toasts.tsx) ───────────────────────────────
+// A raised hand and who joined, newest first, in the stage's top end corner:
+// under the moderation menus, over the tiles, gone after a few seconds.
+
+.wplus-call-wrap .wplus-call-host-toasts {
+    position: absolute;
+    z-index: 5;
+    top: 14px;
+    inset-inline-end: 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    width: min(320px, calc(100% - 28px));
+    pointer-events: none;
+}
+
+.wplus-call-wrap .wplus-call-host-toast {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    box-sizing: border-box;
+    min-height: 44px;
+    padding: 6px 6px 6px 8px;
+    @include wplus-call-glass(0.75);
+    &:not(#\9) { border-radius: 14px; }
+    color: rgba(var(--wplus-call-fg), 1);
+    font-size: 13px;
+    font-weight: 500;
+    line-height: 1.35;
+    pointer-events: auto;
+    animation: wplus-call-popover-down 0.18s ease-out;
+
+    @media (prefers-reduced-motion: reduce) {
+        animation: none;
+    }
+
+    [role="button"]:focus-visible {
+        outline: 2px solid rgba(var(--wplus-color-accent), 1);
+        outline-offset: 2px;
+    }
+}
+
+.wplus-call-wrap .wplus-call-host-toast-avatar,
+.wplus-call-wrap .wplus-call-host-toast-icon {
+    flex: none;
+    width: 28px;
+    height: 28px;
+    &:not(#\9) { border-radius: 50%; }
+}
+
+.wplus-call-wrap .wplus-call-host-toast-avatar {
+    object-fit: cover;
+}
+
+// A raised hand in the amber the tiles give it.
+.wplus-call-wrap .wplus-call-host-toast-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(var(--wplus-color-warning), 1);
+    color: rgba(17, 19, 24, 1);
+}
+
+.wplus-call-wrap .wplus-call-host-toast-text {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow-wrap: break-word;
+}
+
+.wplus-call-wrap .wplus-call-host-toast-close {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: none;
+    width: 28px;
+    height: 28px;
+    &:not(#\9) { border-radius: 50%; }
+    color: rgba(var(--wplus-call-fg), 0.7);
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+
+    &:hover {
+        background: rgba(255, 255, 255, 0.12);
+        color: rgba(var(--wplus-call-fg), 1);
+    }
 }

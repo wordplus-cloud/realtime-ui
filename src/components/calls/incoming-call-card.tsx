@@ -23,27 +23,27 @@ export default function IncomingCallCard( { user_id, name, type, fromThread, onA
     // Where the user was as it rang, such as a chat composer, for the call to give the focus back to as it closes.
     useEffect( () => rememberBeforeRing(), [] );
 
-    return <div className={"bm-toast-site-call-container"}>
-        <div className={"bm-toast-site-call-avatar"}>
+    return <div className={"wplus-toast-site-call-container"}>
+        <div className={"wplus-toast-site-call-avatar"}>
             <UserAvatar user_id={user_id} size={40} link={false} fromThread={fromThread} />
         </div>
-        <div className={"bm-toast-site-call-info"}>
-            <div className={"bm-toast-site-call-title"}>
+        <div className={"wplus-toast-site-call-info"}>
+            <div className={"wplus-toast-site-call-title"}>
                 <UserName user_id={user_id} fallback={name} link={false} fromThread={fromThread} />
             </div>
-            <div className={"bm-toast-site-call-content"}>
-                <div className="bm-toast-site-call-text">
+            <div className={"wplus-toast-site-call-content"}>
+                <div className="wplus-toast-site-call-text">
                     { type === 'video' && <>{ _x( 'Incoming Video Call', 'Private Call - On Site Message', 'bp-better-messages' ) }</> }
                     { type === 'audio' && <>{ _x( 'Incoming Audio Call', 'Private Call - On Site Message', 'bp-better-messages' ) }</> }
                 </div>
 
                 <Tooltip content={ _x( 'Answer', 'Private Call Screen', 'bp-better-messages' ) } zIndex={100003}>
-                    <div className="bm-toast-site-call-action-answer" onClick={ onAnswer }>
+                    <div className="wplus-toast-site-call-action-answer" onClick={ onAnswer }>
                         <Icon name="phone" size={ 17 } />
                     </div>
                 </Tooltip>
                 <Tooltip content={ _x( 'Reject', 'Private Call Screen', 'bp-better-messages' ) } zIndex={100003}>
-                    <div className="bm-toast-site-call-action-reject" onClick={ onReject }>
+                    <div className="wplus-toast-site-call-action-reject" onClick={ onReject }>
                         <Icon name="phone" size={ 17 } />
                     </div>
                 </Tooltip>

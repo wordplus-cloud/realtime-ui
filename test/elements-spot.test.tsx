@@ -44,7 +44,7 @@ it( 'shows a call in its <call-spot>, its children until then, and the call back
     await elements.place( 'match:34:42', 34, 'video', { name: 'Ann' } );
     await settle();
     const window = spot.shadowRoot!.querySelector( '.realtime-call-spot .realtime-call-window' );
-    expect( window?.querySelector( '.bm-private-call' ) ).not.toBeNull();
+    expect( window?.querySelector( '.wplus-private-call' ) ).not.toBeNull();
     expect( spot.getAttribute( 'data-call' ) ).toBe( 'match:34:42' );
     expect( empty.hasAttribute( 'data-call' ) ).toBe( false );
     const started = placed.setTrack.mock.calls.length;

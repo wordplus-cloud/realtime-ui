@@ -22,20 +22,20 @@ describe( 'chat: the message list\'s parts', () => {
             </MessageStack>,
         );
 
-        const stack = container.querySelector( '.bm-msg-stack' )!;
+        const stack = container.querySelector( '.wplus-msg-stack' )!;
         expect( stack.getAttribute( 'data-side' ) ).toBe( 'left' );
         expect( stack.getAttribute( 'data-is-me' ) ).toBeNull();
-        expect( stack.querySelector( '.bm-msg-stack__avatar img' ) ).not.toBeNull();
-        expect( stack.querySelector( '.bm-msg-stack__info' )?.textContent ).toBe( 'Ann10:04' );
+        expect( stack.querySelector( '.wplus-msg-stack__avatar img' ) ).not.toBeNull();
+        expect( stack.querySelector( '.wplus-msg-stack__info' )?.textContent ).toBe( 'Ann10:04' );
 
-        const body = stack.querySelector( '.bm-msg-body.bm-message' )!;
+        const body = stack.querySelector( '.wplus-msg-body.wplus-message' )!;
         expect( body.getAttribute( 'data-is-me' ) ).toBe( '0' );
         expect( body.getAttribute( 'data-message-id' ) ).toBe( '7' );
-        expect( [ ...body.children ].map( ( c ) => c.className ) ).toEqual( [ 'fwd', 'bm-msg-main', 'after' ] );
-        expect( body.querySelector( '.bm-msg-main > .bm-msg-bubble.bm-message-content > .bm-msg-bubble__text' )?.firstChild?.textContent ).toBe( 'Hi Ben' );
+        expect( [ ...body.children ].map( ( c ) => c.className ) ).toEqual( [ 'fwd', 'wplus-msg-main', 'after' ] );
+        expect( body.querySelector( '.wplus-msg-main > .wplus-msg-bubble.wplus-message-content > .wplus-msg-bubble__text' )?.firstChild?.textContent ).toBe( 'Hi Ben' );
         // Inline meta: a spacer that only holds the room, and the visible copy.
-        expect( [ ...body.querySelectorAll( '.bm-msg-meta' ) ].map( ( m ) => m.getAttribute( 'data-variant' ) ) ).toEqual( [ 'spacer', 'overlay' ] );
-        expect( body.querySelector( '.bm-msg-meta[data-variant="overlay"] .bm-msg-meta__time' )?.textContent ).toBe( '10:04' );
+        expect( [ ...body.querySelectorAll( '.wplus-msg-meta' ) ].map( ( m ) => m.getAttribute( 'data-variant' ) ) ).toEqual( [ 'spacer', 'overlay' ] );
+        expect( body.querySelector( '.wplus-msg-meta[data-variant="overlay"] .wplus-msg-meta__time' )?.textContent ).toBe( '10:04' );
     } );
 
     it( 'draws the day, the unread divider, an event and the empty conversation', () => {
@@ -45,10 +45,10 @@ describe( 'chat: the message list\'s parts', () => {
             <SystemRow type="user_joined" tone="success" icon="userPlus">Cara joined</SystemRow>
             <EmptyThread />
         </> );
-        expect( container.querySelector( '.bm-day-sep .bm-day-pill' )?.textContent ).toBe( 'Today' );
-        expect( container.querySelector( '.bm-unread-divider__label' )?.textContent ).toBe( 'New messages' );
-        expect( container.querySelector( '.bm-system-row[data-system-type="user_joined"] .bm-system-row__pill[data-tone="success"]' )?.textContent ).toBe( 'Cara joined' );
-        expect( container.querySelector( '.bm-empty-thread__title' )?.textContent ).toBe( 'Say hi' );
+        expect( container.querySelector( '.wplus-day-sep .wplus-day-pill' )?.textContent ).toBe( 'Today' );
+        expect( container.querySelector( '.wplus-unread-divider__label' )?.textContent ).toBe( 'New messages' );
+        expect( container.querySelector( '.wplus-system-row[data-system-type="user_joined"] .wplus-system-row__pill[data-tone="success"]' )?.textContent ).toBe( 'Cara joined' );
+        expect( container.querySelector( '.wplus-empty-thread__title' )?.textContent ).toBe( 'Say hi' );
     } );
 
     it( 'ticks each delivery state in the same box, seen heavier, and the detailed one opening who saw it', () => {
@@ -58,10 +58,10 @@ describe( 'chat: the message list\'s parts', () => {
             <StatusTick status="delivered" />
             <StatusTick status="seen" onClick={ open } />
         </> );
-        const ticks = [ ...container.querySelectorAll( '.bm-msg-status' ) ];
+        const ticks = [ ...container.querySelectorAll( '.wplus-msg-status' ) ];
         expect( ticks.map( ( t ) => t.getAttribute( 'data-status' ) ) ).toEqual( [ 'sending', 'delivered', 'seen' ] );
-        expect( ticks[ 0 ].querySelector( '.bm-status-spinner' ) ).not.toBeNull();
-        expect( ticks[ 2 ].querySelector( '.bm-status-read' ) ).not.toBeNull();
+        expect( ticks[ 0 ].querySelector( '.wplus-status-spinner' ) ).not.toBeNull();
+        expect( ticks[ 2 ].querySelector( '.wplus-status-read' ) ).not.toBeNull();
         expect( ticks[ 2 ].getAttribute( 'data-detailed' ) ).toBe( '1' );
         fireEvent.click( ticks[ 2 ] );
         expect( open ).toHaveBeenCalled();
@@ -81,19 +81,19 @@ describe( 'chat: reactions', () => {
             <ReactionPill emoji="👍" count={ 1 } mine />
             <ReactionPill emoji="❤️" count={ 3 } onClick={ () => {} } />
         </ReactionPills> );
-        const pills = [ ...container.querySelectorAll( '.bm-reaction-pill' ) ];
+        const pills = [ ...container.querySelectorAll( '.wplus-reaction-pill' ) ];
         expect( pills[ 0 ].getAttribute( 'data-reacted-by-me' ) ).toBe( '1' );
         expect( pills[ 0 ].getAttribute( 'data-static' ) ).toBe( '1' );
-        expect( pills[ 0 ].querySelector( '.bm-reaction-pill__count' ) ).toBeNull();
-        expect( pills[ 1 ].querySelector( '.bm-reaction-pill__count' )?.textContent ).toBe( '3' );
-        expect( container.querySelector( '.bm-reactions > .meta' ) ).not.toBeNull();
+        expect( pills[ 0 ].querySelector( '.wplus-reaction-pill__count' ) ).toBeNull();
+        expect( pills[ 1 ].querySelector( '.wplus-reaction-pill__count' )?.textContent ).toBe( '3' );
+        expect( container.querySelector( '.wplus-reactions > .meta' ) ).not.toBeNull();
 
         const pick = vi.fn();
         const picker = render( <ReactionPicker keys={ [ '1f44d', '2764', '1f602' ] } mine="2764" onPick={ pick } /> );
-        const trigger = picker.container.querySelector( '.bm-reaction-trigger' )!;
+        const trigger = picker.container.querySelector( '.wplus-reaction-trigger' )!;
         expect( trigger.textContent ).toBe( '❤' );
         await act( async () => { fireEvent.mouseEnter( trigger ); } );
-        const items = [ ...document.body.querySelectorAll( '.bm-reaction-strip__item' ) ];
+        const items = [ ...document.body.querySelectorAll( '.wplus-reaction-strip__item' ) ];
         expect( items ).toHaveLength( 3 );
         expect( items[ 1 ].getAttribute( 'data-mine' ) ).toBe( '1' );
         await act( async () => { fireEvent.click( items[ 2 ] ); } );
@@ -111,7 +111,7 @@ describe( 'chat: the composer\'s row', () => {
         const send = vi.fn();
         const { container, rerender } = render( <ComposerRow { ...base } onSend={ send } canSend={ false } hasContent={ false } /> );
         const button = () => container.querySelector( '[aria-label="Send Message"]' ) as HTMLElement;
-        expect( container.querySelector( '.bm-composer__editable' )?.getAttribute( 'placeholder' ) ).toBe( 'Write a message' );
+        expect( container.querySelector( '.wplus-composer__editable' )?.getAttribute( 'placeholder' ) ).toBe( 'Write a message' );
         expect( button().getAttribute( 'aria-label' ) ).toBe( 'Send Message' );
         expect( button().getAttribute( 'aria-disabled' ) ).toBe( 'true' );
 
@@ -124,8 +124,8 @@ describe( 'chat: the composer\'s row', () => {
         vi.useFakeTimers();
         try {
             const { container, unmount } = render( <ComposerRow { ...base } onSend={ () => {} } canSend hasContent /> );
-            const editable = container.querySelector( '.bm-composer__editable' ) as HTMLElement;
-            const typing = () => document.body.classList.contains( 'bm-reply-area-focused' );
+            const editable = container.querySelector( '.wplus-composer__editable' ) as HTMLElement;
+            const typing = () => document.body.classList.contains( 'wplus-reply-area-focused' );
 
             fireEvent.focus( editable );
             expect( typing() ).toBe( true );
@@ -147,8 +147,8 @@ describe( 'chat: the composer\'s row', () => {
         const { container } = render( <ComposerRow { ...base } onSend={ () => {} } canSend={ false } hasContent={ false } canRecordVoice onStartVoice={ () => {} }
                                                      points={ <span className="pts">120</span> } limited maxLength={ 100 } charCount={ 95 } /> );
         expect( container.querySelector( '[aria-label="Record Voice Message"]' ) ).not.toBeNull();
-        expect( container.querySelector( '.bm-composer__points .pts' ) ).not.toBeNull();
-        expect( container.querySelector( '.bm-composer__counter' )?.textContent ).toBe( '95/100' );
-        expect( container.querySelector( '.bm-composer__counter' )?.getAttribute( 'data-warn' ) ).toBe( '1' );
+        expect( container.querySelector( '.wplus-composer__points .pts' ) ).not.toBeNull();
+        expect( container.querySelector( '.wplus-composer__counter' )?.textContent ).toBe( '95/100' );
+        expect( container.querySelector( '.wplus-composer__counter' )?.getAttribute( 'data-warn' ) ).toBe( '1' );
     } );
 } );

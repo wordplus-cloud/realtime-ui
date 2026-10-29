@@ -7,7 +7,7 @@ import type { CallParticipant } from "./context.ts";
 /**
  * Someone whose media stopped arriving while they are still in the call (CallParticipant.stalled, which whoever runs
  * the call reads off what it receives). Their tile used to show their last frame as if it were live until the room
- * said they went, 15 s and more; now that frame is blurred and dimmed (the bm-call-video-stalled class), and the tile
+ * said they went, 15 s and more; now that frame is blurred and dimmed (the wplus-call-video-stalled class), and the tile
  * says what is going on: "Video interrupted" while only their camera stopped, "Reconnecting..." when their sound
  * stopped too, as it says for a tile away for a moment. A call between two says "The other side lost connection"
  * for the second. A camera whose picture never came here (nothing arrived since its <video> was drawn) has no last
@@ -21,7 +21,7 @@ export function stalledShown( participant: CallParticipant | null | undefined, o
 }
 
 /** The class a stalled picture's <video> takes. */
-export const STALLED_VIDEO_CLASS = 'bm-call-video-stalled';
+export const STALLED_VIDEO_CLASS = 'wplus-call-video-stalled';
 
 /** Whether a stalled picture's <video> has nothing to show: no frame of what it plays was ever drawn in it. */
 export function pictureless( element: HTMLVideoElement | null | undefined ): boolean {
@@ -36,12 +36,12 @@ const explanation = () => _x( 'Their video stopped arriving. It comes back by it
  */
 export function VideoInterruptedNotice( { main, face }: { main?: boolean, face?: ReactNode } ) {
     const title = _x( 'Video interrupted', 'Call Screen', 'bp-better-messages' );
-    const faced = face ? ' bm-call-stalled-faced' : '';
+    const faced = face ? ' wplus-call-stalled-faced' : '';
 
     if( main ){
-        return <div className={ 'bm-call-paused bm-call-paused-main bm-call-stalled' + faced } part="video-stalled" role="status">
+        return <div className={ 'wplus-call-paused wplus-call-paused-main wplus-call-stalled' + faced } part="video-stalled" role="status">
             { face }
-            <div className="bm-call-paused-notice">
+            <div className="wplus-call-paused-notice">
                 <Icon name="videoOff" size={ 22 } />
                 <div>
                     <p>{ title }</p>
@@ -51,10 +51,10 @@ export function VideoInterruptedNotice( { main, face }: { main?: boolean, face?:
         </div>;
     }
 
-    return <span className={ 'bm-call-paused bm-call-stalled' + faced } part="video-stalled" role="status">
+    return <span className={ 'wplus-call-paused wplus-call-stalled' + faced } part="video-stalled" role="status">
         { face }
         <Tooltip content={ explanation() }>
-            <span className="bm-call-paused-notice">
+            <span className="wplus-call-paused-notice">
                 <Icon name="videoOff" size={ 16 } />
                 <span>{ title }</span>
             </span>

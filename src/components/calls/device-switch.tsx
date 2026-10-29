@@ -33,9 +33,9 @@ export default function DeviceSwitch(
 
     return (
         <>
-            <div className="bm-call-setting bm-switch-device">
+            <div className="wplus-call-setting wplus-switch-device">
                 <label>{ label }</label>
-                <div className="bm-switch-device-select-wrap">
+                <div className="wplus-switch-device-select-wrap">
                     <select value={selectedDevice} onChange={(event) => {
                         setSelectedDevice(event.target.value);
                     }}>

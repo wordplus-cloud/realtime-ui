@@ -50,7 +50,7 @@ export default function CallsApp( { controller, view = CallScreen }: { controlle
                 const info = infoOf( ring.info );
                 const props = { user_id: ring.from, name: info.name, type: ring.type,
                     onAnswer: () => void controller.answer( ring ), onReject: () => controller.decline( ring ) };
-                return <div key={ ring.id } className="realtime-call-ring bm-toast-site-call" data-call={ ring.call } part="ring-card">
+                return <div key={ ring.id } className="realtime-call-ring wplus-toast-site-call" data-call={ ring.call } part="ring-card">
                     <Piece name="RingCard" props={ props }><IncomingCallCard { ...props } /></Piece>
                 </div>;
             } ) }
@@ -96,8 +96,8 @@ function CallWindow( { showing, close, view, chat }: { showing: Showing, close: 
     // anywhere plays it, and this says so (sound.ts).
     const silent = useSoundHeld();
     // A key per call, so a call that becomes a group call starts its screen afresh.
-    // `.bm-call-surface` carries the stage's colours, as Better Messages' call surface does.
-    return <div className="realtime-call-window bm-call-surface" part="call-window" data-layout={ showing.kind === 'call' ? 'private' : showing.type }>
+    // `.wplus-call-surface` carries the stage's colours, as Better Messages' call surface does.
+    return <div className="realtime-call-window wplus-call-surface" part="call-window" data-layout={ showing.kind === 'call' ? 'private' : showing.type }>
         { showing.kind === 'call'
             ? <PrivateWindow key={ showing.call.id } call={ showing.call } peer={ showing.peer } close={ close } view={ view } chat={ chat } adding={ { people: showing.people, addPerson: showing.add } } />
             : <GroupWindow key="group" group={ showing.group } type={ showing.type } media={ showing.media } close={ close } view={ view } chat={ chat } adding={ { people: showing.people, addPerson: showing.add } } /> }

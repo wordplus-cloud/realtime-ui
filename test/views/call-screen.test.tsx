@@ -20,7 +20,7 @@ const draw = ( call: ReturnType<typeof fakeCall>, layout: 'private' | 'group-vid
     render( <CallView call={ { ...call, wrapper: createRef<HTMLDivElement>() as never } } layout={ layout } /> );
 
 /** Every control the dock shows, by what it says. */
-const controls = ( container: HTMLElement ) => [ ...container.querySelectorAll( '[aria-label], .bm-call-buttons > *, .bm-group-call-controls-buttons > *' ) ];
+const controls = ( container: HTMLElement ) => [ ...container.querySelectorAll( '[aria-label], .wplus-call-buttons > *, .wplus-group-call-controls-buttons > *' ) ];
 
 describe( 'a call between two', () => {
     it( 'rings out with the other side\'s face, says so, and is cancelled from the dock', () => {
@@ -29,7 +29,7 @@ describe( 'a call between two', () => {
 
         expect( container.textContent ).toContain( 'Calling...' );
         expect( container.querySelector<HTMLImageElement>( 'img' )?.src ).toBe( 'https://example.com/ann.png' );
-        fireEvent.click( container.querySelector( '.bm-cancel' )! );
+        fireEvent.click( container.querySelector( '.wplus-cancel' )! );
         expect( call.calls ).toEqual( [ 'endCall "abort"' ] );
     } );
 
@@ -38,8 +38,8 @@ describe( 'a call between two', () => {
         const { container } = draw( call, 'private' );
 
         expect( container.textContent ).toContain( 'Incoming Call' );
-        fireEvent.click( container.querySelector( '.bm-answer' )! );
-        fireEvent.click( container.querySelector( '.bm-cancel' )! );
+        fireEvent.click( container.querySelector( '.wplus-answer' )! );
+        fireEvent.click( container.querySelector( '.wplus-cancel' )! );
         expect( call.calls ).toEqual( [ 'answerCall', 'endCall "reject"' ] );
     } );
 
@@ -54,8 +54,8 @@ describe( 'a call between two', () => {
         expect( camera.attached.some( ( el ) => el?.tagName === 'VIDEO' ) ).toBe( true );
         expect( sound.attached.some( ( el ) => el?.tagName === 'AUDIO' ) ).toBe( true );
 
-        fireEvent.click( container.querySelector( '.bm-disable-mic' )! );
-        fireEvent.click( container.querySelector( '.bm-cancel' )! );
+        fireEvent.click( container.querySelector( '.wplus-disable-mic' )! );
+        fireEvent.click( container.querySelector( '.wplus-cancel' )! );
         expect( call.calls ).toEqual( [ 'disableMic', 'endCall' ] );
     } );
 
@@ -72,7 +72,7 @@ describe( 'a call between two', () => {
     it( 'labels every control, for screen readers and the tooltips', () => {
         const { container } = draw( fakeCall( { myMicrophoneTrack: fakeTrack() } ), 'private' );
         expect( controls( container ).length ).toBeGreaterThan( 0 );
-        expect( container.querySelector( '.bm-cancel' ) ).not.toBeNull();
+        expect( container.querySelector( '.wplus-cancel' ) ).not.toBeNull();
     } );
 } );
 
@@ -91,7 +91,7 @@ describe( 'a group call', () => {
         // The grid lays its tiles out in the room it measures, which a test's page has none of: the browser's preview
         // (`npx @wordplus/realtime-ui preview`) shows them.
         expect( container.querySelector( '[part="call-controls"]' ) ).not.toBeNull();
-        fireEvent.click( container.querySelector( '.bm-exit-room' )! );
+        fireEvent.click( container.querySelector( '.wplus-exit-room' )! );
         expect( call.calls.some( ( c ) => c.startsWith( 'endCall' ) ) ).toBe( true );
     } );
 
@@ -113,8 +113,8 @@ describe( 'the ring\'s card', () => {
 
         expect( container.textContent ).toContain( 'Ann' );
         expect( container.textContent ).toContain( 'Incoming Video Call' );
-        fireEvent.click( container.querySelector( '.bm-toast-site-call-action-answer' )! );
-        fireEvent.click( container.querySelector( '.bm-toast-site-call-action-reject' )! );
+        fireEvent.click( container.querySelector( '.wplus-toast-site-call-action-answer' )! );
+        fireEvent.click( container.querySelector( '.wplus-toast-site-call-action-reject' )! );
         expect( answered ).toEqual( [ 'answer', 'reject' ] );
     } );
 } );

@@ -105,18 +105,18 @@ export function ComposerRow( {
     const unfocusTimer = useRef<ReturnType<typeof setTimeout> | undefined>( undefined );
     useEffect( () => () => {
         clearTimeout( unfocusTimer.current );
-        document.body.classList.remove( "bm-reply-area-focused" );
+        document.body.classList.remove( "wplus-reply-area-focused" );
     }, [] );
     const onEditableFocus = () => {
         clearTimeout( unfocusTimer.current );
-        document.body.classList.add( "bm-reply-area-focused" );
+        document.body.classList.add( "wplus-reply-area-focused" );
     };
     const onEditableBlur = () => {
         clearTimeout( unfocusTimer.current );
         unfocusTimer.current = setTimeout( () => {
             const active = document.activeElement;
-            if ( document.hasFocus() && active instanceof HTMLElement && active.classList.contains( "bm-composer__editable" ) ) return;
-            document.body.classList.remove( "bm-reply-area-focused" );
+            if ( document.hasFocus() && active instanceof HTMLElement && active.classList.contains( "wplus-composer__editable" ) ) return;
+            document.body.classList.remove( "wplus-reply-area-focused" );
         }, 0 );
     };
     // Firefox leaves the caret of a click past a mention inside the chip, where nothing can be typed, and at the end
@@ -125,7 +125,7 @@ export function ComposerRow( {
         if ( ! isFirefox() ) return;
         const sel = window.getSelection();
         const node = sel && sel.isCollapsed ? sel.anchorNode : null;
-        const chip = ( node instanceof Element ? node : node?.parentElement )?.closest( ".bm-inline-mention" );
+        const chip = ( node instanceof Element ? node : node?.parentElement )?.closest( ".wplus-inline-mention" );
         if ( ! sel || ! chip || ! editableRef.current?.contains( chip ) ) return;
         const range = document.createRange();
         range.setStartAfter( chip );
@@ -150,24 +150,24 @@ export function ComposerRow( {
         : _x( "Add attachment", "\"Add attachment\" button tooltip", "bp-better-messages" );
 
     return (
-        <div className="bm-composer__row" data-edit={ isEdit ? 1 : undefined }>
+        <div className="wplus-composer__row" data-edit={ isEdit ? 1 : undefined }>
             { onAttachClick && (
-                <div className="bm-composer__attach-wrap">
+                <div className="wplus-composer__attach-wrap">
                     { /* A paperclip, as 2.0's. keepFocus: the press opens a menu about the editor, so it must not take
                          the editor's caret, which on a phone is the on-screen keyboard. */ }
                     <IconButton icon="paperclip" label={ attachLabel } size={ 18 } keepFocus
                                 onClick={ onAttachClick } />
                     { attachCount > 0 && (
-                        <span className="bm-composer__attach-badge">{ attachCount }</span>
+                        <span className="wplus-composer__attach-badge">{ attachCount }</span>
                     ) }
                 </div>
             ) }
 
-            { /* 2.0's bm-editor DOM shape: wrapper + div.bm-editor-content. */ }
-            <div ref={ hostRef } className="bm-editor bm-composer__editor">
+            { /* 2.0's wplus-editor DOM shape: wrapper + div.wplus-editor-content. */ }
+            <div ref={ hostRef } className="wplus-editor wplus-composer__editor">
                 <div
                     ref={ editableRef }
-                    className="bm-editor-content bm-composer__editable notranslate wp-exclude-emoji"
+                    className="wplus-editor-content wplus-composer__editable notranslate wp-exclude-emoji"
                     { ...( { placeholder } as Record<string, string> ) }
                     contentEditable={ ! disabled }
                     suppressContentEditableWarning
@@ -183,18 +183,18 @@ export function ComposerRow( {
             </div>
 
             { showCounter && (
-                <span className="bm-composer__counter" data-warn={ counterWarn ? 1 : undefined }>
+                <span className="wplus-composer__counter" data-warn={ counterWarn ? 1 : undefined }>
                     { charCount }/{ maxLength }
                 </span>
             ) }
 
             { points && (
-                <span className="bm-composer__points">{ points }</span>
+                <span className="wplus-composer__points">{ points }</span>
             ) }
 
             { /* keepFocus: the bar it opens acts on the editor's selection. */ }
             { formatToggle && (
-                <IconButton icon="textFormat" className="bm-composer__format"
+                <IconButton icon="textFormat" className="wplus-composer__format"
                             label={ formatToggle.open
                                 ? _x( "Hide formatting", "Composer formatting button tooltip", "bp-better-messages" )
                                 : _x( "Formatting", "Composer formatting button tooltip", "bp-better-messages" ) }
@@ -204,7 +204,7 @@ export function ComposerRow( {
 
             { /* keepFocus on a computer, as 2.0's smile button had it: a picked emoji goes in at the caret. */ }
             { onEmojiClick && (
-                <IconButton icon="smile" className="bm-composer__picker" label={ pickerLabel ?? "" }
+                <IconButton icon="smile" className="wplus-composer__picker" label={ pickerLabel ?? "" }
                             size={ 18 } keepFocus={ ! isMobile() } onClick={ onEmojiClick } />
             ) }
 
@@ -232,7 +232,7 @@ export function ComposerRow( {
                                     ? _x( "Save Message", "\"Edit message\" button tooltip", "bp-better-messages" )
                                     : __( "Send Message", "bp-better-messages" ) ) }
                             emphasis="accent" size={ 18 }
-                            className={ overLimit ? "bm-composer__send--over" : undefined }
+                            className={ overLimit ? "wplus-composer__send--over" : undefined }
                             disabled={ ! canSend && ! isEdit && ! overLimit }
                             keepFocus={ ! isMobile() }
                             onClick={ onSend } />
@@ -240,7 +240,7 @@ export function ComposerRow( {
 
             { /* Add-ons put controls next to Send (better_messages_send_button_after in Better Messages). */ }
             { afterButtonHtml ? (
-                <span className="bm-composer__after" dangerouslySetInnerHTML={{ __html: afterButtonHtml }} />
+                <span className="wplus-composer__after" dangerouslySetInnerHTML={{ __html: afterButtonHtml }} />
             ) : null }
         </div>
     );

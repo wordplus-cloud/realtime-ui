@@ -2,9 +2,9 @@
 // Inside them, the screens wear Better Messages' styles. In a shadow root, so nothing of the page's reaches in.
 
 .realtime-calls {
-    font-family: var(--bm-messenger-font, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif);
-    font-size: var(--bm-font-size-base, 15px);
-    line-height: var(--bm-line-height-normal, 1.45);
+    font-family: var(--wplus-messenger-font, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif);
+    font-size: var(--wplus-font-size-base, 15px);
+    line-height: var(--wplus-line-height-normal, 1.45);
     -webkit-font-smoothing: antialiased;
 
     *, *::before, *::after { box-sizing: border-box; }
@@ -17,14 +17,14 @@
     // The system's dark, unless the page keeps light: its body's class where the screens are in the page (calls.css),
     // the element's `data-scheme` in a shadow root (src/elements.tsx, schemeOf()). Each half matches nothing in the other.
     @media (prefers-color-scheme: dark) {
-        body:not(.bm-messages-light) &,
+        body:not(.wplus-messages-light) &,
         :host(:not([data-scheme="light"])) & {
             --wplus-toast-bg: 241, 245, 249;
             --wplus-toast-fg: 15, 23, 42;
         }
     }
 
-    body.bm-messages-dark &,
+    body.wplus-messages-dark &,
     :host([data-scheme="dark"]) & {
         --wplus-toast-bg: 241, 245, 249;
         --wplus-toast-fg: 15, 23, 42;
@@ -39,11 +39,11 @@
     bottom: 24px;
     width: min(880px, calc(100vw - 48px));
     height: min(600px, calc(100vh - 48px));
-    border-radius: var(--bm-radius-card, 12px);
+    border-radius: var(--wplus-radius-card, 12px);
     overflow: hidden;
     box-shadow: 0 24px 64px rgba(0, 0, 0, 0.35), 0 2px 8px rgba(0, 0, 0, 0.2);
-    background: rgba(var(--bm-call-canvas), 1);
-    animation: realtime-call-in var(--bm-duration-base, 200ms) var(--bm-ease-out, ease-out);
+    background: rgba(var(--wplus-call-canvas), 1);
+    animation: realtime-call-in var(--wplus-duration-base, 200ms) var(--wplus-ease-out, ease-out);
 
     &[data-layout="audio"] {
         width: min(560px, calc(100vw - 48px));
@@ -108,11 +108,11 @@
 .realtime-call-ring,
 .realtime-call-notice {
     padding: 12px 14px;
-    border-radius: var(--bm-radius-lg, 12px);
+    border-radius: var(--wplus-radius-lg, 12px);
     background: rgba(var(--wplus-toast-bg), 1);
     color: rgba(var(--wplus-toast-fg), 1);
     box-shadow: 0 12px 32px rgba(0, 0, 0, 0.25);
-    animation: realtime-call-in var(--bm-duration-base, 200ms) var(--bm-ease-out, ease-out);
+    animation: realtime-call-in var(--wplus-duration-base, 200ms) var(--wplus-ease-out, ease-out);
 }
 
 .realtime-call-notice {
@@ -122,7 +122,7 @@
     left: 50%;
     transform: translateX(-50%);
     max-width: calc(100vw - 32px);
-    font-size: var(--bm-font-size-sm, 13px);
+    font-size: var(--wplus-font-size-sm, 13px);
 }
 
 // Turn sound on, over the top of the call while the browser holds the others' sound back (src/sdk/sound.ts): in the
@@ -143,7 +143,7 @@
     color: rgba(var(--wplus-toast-fg), 1);
     box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
     font: inherit;
-    font-size: var(--bm-font-size-sm, 13px);
+    font-size: var(--wplus-font-size-sm, 13px);
     cursor: pointer;
     white-space: nowrap;
 }
@@ -164,7 +164,7 @@
     color: rgba(var(--wplus-tooltip-ink, 255, 255, 255), 1);
     border-radius: var(--wplus-tooltip-radius, 4px);
     box-shadow: var(--wplus-tooltip-shadow, none);
-    font-family: var(--wplus-tooltip-font, var(--bm-messenger-font, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif));
+    font-family: var(--wplus-tooltip-font, var(--wplus-messenger-font, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif));
     font-size: var(--wplus-tooltip-font-size, 11.5px);
     font-weight: 500;
     line-height: 1.35;

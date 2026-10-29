@@ -267,7 +267,7 @@ export default function Icon( { name, size = 18, strokeWidth, className, style }
     const paths = d.includes( "|" ) ? d.split( "|" ) : [ d ];
 
     const cls = RTL_MIRRORED.has( name )
-        ? ( className ? className + " bm-icon-rtl" : "bm-icon-rtl" )
+        ? ( className ? className + " wplus-icon-rtl" : "wplus-icon-rtl" )
         : className;
 
     return (
@@ -326,7 +326,7 @@ export function ResolvedIcon( { icon, size = 18, className }: ResolvedIconProps 
     // would otherwise stand half again as tall as the glyphs beside it.
     // _icon.scss scales whatever lands inside down to this square.
     return (
-        <span className={ "bm-icon-custom" + ( className ? " " + className : "" ) }
+        <span className={ "wplus-icon-custom" + ( className ? " " + className : "" ) }
               style={ { width: size, height: size } } aria-hidden="true">
             { typeof icon === "string" ? parse( icon ) : icon }
         </span>

@@ -38,7 +38,7 @@ export default function GroupAudioGrid() {
         }
     }, []);
 
-    const controlsOf = () => audioGridEl.current!.parentElement!.querySelector<HTMLElement>('.bm-group-call-controls-v2')!;
+    const controlsOf = () => audioGridEl.current!.parentElement!.querySelector<HTMLElement>('.wplus-group-call-controls-v2')!;
 
     const checkSizeChange = () => {
         const containerWidth = wrapper.current!.getBoundingClientRect().width;
@@ -157,7 +157,7 @@ export default function GroupAudioGrid() {
     // not a trade worth making inside call code for a closing animation.
     useFlipReorder( audioGridEl );
 
-    return <div ref={audioGridEl} className="bm-group-call-audios-grid">
+    return <div ref={audioGridEl} className="wplus-group-call-audios-grid">
         {items}
     </div>
 }

@@ -16,9 +16,9 @@ it( 'draws who is in a room on any page, with a call button for each of the othe
     await act( async () => {} );
 
     const root = document.querySelector( 'online-list' )!.shadowRoot!;
-    expect( root.querySelector( '.bm-chat-online__title' )?.textContent ).toBe( 'Online (2)' );
+    expect( root.querySelector( '.wplus-chat-online__title' )?.textContent ).toBe( 'Online (2)' );
     // Ann is the page's user: only Ben's row has call buttons, a video and an audio one.
-    const buttons = [ ...root.querySelectorAll( '.bm-row-action' ) ];
+    const buttons = [ ...root.querySelectorAll( '.wplus-row-action' ) ];
     expect( buttons.map( ( b ) => b.getAttribute( 'aria-label' ) ) ).toEqual( [ 'Video Call', 'Audio Call' ] );
 
     await act( async () => ( buttons[ 0 ] as HTMLElement ).click() );
@@ -40,17 +40,17 @@ it( 'draws a conversation on any page, with the set of reactions it names', asyn
     for ( let i = 0; i < 3; i++ ) await act( async () => {} );
 
     const root = document.querySelector( 'chat-room' )!.shadowRoot!;
-    expect( root.querySelector( '.realtime-chat .bm-chat-text' )?.textContent ).toBe( 'Hi Ann' );
-    expect( root.querySelector( '.bm-composer__editable' )?.getAttribute( 'placeholder' ) ).toBe( 'Ask about your order' );
-    await act( async () => { ( root.querySelector( '.bm-reaction-trigger' ) as HTMLElement ).dispatchEvent( new MouseEvent( 'mouseover', { bubbles: true } ) ); } );
-    expect( root.querySelector( '.bm-reaction-trigger' )?.textContent ).toBe( '🎉' );
+    expect( root.querySelector( '.realtime-chat .wplus-chat-text' )?.textContent ).toBe( 'Hi Ann' );
+    expect( root.querySelector( '.wplus-composer__editable' )?.getAttribute( 'placeholder' ) ).toBe( 'Ask about your order' );
+    await act( async () => { ( root.querySelector( '.wplus-reaction-trigger' ) as HTMLElement ).dispatchEvent( new MouseEvent( 'mouseover', { bubbles: true } ) ); } );
+    expect( root.querySelector( '.wplus-reaction-trigger' )?.textContent ).toBe( '🎉' );
 
     // A message the room took is a `sent` event on the element, for the page to tell its own server.
     const at = Date.now();
     chat.emitWithAck.mockImplementation( async () => ( { id: 'm1', at } ) );
     const sent = vi.fn();
     document.querySelector( 'chat-room' )!.addEventListener( 'sent', ( e ) => sent( ( e as CustomEvent ).detail ) );
-    const editable = root.querySelector( '.bm-composer__editable' ) as HTMLElement;
+    const editable = root.querySelector( '.wplus-composer__editable' ) as HTMLElement;
     editable.textContent = 'Where is it?';
     await act( async () => { fireEvent.input( editable ); } );
     await act( async () => { fireEvent.keyDown( editable, { key: 'Enter' } ); } );
@@ -71,7 +71,7 @@ it( 'draws the conversation the app keeps, from its route or from a loader the p
     // The route: asked with the page's cookies, `?before=` for an older page.
     document.body.insertAdjacentHTML( 'beforeend', '<chat-room id="by-route" room="chat:34:42" messages="/api/chat/messages"></chat-room>' );
     for ( let i = 0; i < 3; i++ ) await act( async () => {} );
-    expect( document.getElementById( 'by-route' )!.shadowRoot!.querySelector( '.bm-chat-text' )?.textContent ).toBe( 'Kept by the app' );
+    expect( document.getElementById( 'by-route' )!.shadowRoot!.querySelector( '.wplus-chat-text' )?.textContent ).toBe( 'Kept by the app' );
     expect( String( fetch.mock.calls[ 0 ][ 0 ] ) ).toBe( `${ location.origin }/api/chat/messages` );
     expect( fetch.mock.calls[ 0 ][ 1 ] ).toMatchObject( { credentials: 'same-origin' } );
     await routeLoader( '/api/chat/messages' )!( { id: 'k1', at } );
@@ -83,6 +83,6 @@ it( 'draws the conversation the app keeps, from its route or from a loader the p
     element.load = async () => ( { messages: [ { id: 'k2', from: 42, text: 'From the page loader', at } ], more: false } );
     document.body.append( element );
     for ( let i = 0; i < 3; i++ ) await act( async () => {} );
-    expect( element.shadowRoot!.querySelector( '.bm-chat-text' )?.textContent ).toBe( 'From the page loader' );
+    expect( element.shadowRoot!.querySelector( '.wplus-chat-text' )?.textContent ).toBe( 'From the page loader' );
     vi.unstubAllGlobals();
 } );

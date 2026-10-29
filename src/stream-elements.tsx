@@ -211,6 +211,15 @@ class StreamElement extends HTMLElement {
         return view && PARTS.includes( view ) ? view : "all";
     }
 
+    /**
+     * Sets the attribute: React sets `view` as a property once the element is defined, as on a page that opens after
+     * another with a stream on it (a studio page after its player). Without it the getter alone threw.
+     */
+    set view( view: PartName | null | undefined ) {
+        if ( view ) this.setAttribute( "view", view );
+        else this.removeAttribute( "view" );
+    }
+
     options(): PartOptions {
         const height = Number( this.getAttribute( "height" ) );
         return {
@@ -274,6 +283,9 @@ class StudioElement extends StreamElement {
     get view(): PartName {
         return "studio";
     }
+
+    /** Always the studio, whatever a framework sets. */
+    set view( _view: PartName | null | undefined ) {}
 }
 
 /** The page's prefix for the elements' names (element-names.ts): '' for their own. */

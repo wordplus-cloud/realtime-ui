@@ -44,12 +44,13 @@ it( 'joins the group call of a <call-spot join> as the spot comes onto the page,
     expect( calls.group.mock.calls ).toEqual( [ [ 'meeting:daily', { type: 'video' } ] ] );
     const spot = document.querySelector( 'call-spot' )!;
     expect( spot.getAttribute( 'data-call' ) ).toBe( 'meeting:daily' );
-    // In with the camera and the microphone off: the browser asked for neither.
+    // In with the camera and the microphone off: the browser asked for neither, "You are muted" included, which listens
+    // only once the microphone was on in the call.
     expect( navigator.mediaDevices.getUserMedia ).not.toHaveBeenCalled();
     expect( group.setTrack ).not.toHaveBeenCalled();
 
     // Left: nothing joins it again while the spot stays, though its attributes change.
-    ( spot.shadowRoot!.querySelector( '.bm-exit-room' ) as HTMLElement ).click();
+    ( spot.shadowRoot!.querySelector( '.wplus-exit-room' ) as HTMLElement ).click();
     await settle();
     expect( group.leave ).toHaveBeenCalled();
     expect( spot.hasAttribute( 'data-call' ) ).toBe( false );
@@ -59,9 +60,11 @@ it( 'joins the group call of a <call-spot join> as the spot comes onto the page,
     spot.remove();
 
     // `join-with` turns on what it names as it joins: here the microphone alone, the camera left off.
+    const before = vi.mocked( navigator.mediaDevices.getUserMedia ).mock.calls.length;
     document.body.insertAdjacentHTML( 'beforeend', '<call-spot call="meeting:team" join="video" join-with="microphone"></call-spot>' );
     await settle();
     expect( calls.group ).toHaveBeenLastCalledWith( 'meeting:team', { type: 'video' } );
-    expect( navigator.mediaDevices.getUserMedia ).toHaveBeenCalledTimes( 1 );
-    expect( navigator.mediaDevices.getUserMedia ).toHaveBeenCalledWith( { audio: true } );
+    expect( vi.mocked( navigator.mediaDevices.getUserMedia ).mock.calls.slice( before ).filter( ( [ asked ] ) => asked?.video ), 'the camera was asked for' ).toEqual( [] );
+    expect( group.setTrack ).toHaveBeenCalledWith( 'microphone', expect.anything() );
+    expect( group.setTrack ).not.toHaveBeenCalledWith( 'camera', expect.anything() );
 } );

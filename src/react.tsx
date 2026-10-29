@@ -15,7 +15,8 @@
 //     <Typing rt={ rt } room="chat:34:42" />
 //     <Chat rt={ rt } room="chat:34:42" />                     // the conversation, its history, typing and reactions
 //     <Chat rt={ rt } room="chat:34:42" to="42" call />        // with them on top, and their calls in it
-import React, { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from "react";
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from "react";
+import { CallOptionsContext } from "./sdk/call-options.ts";
 import { configureUi, setUiUsers } from "./host.ts";
 import { translator, direction } from "./inc/translations.ts";
 import { setOwnTooltips } from "./inc/shared-parts.ts";
@@ -45,9 +46,11 @@ export { RoomTyping as Typing, RoomCount as OnlineCount } from "./sdk/presence-v
 export type { RoomTypingProps as TypingProps, RoomCountProps as OnlineCountProps, RoomPerson } from "./sdk/presence-views.tsx";
 export { Chat, DEFAULT_REACTIONS } from "./sdk/chat.tsx";
 export { routeLoader } from "./sdk/route-loader.ts";
-export type { ChatProps, ChatLoader, ChatPage, StoredMessage, SentMessage } from "./sdk/chat.tsx";
+export type { ChatProps, ChatLoader, ChatPage, StoredMessage, SentMessage, ChatFile, ChatUploader } from "./sdk/chat.tsx";
+export { MessageFiles, StagedFiles, ImageViewer, DropStrip, routeUploader, shownUrl, kindOf as fileKindOf, badgeOf as fileBadgeOf, bytesLabel, UploadError } from "./sdk/chat-files.tsx";
+export type { FileKind, StagedFile, ViewedImage, MessageFilesProps, StagedFilesProps, ImageViewerProps } from "./sdk/chat-files.tsx";
 // The engines under the views, which an app's own copy of a view runs on (`npx @wordplus/realtime-ui add`).
-export { useChat, grouped as groupedByDay } from "./sdk/use-chat.ts";
+export { useChat, grouped as groupedByDay, filesOf } from "./sdk/use-chat.ts";
 export type { UseChatOptions, ChatState, ChatMessage, ChatPerson, ChatEvents } from "./sdk/use-chat.ts";
 export { useChatCall, useChatPeer, useStartCall } from "./sdk/chat-call.tsx";
 export type { ChatCall, ChatPeer } from "./sdk/chat-call.tsx";
@@ -72,12 +75,26 @@ export interface CallScreenProps {
      * the same calls: `view={ CallView }`.
      */
     view?: CallView;
+    /**
+     * "You are muted" for someone who talks with the microphone off. It keeps a microphone open while muted, never
+     * sent, so the browser shows it in use. On unless `false`.
+     */
+    mutedHint?: boolean;
+    /**
+     * A group call joined with the camera and the microphone off, unless the app names what to turn on, and a prompt
+     * over the dock that says so and that the dock turns them on, with Preview: the device settings with a picture of
+     * the camera and the microphone's level, only the person's, asked of the browser once. The browser asks for nothing
+     * until the person presses something. On unless `false`: then a group call starts with the microphone and, on a
+     * video call, the camera.
+     */
+    devicesOnJoin?: boolean;
 }
 
 /** The rings and the call window, Better Messages' call screens, on the page's calls. Once on the page, in its layout. */
-export function CallScreen( { rt, lang, strings, add, components, view }: CallScreenProps ) {
+export function CallScreen( { rt, lang, strings, add, components, view, mutedHint = true, devicesOnJoin = true }: CallScreenProps ) {
     const controller = useController( rt, add );
     const language = lang ?? ( typeof document !== "undefined" ? document.documentElement.lang || "en" : "en" );
+    const options = useMemo( () => ( { mutedHint, devicesOnJoin } ), [ mutedHint, devicesOnJoin ] );
 
     // Before the first screen draws, and again when the language changes. The controls' tooltips from the WordPlus
     // SDK's floater where the page has it, else the package's own.
@@ -91,7 +108,9 @@ export function CallScreen( { rt, lang, strings, add, components, view }: CallSc
     // Its rings and window are fixed over the page, so it takes no place in the app's layout, a grid's cell included
     // (an SDK review, 2026-10-15), while its look still reaches them through the wrapper.
     return <div className="realtime-calls" dir={ direction( language ) } style={ { display: "contents" } }>
-        <PiecesProvider pieces={ components }><CallsApp controller={ controller } view={ view } /></PiecesProvider>
+        <CallOptionsContext.Provider value={ options }>
+            <PiecesProvider pieces={ components }><CallsApp controller={ controller } view={ view } /></PiecesProvider>
+        </CallOptionsContext.Provider>
     </div>;
 }
 

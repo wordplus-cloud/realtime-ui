@@ -11,5 +11,5 @@ export default function UserName( props: UserNameProps ) {
 
 /** The name the defaults write, as Better Messages marks it up: the one the app's realtime server gave. */
 export function FallbackName( props: UserNameProps ) {
-    return <span className="bm-uname">{ uiUser( props.user_id )?.name ?? props.fallback ?? "" }</span>;
+    return <span className="wplus-uname">{ uiUser( props.user_id )?.name ?? props.fallback ?? "" }</span>;
 }

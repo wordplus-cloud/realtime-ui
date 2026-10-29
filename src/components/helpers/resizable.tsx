@@ -51,7 +51,7 @@ export default function Resizable({
     };
 
     if ( aspectRatio ) {
-        ( styles as Record<string, string> )["--bm-chip-ratio"] = aspectRatio;
+        ( styles as Record<string, string> )["--wplus-chip-ratio"] = aspectRatio;
     }
 
     // Before the first paint: with a plain effect the box showed at the
@@ -160,7 +160,7 @@ export default function Resizable({
     return (
         <div
             ref={ref}
-            className={`bm-smart-container ${className || ""}`.trim()}
+            className={`wplus-smart-container ${className || ""}`.trim()}
             style={styles}
             part={part}
         >
@@ -171,7 +171,7 @@ export default function Resizable({
                     onMouseDown={(event) => handleStart(event, true)}
                     onTouchStart={(event) => handleStart(event, true)}
                     className={
-                        "bm-resizable-handle bm-resizable-handle-" + resizeDirection
+                        "wplus-resizable-handle wplus-resizable-handle-" + resizeDirection
                     }
                 />
             )}
@@ -182,7 +182,7 @@ export default function Resizable({
                 }}
                 onMouseDown={(event) => handleStart(event, false)}
                 onTouchStart={(event) => handleStart(event, false)}
-                className="bm-draggable-handle"
+                className="wplus-draggable-handle"
             />
         </div>
     );

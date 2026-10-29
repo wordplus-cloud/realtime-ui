@@ -5,7 +5,8 @@ import { personOf, useProfiles, useRoom, useTyping, type SdkEventMeta, type SdkH
 // A conversation on one of an app's rooms, without its look: the engine under the chat (chat.tsx), and under an app's
 // own copy of it (`npx @wordplus/realtime-ui add chat`), so a fix here reaches both. What travels, by the room's events
 // (the app's server lists them in the room's `emit`):
-//   message   { text }          emitted with an ack; the app's server keeps it, from its webhook
+//   message   { text, files? }  emitted with an ack; the app's server keeps it, from its webhook. Its files are those
+//                               the app's own server took (Chat's `upload`): what travels is where each is, never the file
 //   typing    { on }            volatile, while writing and when stopping
 //   reaction  { id, key }       the user's reaction to a message, one each, an empty key taking it back; kept as messages are
 //   read      { id }            volatile, the newest message the user has seen, for the sender's ticks
@@ -16,12 +17,35 @@ import { personOf, useProfiles, useRoom, useTyping, type SdkEventMeta, type SdkH
 // long, only fills in what the app's server hasn't saved yet and what a page that reconnects missed. Without `load`, the
 // room's history is all there is.
 
+/**
+ * A file in a message, as the app's server answered its upload (Chat's `upload`): where it is, and what it is. The
+ * app's server keeps the file and decides who may open it: the room carries only this.
+ */
+export interface ChatFile {
+    /** The app's own id for it. */
+    id: string;
+    /** Where it opens: an address of the app's, or of a host it names in the chat's `fileHosts`. */
+    url: string;
+    name: string;
+    /** Its media type: `image/jpeg`, `application/pdf` … */
+    type: string;
+    /** In bytes. */
+    size: number;
+    /** A picture's size, where the app knows it. */
+    width?: number;
+    height?: number;
+    /** A smaller picture of it for the message, where the app makes one: `url` is shown otherwise. */
+    thumb?: string;
+}
+
 /** A message the app's server kept from its webhook: its room event's id, who sent it, what, when, and its reactions. */
 export interface StoredMessage {
     id: string;
     from: string | number;
     text: string;
     at: number;
+    /** Its files, as the webhook brought them. */
+    files?: ChatFile[];
     /** By reaction key, who picked it. */
     reactions?: Record<string, Array<string | number>>;
 }
@@ -40,6 +64,8 @@ export interface SentMessage {
     room: string;
     text: string;
     at: number;
+    /** Its files, where it has any. */
+    files?: ChatFile[];
 }
 
 /** The events' names, where the app's are others. */
@@ -57,8 +83,11 @@ export interface ChatMessage {
     /** Null while it is being sent. */
     id: string | null;
     from: string;
+    /** Empty for a message of files alone. */
     text: string;
     at: number;
+    /** Its files: none for most. */
+    files: ChatFile[];
     status?: DeliveryState;
     /** By reaction key, who picked it. */
     reactions: Record<string, string[]>;
@@ -107,8 +136,8 @@ export interface ChatState {
     person( id: string ): ChatPerson;
     /** A message of the user's: sending, sent, seen by the other side, or failed. */
     statusOf( message: ChatMessage ): DeliveryState | undefined;
-    /** Sends a message: shown at once, then as sent or failed. */
-    send( text: string ): Promise<void>;
+    /** Sends a message, its text and the files the app's server took for it: shown at once, then as sent or failed. */
+    send( text: string, files?: ChatFile[] ): Promise<void>;
     /** Says the user is typing, at most every two seconds. */
     typing(): void;
     /** Says the user stopped typing. */
@@ -126,9 +155,26 @@ const textOf = ( data: unknown ) => {
     return typeof text === "string" ? text : "";
 };
 
+/**
+ * The files of a message as it came, those whole: an id, an address, a name, a type and a size each. A member may send
+ * anything in a room their rule lets them write in, so what is shown is checked again where it is drawn (chat-files.tsx).
+ */
+export function filesOf( data: unknown ): ChatFile[] {
+    const files = ( data as { files?: unknown } | null )?.files;
+    if ( ! Array.isArray( files ) ) return [];
+    return files.flatMap( ( f ) => {
+        const { id, url, name, type, size, width, height, thumb } = ( f ?? {} ) as Record<string, unknown>;
+        if ( typeof url !== "string" || ! url || typeof name !== "string" || typeof type !== "string" ) return [];
+        const file: ChatFile = { id: typeof id === "string" || typeof id === "number" ? String( id ) : url, url, name, type, size: typeof size === "number" ? size : 0 };
+        if ( typeof width === "number" && typeof height === "number" ) Object.assign( file, { width, height } );
+        if ( typeof thumb === "string" && thumb ) file.thumb = thumb;
+        return [ file ];
+    } ).slice( 0, 20 );
+}
+
 /** A message the app kept, as the chat holds it. */
 export const fromStored = ( m: StoredMessage ): ChatMessage => ( {
-    key: m.id, id: m.id, from: String( m.from ), text: m.text, at: m.at,
+    key: m.id, id: m.id, from: String( m.from ), text: m.text, at: m.at, files: filesOf( m ),
     reactions: Object.fromEntries( Object.entries( m.reactions ?? {} ).map( ( [ k, users ] ) => [ k, users.map( String ) ] ) ),
 } );
 
@@ -147,7 +193,7 @@ export function applyEvent( list: ChatMessage[], name: string, data: unknown, me
     if ( name === names.message ) {
         if ( meta.id && list.some( ( m ) => m.id === meta.id ) ) return list;
         // In time order: a page that reconnects hears what it missed after what it has.
-        return ordered( [ ...list, { key: meta.id ?? `e${ list.length }-${ meta.at ?? 0 }`, id: meta.id ?? null, from, text: textOf( data ), at: meta.at ?? Date.now(), reactions: {} } ] );
+        return ordered( [ ...list, { key: meta.id ?? `e${ list.length }-${ meta.at ?? 0 }`, id: meta.id ?? null, from, text: textOf( data ), at: meta.at ?? Date.now(), files: filesOf( data ), reactions: {} } ] );
     }
     if ( name === names.reaction ) {
         const { id, key } = ( data ?? {} ) as { id?: string; key?: string };
@@ -297,15 +343,15 @@ export function useChat( { rt, room, events, maxLength = 0, load, onSent }: UseC
         return seenAt >= index ? "seen" : "sent";
     };
 
-    const send = async ( value: string ) => {
+    const send = async ( value: string, files: ChatFile[] = [] ) => {
         const words = value.trim();
-        if ( ! words || ! view.room || ( maxLength > 0 && words.length > maxLength ) ) return;
+        if ( ( ! words && ! files.length ) || ! view.room || ( maxLength > 0 && words.length > maxLength ) ) return;
         const key = `local-${ Date.now() }-${ Math.random().toString( 36 ).slice( 2 ) }`;
-        setMessages( ( list ) => [ ...list, { key, id: null, from: me ?? "", text: words, at: Date.now(), status: "sending", reactions: {} } ] );
+        setMessages( ( list ) => [ ...list, { key, id: null, from: me ?? "", text: words, at: Date.now(), files, status: "sending", reactions: {} } ] );
         stopTyping();
         let sent: { id: string; at: number };
         try {
-            sent = await view.room.emitWithAck( names.message, { text: words } );
+            sent = await view.room.emitWithAck( names.message, files.length ? { text: words, files } : { text: words } );
         } catch {
             setMessages( ( list ) => list.map( ( m ) => ( m.key === key ? { ...m, status: "failed" } : m ) ) );
             return;
@@ -316,7 +362,7 @@ export function useChat( { rt, room, events, maxLength = 0, load, onSent }: UseC
             : list.map( ( m ) => ( m.key === key ? { ...m, id, at, status: undefined } : m ) ) );
         // Sent: the page hears it, and what it does is its own, never the message's failure.
         try {
-            sentTo.current?.( { id, room, text: words, at } );
+            sentTo.current?.( files.length ? { id, room, text: words, at, files } : { id, room, text: words, at } );
         } catch ( error ) {
             console.error( error );
         }

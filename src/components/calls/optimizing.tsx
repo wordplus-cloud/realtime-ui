@@ -131,11 +131,11 @@ export function useCameraOptimizing( participant: CallParticipant | null | undef
 export function CameraOptimizingNotice( { state, avatar, main }: { state: CameraOptimizingState, avatar?: string, main?: boolean } ) {
     if( ! state.shown ) return null;
     const backdrop = state.still ?? avatar ?? '';
-    return <span className={ 'bm-call-optimizing' + ( main ? ' bm-call-optimizing-main' : '' ) + ( state.leaving ? ' bm-call-optimizing--leaving' : '' ) }
+    return <span className={ 'wplus-call-optimizing' + ( main ? ' wplus-call-optimizing-main' : '' ) + ( state.leaving ? ' wplus-call-optimizing--leaving' : '' ) }
                  part="video-optimizing" role="status" aria-live="polite">
-        { backdrop && <span className="bm-call-optimizing-backdrop" aria-hidden="true" style={ { backgroundImage: 'url("' + backdrop.replace( /"/g, '%22' ) + '")' } } /> }
-        <span className="bm-call-optimizing-notice">
-            <svg className="bm-call-optimizing-spinner" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+        { backdrop && <span className="wplus-call-optimizing-backdrop" aria-hidden="true" style={ { backgroundImage: 'url("' + backdrop.replace( /"/g, '%22' ) + '")' } } /> }
+        <span className="wplus-call-optimizing-notice">
+            <svg className="wplus-call-optimizing-spinner" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
                 <circle cx="12" cy="12" r="9" />
                 <path d="M12 3a9 9 0 0 1 9 9" />
             </svg>

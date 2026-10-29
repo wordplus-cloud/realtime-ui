@@ -1,6 +1,6 @@
 // An app's Chat (src/sdk/chat.tsx): Better Messages' conversation column, the
 // message list over the composer, filling whatever holds it. Its own, not
-// Better Messages': the messenger lays its column out itself (.bm-thread-col).
+// Better Messages': the messenger lays its column out itself (.wplus-thread-col).
 
 .realtime-chat {
     display: flex;
@@ -8,37 +8,37 @@
     height: 100%;
     min-height: 0;
     overflow: hidden;
-    background: rgba(var(--bm-color-chat-bg), 1);
-    color: rgba(var(--bm-color-text-primary), 1);
-    font-family: var(--bm-messenger-font, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif);
-    font-size: var(--bm-font-size-base, 15px);
-    line-height: var(--bm-line-height-normal, 1.45);
+    background: rgba(var(--wplus-color-chat-bg), 1);
+    color: rgba(var(--wplus-color-text-primary), 1);
+    font-family: var(--wplus-messenger-font, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif);
+    font-size: var(--wplus-font-size-base, 15px);
+    line-height: var(--wplus-line-height-normal, 1.45);
     -webkit-font-smoothing: antialiased;
 
     *, *::before, *::after { box-sizing: border-box; }
 
     // A message as it was typed: its line breaks kept, a long word broken
     // rather than widening the bubble.
-    .bm-chat-text {
+    .wplus-chat-text {
         white-space: pre-wrap;
         overflow-wrap: anywhere;
     }
 
     // The sender's name above their stack.
-    .bm-msg-stack__info .bm-name {
+    .wplus-msg-stack__info .wplus-name {
         font-weight: 600;
     }
 }
 
 // The user was taken out of the room by the app server: a quiet line where the composer was.
-.realtime-chat .bm-chat-removed {
+.realtime-chat .wplus-chat-removed {
     flex: 0 0 auto;
-    background: rgba(var(--bm-color-composer-bg), 1);
-    border-top: 1px solid rgba(var(--bm-color-border), 1);
+    background: rgba(var(--wplus-color-composer-bg), 1);
+    border-top: 1px solid rgba(var(--wplus-color-border), 1);
     padding: 16px 12px;
     text-align: center;
-    font-size: var(--bm-font-size-sm);
-    color: rgba(var(--bm-color-text-primary), 0.7);
+    font-size: var(--wplus-font-size-sm);
+    color: rgba(var(--wplus-color-text-primary), 0.7);
 }
 
 // A chat between two (Chat's `to`): the other person on a bar of its own over the conversation, their name, whether
@@ -49,17 +49,17 @@
     align-items: center;
     gap: 10px;
     padding: 8px 12px;
-    background: rgba(var(--bm-color-composer-bg), 1);
-    border-bottom: 1px solid rgba(var(--bm-color-border), 1);
+    background: rgba(var(--wplus-color-composer-bg), 1);
+    border-bottom: 1px solid rgba(var(--wplus-color-border), 1);
 
-    .bm-avatar-img {
+    .wplus-avatar-img {
         display: block;
         object-fit: cover;
     }
 
     // No picture known: a quiet disc in its place, not an empty gap.
-    .bm-avatar-blank {
-        background: rgba(var(--bm-color-bg-hover), 1);
+    .wplus-avatar-blank {
+        background: rgba(var(--wplus-color-bg-hover), 1);
     }
 }
 
@@ -79,8 +79,8 @@
 }
 
 .realtime-chat-top__online {
-    font-size: var(--bm-font-size-sm, 13px);
-    color: rgba(var(--bm-color-online, 34, 197, 94), 1);
+    font-size: var(--wplus-font-size-sm, 13px);
+    color: rgba(var(--wplus-color-online, 34, 197, 94), 1);
 }
 
 .realtime-chat-top__calls {
@@ -96,12 +96,12 @@
     width: 38px;
     height: 38px;
     border-radius: 50%;
-    color: rgba(var(--bm-color-accent), 1);
+    color: rgba(var(--wplus-color-accent), 1);
     cursor: pointer;
     transition: background 0.15s ease;
 
     &:hover {
-        background: rgba(var(--bm-color-accent), 0.1);
+        background: rgba(var(--wplus-color-accent), 0.1);
     }
 
     &[aria-disabled="true"] {
@@ -152,12 +152,12 @@
 
     .realtime-chat-col {
         max-width: var(--realtime-chat-beside-call, 350px);
-        border-inline-start: 1px solid rgba(var(--bm-color-border), 1);
+        border-inline-start: 1px solid rgba(var(--wplus-color-border), 1);
     }
 
     // The call's toggle is Show Chat / Hide Chat in its controls: the chevron Better Messages puts on the call's edge
     // stays out.
-    .bm-switch-chat {
+    .wplus-switch-chat {
         display: none;
     }
 }
@@ -174,7 +174,7 @@
     .realtime-chat-col {
         max-width: none;
         border-inline-start: 0;
-        border-top: 1px solid rgba(var(--bm-color-border), 1);
+        border-top: 1px solid rgba(var(--wplus-color-border), 1);
     }
 
     // The messages under the call: the call keeps the larger part.

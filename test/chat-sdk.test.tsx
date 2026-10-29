@@ -19,9 +19,9 @@ function chatWith( events: Array<{ event: string; data: unknown; id?: string; at
     return { room, rt };
 }
 
-const stacks = ( container: HTMLElement ) => [ ...container.querySelectorAll( '.bm-msg-stack' ) ].map( ( s ) => ( {
+const stacks = ( container: HTMLElement ) => [ ...container.querySelectorAll( '.wplus-msg-stack' ) ].map( ( s ) => ( {
     me: s.getAttribute( 'data-is-me' ) === '1',
-    texts: [ ...s.querySelectorAll( '.bm-chat-text' ) ].map( ( t ) => t.textContent ),
+    texts: [ ...s.querySelectorAll( '.wplus-chat-text' ) ].map( ( t ) => t.textContent ),
 } ) );
 
 describe( 'the chat on a room', () => {
@@ -41,13 +41,13 @@ describe( 'the chat on a room', () => {
             { me: false, texts: [ 'Hi! Has my order left yet?', 'Not yet' ] },
             { me: true, texts: [ 'It is being packed now' ] },
         ] );
-        expect( container.querySelector( '.bm-day-pill' )?.textContent ).toBe( 'Today' );
-        const pill = container.querySelector( '[data-message-id="h3"] .bm-reaction-pill' )!;
+        expect( container.querySelector( '.wplus-day-pill' )?.textContent ).toBe( 'Today' );
+        const pill = container.querySelector( '[data-message-id="h3"] .wplus-reaction-pill' )!;
         expect( pill.textContent ).toBe( '❤' );
-        expect( container.querySelector( '.bm-history-start' )?.textContent ).toBe( 'Start of conversation' );
+        expect( container.querySelector( '.wplus-history-start' )?.textContent ).toBe( 'Start of conversation' );
         // Ben's messages can be reacted to; Ann's own can't.
-        expect( container.querySelectorAll( '[data-is-me="0"] .bm-reaction-trigger' ) ).toHaveLength( 2 );
-        expect( container.querySelectorAll( '[data-is-me="1"] .bm-reaction-trigger' ) ).toHaveLength( 0 );
+        expect( container.querySelectorAll( '[data-is-me="0"] .wplus-reaction-trigger' ) ).toHaveLength( 2 );
+        expect( container.querySelectorAll( '[data-is-me="1"] .wplus-reaction-trigger' ) ).toHaveLength( 0 );
     } );
 
     it( 'sends what is typed with an ack, says it is typing and stops, and ticks sent, then seen when read', async () => {
@@ -55,9 +55,9 @@ describe( 'the chat on a room', () => {
         room.emitWithAck.mockImplementation( async () => ( { id: 'm9', at: Date.now() } ) );
         const { container } = render( <Chat rt={ rt } room="chat:34:42" /> );
         await settle();
-        expect( container.querySelector( '.bm-empty-thread' ) ).not.toBeNull();
+        expect( container.querySelector( '.wplus-empty-thread' ) ).not.toBeNull();
 
-        const editable = container.querySelector( '.bm-composer__editable' ) as HTMLElement;
+        const editable = container.querySelector( '.wplus-composer__editable' ) as HTMLElement;
         editable.textContent = 'It left this morning';
         await act( async () => { fireEvent.input( editable ); } );
         expect( room.volatile.emit ).toHaveBeenCalledWith( 'typing', { on: true } );
@@ -68,7 +68,7 @@ describe( 'the chat on a room', () => {
         expect( room.volatile.emit ).toHaveBeenCalledWith( 'typing', { on: false } );
         expect( editable.textContent ).toBe( '' );
         expect( stacks( container ) ).toEqual( [ { me: true, texts: [ 'It left this morning' ] } ] );
-        const status = () => container.querySelector( '.bm-msg-meta[data-variant="overlay"] .bm-msg-status' )?.getAttribute( 'data-status' );
+        const status = () => container.querySelector( '.wplus-msg-meta[data-variant="overlay"] .wplus-msg-status' )?.getAttribute( 'data-status' );
         expect( status() ).toBe( 'sent' );
 
         await act( async () => room.fire( 'read', { id: 'm9' }, { from: '42' } ) );
@@ -80,14 +80,14 @@ describe( 'the chat on a room', () => {
         const { rt, room } = chatWith();
         const { container } = render( <Chat rt={ rt } room="chat:34:42" /> );
         await settle();
-        expect( container.querySelector( '.bm-chat-removed' ) ).toBeNull();
+        expect( container.querySelector( '.wplus-chat-removed' ) ).toBeNull();
         await act( async () => {
             Object.assign( room, { state: 'failed', error: 'kicked' } );
             room.fire( 'kicked', { code: 'kicked' } );
         } );
-        expect( container.querySelector( '.bm-chat-removed' )?.textContent ).toBe( 'Removed from conversation' );
+        expect( container.querySelector( '.wplus-chat-removed' )?.textContent ).toBe( 'Removed from conversation' );
         // In place of the composer: a placeholder and a Send arrow left there read as usable.
-        expect( container.querySelector( '.bm-composer' ) ).toBeNull();
+        expect( container.querySelector( '.wplus-composer' ) ).toBeNull();
     } );
 
     it( 'tells the page each message the room took, with its id, for its own server, and nothing of one that failed', async () => {
@@ -98,7 +98,7 @@ describe( 'the chat on a room', () => {
         const sent = vi.fn();
         const { container } = render( <Chat rt={ rt } room="chat:34:42" onSent={ sent } /> );
         await settle();
-        const editable = container.querySelector( '.bm-composer__editable' ) as HTMLElement;
+        const editable = container.querySelector( '.wplus-composer__editable' ) as HTMLElement;
         const say = async ( text: string ) => {
             editable.textContent = text;
             await act( async () => { fireEvent.input( editable ); } );
@@ -119,17 +119,17 @@ describe( 'the chat on a room', () => {
 
         await act( async () => room.fire( 'typing', { on: true }, { from: '42' } ) );
         await settle();
-        expect( container.querySelector( '.bm-typing-pinned' )?.textContent ).toBe( 'Ben typing' );
+        expect( container.querySelector( '.wplus-typing-pinned' )?.textContent ).toBe( 'Ben typing' );
 
         await act( async () => room.fire( 'message', { text: 'Thanks!' }, { from: '42', id: 'n1', at: Date.now() } ) );
         await settle();
         expect( stacks( container ) ).toEqual( [ { me: false, texts: [ 'Thanks!' ] } ] );
-        expect( container.querySelector( '.bm-typing-pinned' ) ).toBeNull();
+        expect( container.querySelector( '.wplus-typing-pinned' ) ).toBeNull();
         expect( room.volatile.emit ).toHaveBeenCalledWith( 'read', { id: 'n1' } );
 
         // The same message again (another tab's echo, a replay) is kept once.
         await act( async () => room.fire( 'message', { text: 'Thanks!' }, { from: '42', id: 'n1', at: Date.now() } ) );
-        expect( container.querySelectorAll( '.bm-chat-text' ) ).toHaveLength( 1 );
+        expect( container.querySelectorAll( '.wplus-chat-text' ) ).toHaveLength( 1 );
     } );
 
     it( 'reacts to a message from its picker, and takes the reaction back from the pill', async () => {
@@ -137,17 +137,17 @@ describe( 'the chat on a room', () => {
         const { container } = render( <Chat rt={ rt } room="chat:34:42" reactions={ [ '1f44d', '2764' ] } /> );
         await settle();
 
-        await act( async () => { fireEvent.mouseEnter( container.querySelector( '.bm-reaction-trigger' )! ); } );
-        await act( async () => { fireEvent.click( document.body.querySelectorAll( '.bm-reaction-strip__item' )[ 0 ] ); } );
+        await act( async () => { fireEvent.mouseEnter( container.querySelector( '.wplus-reaction-trigger' )! ); } );
+        await act( async () => { fireEvent.click( document.body.querySelectorAll( '.wplus-reaction-strip__item' )[ 0 ] ); } );
         await settle();
         expect( room.emitWithAck ).toHaveBeenCalledWith( 'reaction', { id: 'h1', key: '1f44d' } );
-        const pill = container.querySelector( '.bm-reaction-pill' )!;
+        const pill = container.querySelector( '.wplus-reaction-pill' )!;
         expect( pill.getAttribute( 'data-reacted-by-me' ) ).toBe( '1' );
 
         await act( async () => { fireEvent.click( pill ); } );
         await settle();
         expect( room.emitWithAck ).toHaveBeenLastCalledWith( 'reaction', { id: 'h1', key: '' } );
-        expect( container.querySelector( '.bm-reaction-pill' ) ).toBeNull();
+        expect( container.querySelector( '.wplus-reaction-pill' ) ).toBeNull();
     } );
 
     it( 'pages back through the history as the reader nears the top', async () => {
@@ -155,15 +155,49 @@ describe( 'the chat on a room', () => {
         const { rt, room } = chatWith( [ { event: 'message', data: { text: 'Newer' }, id: 'h9', at, from: '42' } ], true );
         const { container } = render( <Chat rt={ rt } room="chat:34:42" /> );
         await settle();
-        expect( container.querySelector( '.bm-history-start' )?.getAttribute( 'data-visible' ) ).toBeNull();
+        expect( container.querySelector( '.wplus-history-start' )?.getAttribute( 'data-visible' ) ).toBeNull();
 
         room.history.mockImplementation( async () => ( { events: [ { event: 'message', data: { text: 'Older' }, id: 'h1', at: at - 1000, from: '42' } ], more: false } ) );
-        const list = container.querySelector( '.bm-msg-list' ) as HTMLElement;
+        const list = container.querySelector( '.wplus-msg-list' ) as HTMLElement;
         await act( async () => { fireEvent.scroll( list ); } );
         await settle();
         expect( room.history ).toHaveBeenLastCalledWith( { before: 'h9', limit: 50 } );
         expect( stacks( container ) ).toEqual( [ { me: false, texts: [ 'Older', 'Newer' ] } ] );
-        expect( container.querySelector( '.bm-history-start' )?.textContent ).toBe( 'Start of conversation' );
+        expect( container.querySelector( '.wplus-history-start' )?.textContent ).toBe( 'Start of conversation' );
+    } );
+
+    it( 'shows a day label pinned to the top while the list scrolls, and fades it once the list rests', async () => {
+        const { rt } = chatWith( [ { event: 'message', data: { text: 'Hello' }, id: 'h1', at: Date.now(), from: '42' } ] );
+        const { container } = render( <Chat rt={ rt } room="chat:34:42" /> );
+        await settle();
+        const list = container.querySelector( '.wplus-msg-list' ) as HTMLElement;
+        const day = container.querySelector( '.wplus-msg-day' ) as HTMLElement;
+        const label = container.querySelector( '.wplus-day-sep' ) as HTMLElement;
+        // The day runs on above the top edge, its label pushed down to it.
+        day.getBoundingClientRect = () => ( { top: -300 } ) as DOMRect;
+        label.getBoundingClientRect = () => ( { top: 0 } ) as DOMRect;
+        vi.useFakeTimers();
+        try {
+            act( () => { fireEvent.scroll( list ); } );
+            expect( label.classList.contains( 'wplus-day-sep--stuck' ) ).toBe( true );
+            expect( label.classList.contains( 'wplus-day-sep--faded' ) ).toBe( false );
+            act( () => { vi.advanceTimersByTime( 900 ); } );
+            expect( label.classList.contains( 'wplus-day-sep--faded' ) ).toBe( true );
+            act( () => { fireEvent.scroll( list ); } );
+            expect( label.classList.contains( 'wplus-day-sep--faded' ) ).toBe( false );
+        } finally {
+            vi.useRealTimers();
+        }
+        // In its place at the head of its day, a label is never faded.
+        label.getBoundingClientRect = () => ( { top: -300 } ) as DOMRect;
+        vi.useFakeTimers();
+        try {
+            act( () => { fireEvent.scroll( list ); vi.advanceTimersByTime( 900 ); } );
+            expect( label.classList.contains( 'wplus-day-sep--stuck' ) ).toBe( false );
+            expect( label.classList.contains( 'wplus-day-sep--faded' ) ).toBe( false );
+        } finally {
+            vi.useRealTimers();
+        }
     } );
 } );
 
@@ -194,9 +228,9 @@ describe( 'the chat on the conversation the app keeps', () => {
             { me: false, texts: [ 'Thanks!' ] },
         ] );
         // The app's reaction, then Ben's change of it from the room's last day: one each.
-        expect( container.querySelector( '[data-message-id="k2"] .bm-reaction-pill' )?.textContent ).toBe( '👍' );
+        expect( container.querySelector( '[data-message-id="k2"] .wplus-reaction-pill' )?.textContent ).toBe( '👍' );
         // More of the app's pages to come: not yet the start of the conversation.
-        expect( container.querySelector( '.bm-history-start' )?.getAttribute( 'data-visible' ) ).toBeNull();
+        expect( container.querySelector( '.wplus-history-start' )?.getAttribute( 'data-visible' ) ).toBeNull();
     } );
 
     it( 'names the people of a group by the names and pictures the page gives, where the directory knows them not', async () => {
@@ -213,11 +247,11 @@ describe( 'the chat on the conversation the app keeps', () => {
         const { container } = render( <Chat rt={ rt } room="chat:34:42" load={ load } people={ { 77: { name: 'Cara', avatar: '/people/cara.jpg' } } } /> );
         await settle();
 
-        const stack = ( id: string ) => container.querySelector( `[data-message-id="${ id }"]` )!.closest( '.bm-msg-stack' )!;
-        expect( stack( 'k1' ).querySelector( '.bm-name' )?.textContent ).toBe( 'Cara' );
+        const stack = ( id: string ) => container.querySelector( `[data-message-id="${ id }"]` )!.closest( '.wplus-msg-stack' )!;
+        expect( stack( 'k1' ).querySelector( '.wplus-name' )?.textContent ).toBe( 'Cara' );
         expect( stack( 'k1' ).innerHTML ).toContain( '/people/cara.jpg' );
         // Ben, whom the page leaves out, by the directory.
-        expect( stack( 'k2' ).querySelector( '.bm-name' )?.textContent ).toBe( 'Ben' );
+        expect( stack( 'k2' ).querySelector( '.wplus-name' )?.textContent ).toBe( 'Ben' );
     } );
 
     it( 'pages back through the app, not the room, and leaves out a room message older than the app\'s page', async () => {
@@ -230,13 +264,13 @@ describe( 'the chat on the conversation the app keeps', () => {
         await settle();
         expect( stacks( container ) ).toEqual( [ { me: false, texts: [ 'Newer' ] } ] );
 
-        const list = container.querySelector( '.bm-msg-list' ) as HTMLElement;
+        const list = container.querySelector( '.wplus-msg-list' ) as HTMLElement;
         await act( async () => { fireEvent.scroll( list ); } );
         await settle();
         expect( load ).toHaveBeenLastCalledWith( { id: 'k1', at } );
         expect( room.history ).not.toHaveBeenCalledWith( expect.objectContaining( { before: expect.anything() } ) );
         expect( stacks( container ) ).toEqual( [ { me: false, texts: [ 'Older, on the app\'s next page', 'Newer' ] } ] );
-        expect( container.querySelector( '.bm-history-start' )?.textContent ).toBe( 'Start of conversation' );
+        expect( container.querySelector( '.wplus-history-start' )?.textContent ).toBe( 'Start of conversation' );
     } );
 
     it( 'shows the room\'s last day when the app\'s server does not answer', async () => {

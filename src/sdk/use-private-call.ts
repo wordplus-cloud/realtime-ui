@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useContext, useEffect, useMemo, useRef, useState } from "react";
+import { CallOptionsContext } from "./call-options.ts";
 import type { CallAction, CallContextInterface, CallParticipant } from "../components/calls/context.ts";
 import { callInfoDefaults } from "../components/calls/context.ts";
 import { _x } from "../inc/globals.ts";
@@ -32,6 +33,7 @@ export function usePrivateCall(
     adding: Pick<CallContextInterface, 'people' | 'addPerson'> = {},
 ): CallContextInterface {
     const wrapper = useRef<HTMLDivElement | null>( null );
+    const options = useContext( CallOptionsContext );
     const media = useLocalMedia( ( source, track ) => call.setTrack( source, track ) );
     const full = useFullScreen( wrapper );
     const peerKey = 'user_' + call.peer.user;
@@ -170,6 +172,7 @@ export function usePrivateCall(
         moderate: noModeration,
         ...adding,
         iconsReverted: false,
+        mutedHint: options.mutedHint,
     } as CallContextInterface;
 }
 

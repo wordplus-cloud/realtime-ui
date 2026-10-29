@@ -20,7 +20,7 @@ const params = new URLSearchParams( location.search );
 const theme = params.get( "theme" ) === "dark" ? "dark" : "light";
 const dir = params.get( "dir" ) === "rtl" ? "rtl" : "ltr";
 const width = params.get( "width" ) === "phone" ? "phone" : "computer";
-document.body.classList.add( theme === "dark" ? "bm-messages-dark" : "bm-messages-light" );
+document.body.classList.add( theme === "dark" ? "wplus-messages-dark" : "wplus-messages-light" );
 if ( bodyClass ) document.body.classList.add( ...String( bodyClass ).split( /\s+/ ).filter( Boolean ) );
 document.documentElement.dir = dir;
 
@@ -45,7 +45,7 @@ function Shot( { title, note, children }: { title: string; note?: string; childr
 }
 
 function Call( { layout, over }: { layout: "private" | "group-video" | "group-audio"; over: Record<string, unknown> } ) {
-    return <div className="bm-call-surface preview-call" data-layout={ layout }>
+    return <div className="wplus-call-surface preview-call" data-layout={ layout }>
         <CallView layout={ layout } call={ call( { thread: { thread_id: 7, participants: [ 42 ] }, ...over } ) } />
     </div>;
 }
@@ -90,7 +90,7 @@ function App() {
         </div>
 
         <Shot title="A call ringing in" note="the ring's card">
-            <div className="realtime-calls"><div className="realtime-call-ring bm-toast-site-call">
+            <div className="realtime-calls"><div className="realtime-call-ring wplus-toast-site-call">
                 <RingCard user_id={ 42 } name="Ben" type="video" onAnswer={ () => {} } onReject={ () => {} } />
             </div></div>
         </Shot>

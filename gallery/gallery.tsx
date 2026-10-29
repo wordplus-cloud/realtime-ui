@@ -15,7 +15,7 @@ import { CallScreen } from "../src/calls.ts";
 import { fakeCall, participant } from "../test/fake-call.ts";
 
 const params = new URLSearchParams( location.search );
-document.body.classList.add( params.get( "theme" ) === "dark" ? "bm-messages-dark" : "bm-messages-light" );
+document.body.classList.add( params.get( "theme" ) === "dark" ? "wplus-messages-dark" : "wplus-messages-light" );
 document.documentElement.dir = params.get( "dir" ) === "rtl" ? "rtl" : "ltr";
 
 const PEOPLE = {
@@ -46,41 +46,41 @@ const meta = ( time: string, status?: DeliveryState, extra: { edited?: boolean; 
 function Messages() {
     return (
         <div className="realtime-chat gallery-chat">
-            <div className="bm-msg-list-wrap">
-                <div className="bm-msg-list" data-typing="list">
-                    <div className="bm-msg-day">
+            <div className="wplus-msg-list-wrap">
+                <div className="wplus-msg-list" data-typing="list">
+                    <div className="wplus-msg-day">
                         <DaySeparator label="Today" />
-                        <MessageStack isMe={ false } side="left" bubble="filled" avatar={ <Avatar user={ PEOPLE.ben } size={ 32 } title="" presence="online" /> } name={ <span className="bm-name">Ben</span> }>
+                        <MessageStack isMe={ false } side="left" bubble="filled" avatar={ <Avatar user={ PEOPLE.ben } size={ 32 } title="" presence="online" /> } name={ <span className="wplus-name">Ben</span> }>
                             <MessageBody isMe={ false } data-has-text={ 1 }>
-                                <MessageText><span className="bm-chat-text">Hi! Has my order left yet?</span>{ meta( "10:02" ) }</MessageText>
+                                <MessageText><span className="wplus-chat-text">Hi! Has my order left yet?</span>{ meta( "10:02" ) }</MessageText>
                             </MessageBody>
                             <MessageBody isMe={ false } data-has-text={ 1 }>
                                 <MessageText after={ <ReactionPills meta={ <MessageMeta variant="row" pieces={ ( i ) => <MetaPieces interactive={ i } time={ { label: "10:03" } } /> } /> }>
                                     <ReactionPill emoji="👍" count={ 1 } mine />
                                 </ReactionPills> }>
-                                    <span className="bm-chat-text">It is a gift, so the sooner the better</span>
+                                    <span className="wplus-chat-text">It is a gift, so the sooner the better</span>
                                 </MessageText>
                             </MessageBody>
                         </MessageStack>
                         <UnreadDivider />
-                        <MessageStack isMe side="right" bubble="filled" name={ <span className="bm-name">Ann</span> }>
+                        <MessageStack isMe side="right" bubble="filled" name={ <span className="wplus-name">Ann</span> }>
                             <MessageBody isMe data-has-text={ 1 }>
-                                <MessageText><span className="bm-chat-text">Hi Ben, it is being packed now. I will let you know.</span>{ meta( "10:05", "seen", { edited: true } ) }</MessageText>
+                                <MessageText><span className="wplus-chat-text">Hi Ben, it is being packed now. I will let you know.</span>{ meta( "10:05", "seen", { edited: true } ) }</MessageText>
                             </MessageBody>
                             <MessageBody isMe data-has-text={ 1 }>
                                 <MessageText after={ <ReactionPills meta={ <MessageMeta variant="row" pieces={ ( i ) => <MetaPieces interactive={ i } time={ { label: "10:06" } } status={ <StatusTick status="delivered" interactive={ i } /> } /> } /> }>
                                     <ReactionPill emoji="❤️" count={ 2 } />
                                     <ReactionPill emoji="🎉" count={ 1 } />
                                 </ReactionPills> }>
-                                    <span className="bm-chat-text">It left this morning 📦</span>
+                                    <span className="wplus-chat-text">It left this morning 📦</span>
                                 </MessageText>
                             </MessageBody>
                             <MessageBody isMe data-has-text={ 1 }>
-                                <MessageText><span className="bm-chat-text">Tracking number to follow</span>{ meta( "10:07", "sending" ) }</MessageText>
+                                <MessageText><span className="wplus-chat-text">Tracking number to follow</span>{ meta( "10:07", "sending" ) }</MessageText>
                             </MessageBody>
                         </MessageStack>
                         <SystemRow type="user_joined" tone="success" icon="userPlus">Cara joined the conversation</SystemRow>
-                        <MessageStack isMe={ false } side="left" bubble="filled" avatar={ <Avatar user={ PEOPLE.cara } size={ 32 } title="" /> } name={ <span className="bm-name">Cara</span> }>
+                        <MessageStack isMe={ false } side="left" bubble="filled" avatar={ <Avatar user={ PEOPLE.cara } size={ 32 } title="" /> } name={ <span className="wplus-name">Cara</span> }>
                             <DeletedBubble isMe={ false } time="10:09" />
                             <MessageBody isMe={ false } data-has-text={ 1 }>
                                 <MessageText><AiWaiting /></MessageText>
@@ -104,7 +104,7 @@ function Composer( { text }: { text?: string } ) {
     }, [ text ] );
     return (
         <div className="realtime-chat gallery-composer">
-            <div className="bm-composer">
+            <div className="wplus-composer">
                 <ComposerRow hostRef={ createRef() } editableRef={ editable } onInput={ () => {} } onKeyDown={ () => {} } placeholder="Write your message"
                              maxLength={ 100 } charCount={ text ? text.length : 0 } limited={ !! text } onSend={ () => {} } canSend={ !! text } hasContent={ !! text }
                              canRecordVoice={ ! text } canRecordVideo={ ! text } onStartVoice={ () => {} } onStartVideo={ () => {} }
@@ -124,21 +124,21 @@ function App() {
         <main className="gallery">
             <Shot name="ring" title="A call ringing" width={ 380 }>
                 <div className="realtime-calls">
-                    <div className="realtime-call-ring bm-toast-site-call">
+                    <div className="realtime-call-ring wplus-toast-site-call">
                         <IncomingCallCard user_id={ 42 } name="Ben" type="video" onAnswer={ () => {} } onReject={ () => {} } />
                     </div>
                 </div>
             </Shot>
 
             <Shot name="private-call" title="A call between two" width={ 720 }>
-                <div className="bm-call-surface gallery-call" data-layout="private">
+                <div className="wplus-call-surface gallery-call" data-layout="private">
                     <CallScreen layout="private" call={ callWith( [ [ "user_34", { name: "Ann", avatar: PEOPLE.ann.avatar } ], [ "user_42", { name: "Ben", avatar: PEOPLE.ben.avatar } ] ],
                         { thread: { thread_id: 7, participants: [ 42 ] } } ) } />
                 </div>
             </Shot>
 
             <Shot name="group-video" title="A group call" width={ 720 }>
-                <div className="bm-call-surface gallery-call" data-layout="video">
+                <div className="wplus-call-surface gallery-call" data-layout="video">
                     <CallScreen layout="group-video" call={ callWith( [
                         [ "user_34", { name: "Ann", avatar: PEOPLE.ann.avatar } ],
                         [ "user_42", { name: "Ben", avatar: PEOPLE.ben.avatar, isSpeaking: true, audioLevel: 0.6 } ],
@@ -148,7 +148,7 @@ function App() {
             </Shot>
 
             <Shot name="group-audio" title="A group audio call" width={ 520 }>
-                <div className="bm-call-surface gallery-call" data-layout="audio">
+                <div className="wplus-call-surface gallery-call" data-layout="audio">
                     <CallScreen layout="group-audio" call={ callWith( [
                         [ "user_34", { name: "Ann", avatar: PEOPLE.ann.avatar } ],
                         [ "user_42", { name: "Ben", avatar: PEOPLE.ben.avatar, isSpeaking: true } ],
@@ -181,9 +181,9 @@ function App() {
                     <OnlineList count={ 3 } onClose={ () => {} }>
                         <PersonRow avatar={ <Avatar user={ PEOPLE.ann } size={ 32 } presence="online" title="" /> } name="Ann" sub="You" />
                         <PersonRow avatar={ <Avatar user={ PEOPLE.ben } size={ 32 } presence="online" title="" /> } name="Ben" sub="Customer"
-                                   actions={ <span className="bm-conv-admin__member-actions"><RowAction icon="phone" label="Audio Call" onClick={ () => {} } /><RowAction icon="video" label="Video Call" onClick={ () => {} } /></span> } />
+                                   actions={ <span className="wplus-conv-admin__member-actions"><RowAction icon="phone" label="Audio Call" onClick={ () => {} } /><RowAction icon="video" label="Video Call" onClick={ () => {} } /></span> } />
                         <PersonRow avatar={ <Avatar user={ PEOPLE.cara } size={ 32 } presence="online" title="" /> } name="Cara" sub="Warehouse"
-                                   actions={ <span className="bm-conv-admin__member-actions"><RowAction icon="video" label="Video Call" onClick={ () => {} } /></span> } />
+                                   actions={ <span className="wplus-conv-admin__member-actions"><RowAction icon="video" label="Video Call" onClick={ () => {} } /></span> } />
                     </OnlineList>
                 </div>
                 <div className="gallery-row"><OnlineCount count={ 7 } /><OnlineCount count={ 230 } /></div>
@@ -195,10 +195,10 @@ function App() {
 
             <Shot name="hover-actions" title="A message hovered" width={ 560 }>
                 <div className="realtime-chat gallery-chat gallery-short">
-                    <div className="bm-msg-list-wrap"><div className="bm-msg-list"><div className="bm-msg-day">
-                        <MessageStack isMe={ false } side="left" bubble="filled" avatar={ <Avatar user={ PEOPLE.ben } size={ 32 } title="" /> } name={ <span className="bm-name">Ben</span> }>
-                            <MessageBody isMe={ false } data-has-text={ 1 } data-actions="1" className="bm-msg-body bm-message gallery-hovered">
-                                <MessageText><span className="bm-chat-text">Can I change the address?</span>{ meta( "10:12" ) }</MessageText>
+                    <div className="wplus-msg-list-wrap"><div className="wplus-msg-list"><div className="wplus-msg-day">
+                        <MessageStack isMe={ false } side="left" bubble="filled" avatar={ <Avatar user={ PEOPLE.ben } size={ 32 } title="" /> } name={ <span className="wplus-name">Ben</span> }>
+                            <MessageBody isMe={ false } data-has-text={ 1 } data-actions="1" className="wplus-msg-body wplus-message gallery-hovered">
+                                <MessageText><span className="wplus-chat-text">Can I change the address?</span>{ meta( "10:12" ) }</MessageText>
                                 <HoverActions>
                                     <HoverButton icon="more" label="More actions" />
                                     <HoverButton icon="reply" label="Reply" />
@@ -216,7 +216,7 @@ function App() {
             </Shot>
 
             <Shot name="empty" title="An empty conversation" width={ 560 }>
-                <div className="realtime-chat gallery-short"><div className="bm-msg-list-wrap"><div className="bm-msg-list"><EmptyThread /></div></div></div>
+                <div className="realtime-chat gallery-short"><div className="wplus-msg-list-wrap"><div className="wplus-msg-list"><EmptyThread /></div></div></div>
             </Shot>
         </main>
     );

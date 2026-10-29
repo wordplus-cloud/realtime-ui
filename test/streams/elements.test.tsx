@@ -153,3 +153,17 @@ it( 'joins another stream when an element is renamed', async () => {
     await waitFor( () => expect( shows.get( 'show:cups' ) ).toBeTruthy() );
     expect( left ).toHaveBeenCalledWith( 'show:mugs' );
 } );
+
+it( 'takes its view as a property too, as React sets it once the element is defined', async () => {
+    // A studio page opened after the stream's player had defined the element: React set `view` as a property, and the
+    // getter alone threw "Cannot set property view … which has only a getter" (Golden Hour, 2026-10-28).
+    const element = document.createElement( 'live-stream' ) as HTMLElement & { view: string };
+    expect( () => { element.view = 'studio-page'; } ).not.toThrow();
+    expect( element.getAttribute( 'view' ) ).toBe( 'studio-page' );
+    expect( element.view ).toBe( 'studio-page' );
+    element.view = '';
+    expect( element.hasAttribute( 'view' ) ).toBe( false );
+    const studio = document.createElement( 'stream-studio' ) as HTMLElement & { view: string };
+    expect( () => { studio.view = 'player'; } ).not.toThrow();
+    expect( studio.view ).toBe( 'studio' );
+} );

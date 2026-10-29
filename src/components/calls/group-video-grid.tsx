@@ -59,7 +59,7 @@ export default function GroupVideoGrid() {
         window.addEventListener('resize', updateGrid );
         checkSizeChangeInterval.current = window.setInterval( checkSizeChange, 1000 );
 
-        // The stage slides in from nothing — .bm-call-surface animates its
+        // The stage slides in from nothing — .wplus-call-surface animates its
         // width — and the first tile is now drawn at the start of that slide
         // rather than after the site has answered `groupCallStart`. Measured
         // once, against a container still 0 wide, updateGrid gives up and
@@ -82,7 +82,7 @@ export default function GroupVideoGrid() {
     const checkSizeChange = () => {
         if( ! wrapper.current || ! videoGridEl.current?.parentElement ) return;
 
-        const controls = videoGridEl.current.parentElement.querySelector<HTMLElement>('.bm-group-call-controls-v2');
+        const controls = videoGridEl.current.parentElement.querySelector<HTMLElement>('.wplus-group-call-controls-v2');
         if( ! controls ) return;
 
         const containerWidth = wrapper.current.getBoundingClientRect().width;
@@ -460,7 +460,7 @@ export default function GroupVideoGrid() {
     const updateGrid = () => {
         if( ! wrapper.current || ! videoGridEl.current?.parentElement ) return;
 
-        const controls = videoGridEl.current.parentElement.querySelector<HTMLElement>('.bm-group-call-controls-v2');
+        const controls = videoGridEl.current.parentElement.querySelector<HTMLElement>('.wplus-group-call-controls-v2');
         if( ! controls ) return;
 
         const containerWidth = wrapper.current.getBoundingClientRect().width;
@@ -577,12 +577,12 @@ export default function GroupVideoGrid() {
         ? ( width / dividedWidth * 100 ) + '%'
         : undefined;
 
-    return <div ref={videoGridEl} className="bm-group-call-videos-grid" data-split={ beside ? 'beside' : 'stacked' } style={{ height: videoGridHeight }}>
-        <div className="bm-group-call-videos-grid-primary" style={{ height: primaryRowHeight, width: shareOfWidth( primaryWidth ) }}>
+    return <div ref={videoGridEl} className="wplus-group-call-videos-grid" data-split={ beside ? 'beside' : 'stacked' } style={{ height: videoGridHeight }}>
+        <div className="wplus-group-call-videos-grid-primary" style={{ height: primaryRowHeight, width: shareOfWidth( primaryWidth ) }}>
             { itemsPrimary }
         </div>
 
-        <div className="bm-group-call-videos-grid-secondary" style={{ height: secondaryRowHeight, width: shareOfWidth( secondaryWidth ) }}>
+        <div className="wplus-group-call-videos-grid-secondary" style={{ height: secondaryRowHeight, width: shareOfWidth( secondaryWidth ) }}>
             { items }
         </div>
     </div>

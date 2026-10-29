@@ -21,7 +21,7 @@ const ConnectionStatus: React.FC<GroupVideoGridItemInterface> = ({ state, qualit
     useEffect(() => {
         if (state !== lastState) {
             setStateJustChanged( true )
-            ref.current?.classList.add('bm-opacity');
+            ref.current?.classList.add('wplus-opacity');
 
             removeOpacityTimeout.current = window.setTimeout(() => {
                 setStateJustChanged( false );
@@ -39,7 +39,7 @@ const ConnectionStatus: React.FC<GroupVideoGridItemInterface> = ({ state, qualit
 
     let loadingIcon =  <Icon name="wifi" size={ 13 } />
     if( state === 'reconnecting' || state === 'connecting' || state === 'signalReconnecting' ){
-        loadingIcon = <Icon name="spinner" size={ 13 } className="bm-svg-animate" />
+        loadingIcon = <Icon name="spinner" size={ 13 } className="wplus-svg-animate" />
     } else if ( state === 'disconnected' ){
         loadingIcon = <Icon name="x" size={ 13 } />
     }
@@ -50,14 +50,14 @@ const ConnectionStatus: React.FC<GroupVideoGridItemInterface> = ({ state, qualit
         state = state + ' (' + quality + ')';
     }
 
-    let spanClass = "bm-connection-quality bm-state-" + state + " bm-quality-" + quality;
+    let spanClass = "wplus-connection-quality wplus-state-" + state + " wplus-quality-" + quality;
 
     if( stateJustChanged ) {
-        spanClass += ' bm-opacity';
+        spanClass += ' wplus-opacity';
     }
 
     return (
-        <div className="bm-connection-control">
+        <div className="wplus-connection-control">
             <Tooltip content={ _x('Connection Status (Quality)', 'Group Call Screen', 'bp-better-messages') }>
                 <span ref={ref} className={spanClass}>
                     {loadingIcon}

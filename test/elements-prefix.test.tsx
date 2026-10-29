@@ -26,7 +26,7 @@ it( 'names every element after the page prefix, and leaves the plain names to th
     document.body.insertAdjacentHTML( 'beforeend', '<shop-online-list room="shop"></shop-online-list>' );
     for ( let i = 0; i < 2; i++ ) await act( async () => {} );
     const root = document.querySelector( 'shop-online-list' )!.shadowRoot!;
-    expect( root.querySelector( '.bm-chat-online__title' )?.textContent ).toBe( 'Online (2)' );
+    expect( root.querySelector( '.wplus-chat-online__title' )?.textContent ).toBe( 'Online (2)' );
     expect( root.querySelector( '.realtime-calls.realtime-online' ) ).toBeTruthy();
     expect( root.querySelector( 'style' )?.textContent ).toContain( ':host { display: block; }' );
 } );

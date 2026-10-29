@@ -47,6 +47,6 @@ it( 'shows the other person on top of <chat-room>, and its call in it once place
     ( shadow.querySelector( '[aria-label="Video Call"]' ) as HTMLElement ).click();
     await settle();
     expect( calls.start ).toHaveBeenCalledWith( 'chat:34:42', { to: '42', type: 'video' } );
-    expect( shadow.querySelector( '.realtime-chat-call .realtime-call-window .bm-private-call' ) ).not.toBeNull();
+    expect( shadow.querySelector( '.realtime-chat-call .realtime-call-window .wplus-private-call' ) ).not.toBeNull();
     expect( shadow.querySelector( '.realtime-chat' )?.getAttribute( 'data-call' ) ).toBe( 'chat:34:42' );
 } );

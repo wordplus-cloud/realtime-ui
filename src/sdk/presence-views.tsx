@@ -48,7 +48,7 @@ function OnlineRows( { rt, room, title, actions, onClose, empty }: Omit<RoomOnli
                 const mine = member.id === me;
                 const role = typeof member.info.role === "string" ? member.info.role : "";
                 const offered = ! mine && actions
-                    ? <span className="bm-conv-admin__member-actions">{ actions( { ...member, name: person.name, avatar: person.avatar } ) }</span>
+                    ? <span className="wplus-conv-admin__member-actions">{ actions( { ...member, name: person.name, avatar: person.avatar } ) }</span>
                     : null;
                 return (
                     <Piece key={ member.id } name="OnlineRow"

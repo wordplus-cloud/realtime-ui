@@ -20,8 +20,8 @@ import FoldingDock from "./folding-dock.tsx";
 // app's `controls` piece arranges the call's controls (pieces.tsx).
 
 interface Props {
-    // The dock's own class — .bm-call-buttons (1:1) or
-    // .bm-group-call-controls-buttons (rooms). Both carry the same dock
+    // The dock's own class — .wplus-call-buttons (1:1) or
+    // .wplus-group-call-controls-buttons (rooms). Both carry the same dock
     // styling; the class stays with the call site so the stylesheet and the
     // specs keep reading the markup 2.0 emitted.
     className : string;
@@ -79,7 +79,7 @@ export default function CallDock( { className, pinned = 0, children }: Props ) {
                 <Tooltip content={ _x( 'More', 'Call Controls', 'bp-better-messages' ) }>
                     <span
                         onClick={ toggle }
-                        className="bm-call-more"
+                        className="wplus-call-more"
                         data-active={ open ? 1 : undefined }
                         aria-haspopup="menu"
                         aria-expanded={ open }

@@ -16,9 +16,9 @@ describe( 'the package\'s tooltip floater', () => {
         anchor.getBoundingClientRect = () => ( { left: 2, right: 34, top: 100, bottom: 132, width: 32, height: 32, x: 2, y: 100, toJSON() {} } ) as DOMRect;
 
         const tooltips = ownTooltips();
-        tooltips.show( anchor, 'Turn off camera', { className: 'bm-tooltip' } );
+        tooltips.show( anchor, 'Turn off camera', { className: 'wplus-tooltip' } );
 
-        const box = root.querySelector( '.realtime-tooltip.bm-tooltip' ) as HTMLElement;
+        const box = root.querySelector( '.realtime-tooltip.wplus-tooltip' ) as HTMLElement;
         expect( box.textContent ).toBe( 'Turn off camera' );
         expect( box.getAttribute( 'role' ) ).toBe( 'tooltip' );
         // Centred over a button at the window's left edge, it slides to stay 8px inside.
