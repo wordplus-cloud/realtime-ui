@@ -30,15 +30,15 @@ const live = ( patch : Partial<EasyStreamState> = {} ) : Partial<EasyStreamState
     ...patch
 } );
 
-const stage = () => document.querySelector( '.estream-stage' ) as HTMLElement;
-const audio = () => document.querySelector( '.estream-audio audio' ) as HTMLAudioElement;
+const stage = () => document.querySelector( '.wplus-live-stream-stage' ) as HTMLElement;
+const audio = () => document.querySelector( '.wplus-live-stream-audio audio' ) as HTMLAudioElement;
 
 describe( 'the player', () => {
     it( 'puts its controls on the picture: sound, the time on air, settings, the chat and the Live badge', () => {
         const { asClient } = fakeClient( live() );
         render( <EasyStreamApp client={ asClient } title="Launch" /> );
 
-        expect( screen.getByText( 'Live' ).className ).toContain( 'estream-badge--live' );
+        expect( screen.getByText( 'Live' ).className ).toContain( 'wplus-live-stream-badge--live' );
         expect( screen.getByLabelText( 'Time on air' ).textContent ).toBe( '1:05' );
         expect( screen.getByLabelText( 'Settings' ) ).toBeTruthy();
         expect( screen.getByLabelText( 'Hide chat' ) ).toBeTruthy();
@@ -54,7 +54,7 @@ describe( 'the player', () => {
         expect( window.localStorage.getItem( 'wordplus-stream:volume' ) ).toBe( '0.3' );
     } );
 
-    it( 'takes no press on its controls from the tap that wakes them, and their own taps as before (Better Messages ticket 10500 sweep)', () => {
+    it( 'takes no press on its controls from the tap that wakes them, and their own taps as before (from a support report)', () => {
         const { asClient } = fakeClient( live() );
         render( <EasyStreamApp client={ asClient } title="Launch" /> );
         const mute = screen.getByLabelText( 'Mute' );
@@ -76,10 +76,10 @@ describe( 'the player', () => {
         const { container } = render( <EasyStreamApp client={ asClient } /> );
 
         expect( audio().volume ).toBe( 0.4 );
-        expect( container.querySelector( '.estream-app__side' ) ).toBeNull();
+        expect( container.querySelector( '.wplus-live-stream-app__side' ) ).toBeNull();
 
         fireEvent.click( screen.getByLabelText( 'Show chat' ) );
-        expect( container.querySelector( '.estream-app__side' ) ).toBeTruthy();
+        expect( container.querySelector( '.wplus-live-stream-app__side' ) ).toBeTruthy();
         expect( window.localStorage.getItem( 'wordplus-stream:chat-hidden' ) ).toBe( 'false' );
     } );
 
@@ -104,10 +104,10 @@ describe( 'the player', () => {
         expect( audio().volume ).toBe( 0.9 );
 
         fireEvent.keyDown( screen.getByPlaceholderText( 'Say something…' ), { key: 'c' } );
-        expect( container.querySelector( '.estream-app__side' ) ).toBeTruthy();
+        expect( container.querySelector( '.wplus-live-stream-app__side' ) ).toBeTruthy();
 
         fireEvent.keyDown( stage(), { key: 'c' } );
-        expect( container.querySelector( '.estream-app__side' ) ).toBeNull();
+        expect( container.querySelector( '.wplus-live-stream-app__side' ) ).toBeNull();
     } );
 
     it( 'caps the picture\'s quality from its settings, shows what arrives, and keeps the choice', async () => {
@@ -115,7 +115,7 @@ describe( 'the player', () => {
         const { unmount } = render( <EasyStreamApp client={ asClient } /> );
 
         // What arrives, as the main picture's size says.
-        const video = document.querySelector( '.estream-video' ) as HTMLVideoElement;
+        const video = document.querySelector( '.wplus-live-stream-video' ) as HTMLVideoElement;
         Object.defineProperty( video, 'videoHeight', { configurable: true, value: 720 } );
         fireEvent( video, new Event( 'resize' ) );
 
@@ -192,7 +192,7 @@ describe( 'the player', () => {
         fireEvent.click( screen.getByRole( 'menuitem', { name: 'Statistics' } ) );
         const panel = screen.getByRole( 'region', { name: 'Statistics' } );
         expect( document.activeElement ).toBe( panel );
-        const row = ( label : string ) => [ ...panel.querySelectorAll( '.estream-stats__row' ) ].find( ( r ) => r.querySelector( 'dt' )?.textContent === label )?.querySelector( 'dd' )?.textContent;
+        const row = ( label : string ) => [ ...panel.querySelectorAll( '.wplus-live-stream-stats__row' ) ].find( ( r ) => r.querySelector( 'dt' )?.textContent === label )?.querySelector( 'dd' )?.textContent;
         expect( row( 'Resolution' ) ).toBe( '1280×720' );
         expect( row( 'Layer' ) ).toBe( '720p, of 720p, 360p sent' );
         expect( row( 'Frame rate' ) ).toBe( '30 fps' );
@@ -202,9 +202,9 @@ describe( 'the player', () => {
         expect( row( 'Server' ) ).toBe( 'ND_bhs_1, bhs' );
         expect( row( 'Picture in' ) ).toBe( '1.2 s' );
         expect( row( 'Stalls' ) ).toBe( '2, 3.1 s in all' );
-        expect( panel.querySelector( '.estream-stats__events' )?.textContent ).toContain( 'Picture stopped' );
+        expect( panel.querySelector( '.wplus-live-stream-stats__events' )?.textContent ).toContain( 'Picture stopped' );
         // The viewer's buffer moving with its connection: its new length.
-        expect( panel.querySelector( '.estream-stats__events' )?.textContent ).toMatch( /Buffer\W*2 s/ );
+        expect( panel.querySelector( '.wplus-live-stream-stats__events' )?.textContent ).toMatch( /Buffer\W*2 s/ );
 
         await act( async () => { fireEvent.click( screen.getByRole( 'button', { name: 'Copy' } ) ); } );
         const copied = JSON.parse( writeText.mock.calls[0]![0] );
@@ -225,17 +225,17 @@ describe( 'the player', () => {
     it( 'shows a spinner while the picture stopped, and says when the browser is offline', () => {
         const { update, asClient } = fakeClient( live() );
         render( <EasyStreamApp client={ asClient } /> );
-        expect( document.querySelector( '.estream-buffering' ) ).toBeNull();
+        expect( document.querySelector( '.wplus-live-stream-buffering' ) ).toBeNull();
 
         update( { stalled: true } );
-        expect( document.querySelector( '.estream-buffering' )?.getAttribute( 'role' ) ).toBe( 'status' );
+        expect( document.querySelector( '.wplus-live-stream-buffering' )?.getAttribute( 'role' ) ).toBe( 'status' );
         expect( screen.getByText( 'The picture stopped. Waiting for it.' ) ).toBeTruthy();
 
         // Offline says so, in place of the spinner and of reconnecting.
         update( { offline: true, media: 'reconnecting' } );
         expect( screen.getByText( 'You are offline' ) ).toBeTruthy();
         expect( screen.queryByText( 'Reconnecting…' ) ).toBeNull();
-        expect( document.querySelector( '.estream-buffering' ) ).toBeNull();
+        expect( document.querySelector( '.wplus-live-stream-buffering' ) ).toBeNull();
 
         update( { offline: false, media: 'live', stalled: false } );
         expect( screen.queryByText( 'You are offline' ) ).toBeNull();
@@ -255,10 +255,10 @@ describe( 'the player', () => {
 
         // With the sound held back by the browser, turning it on is beside Try again, not over it.
         update( { tooSlow: true, audioBlocked: true } );
-        const box = screen.getByText( said ).closest( '.estream-slow' ) as HTMLElement;
+        const box = screen.getByText( said ).closest( '.wplus-live-stream-slow' ) as HTMLElement;
         fireEvent.click( within( box ).getByRole( 'button', { name: 'Turn sound on' } ) );
         expect( client.startAudio ).toHaveBeenCalled();
-        expect( document.querySelector( '.estream-unmute' ) ).toBeNull();
+        expect( document.querySelector( '.wplus-live-stream-unmute' ) ).toBeNull();
 
         // Offline says that instead.
         update( { offline: true } );
@@ -293,12 +293,56 @@ describe( 'the player', () => {
 
             await act( async () => { fireEvent.click( screen.getByLabelText( 'Full screen' ) ); } );
 
-            const root = container.querySelector( '.estream-theme' )!;
+            const root = container.querySelector( '.wplus-live-stream-theme' )!;
             expect( request.mock.contexts[0] ).toBe( root );
-            expect( root.className ).toContain( 'estream-theme--full' );
+            expect( root.className ).toContain( 'wplus-live-stream-theme--full' );
             expect( screen.getByLabelText( 'Exit full screen' ) ).toBeTruthy();
-            expect( container.querySelector( '.estream-top__title' )?.textContent ).toBe( 'Launch' );
-            expect( container.querySelector( '.estream-app__side' ), 'the chat goes with it' ).toBeTruthy();
+            expect( container.querySelector( '.wplus-live-stream-top__title' )?.textContent ).toBe( 'Launch' );
+            expect( container.querySelector( '.wplus-live-stream-app__side' ), 'the chat goes with it' ).toBeTruthy();
+        } finally {
+            delete ( document as any ).fullscreenEnabled;
+            delete ( document as any ).fullscreenElement;
+            delete ( Element.prototype as any ).requestFullscreen;
+        }
+    } );
+
+    it( 'keeps a viewer\'s reactions in full screen, which hides the line under the player that has them: a menu in its bar, open for more', async () => {
+        let full : Element | null = null;
+        Object.defineProperty( document, 'fullscreenEnabled', { configurable: true, value: true } );
+        Object.defineProperty( document, 'fullscreenElement', { configurable: true, get: () => full } );
+        Element.prototype.requestFullscreen = async function( this : Element ){
+            full = this;
+            document.dispatchEvent( new Event( 'fullscreenchange' ) );
+        } as any;
+
+        try {
+            const { client, update, asClient } = fakeClient( live() );
+            const { container } = render( <EasyStreamApp client={ asClient } /> );
+            const bar = () => container.querySelector( '.wplus-live-stream-bar' )!;
+
+            // On the page they are under the player, and the bar has none.
+            expect( screen.getByLabelText( 'Heart' ) ).toBeTruthy();
+            expect( bar().querySelector( '[aria-label="Reactions"]' ) ).toBeNull();
+
+            await act( async () => { fireEvent.click( screen.getByLabelText( 'Full screen' ) ); } );
+            const button = bar().querySelector<HTMLButtonElement>( 'button[aria-label="Reactions"]' )!;
+            expect( button ).toBeTruthy();
+            fireEvent.click( button );
+            const menu = screen.getByRole( 'menu' );
+            const heart = [ ...menu.querySelectorAll<HTMLButtonElement>( '[role="menuitem"]' ) ].find( ( b ) => b.getAttribute( 'aria-label' ) === 'Heart' )!;
+            fireEvent.click( heart );
+            fireEvent.click( heart );
+            expect( client.react ).toHaveBeenCalledTimes( 2 );
+            expect( client.react ).toHaveBeenCalledWith( '❤️' );
+            expect( screen.getByRole( 'menu' ), 'open for more' ).toBe( menu );
+            fireEvent.keyDown( menu, { key: 'Escape' } );
+            expect( screen.queryByRole( 'menu' ) ).toBeNull();
+
+            // None while the stream takes none, and none for its host.
+            update( { reactionsOn: false } );
+            expect( bar().querySelector( '[aria-label="Reactions"]' ) ).toBeNull();
+            update( { reactionsOn: true, you: { ...base.you!, role: 'host' } } );
+            expect( bar().querySelector( '[aria-label="Reactions"]' ) ).toBeNull();
         } finally {
             delete ( document as any ).fullscreenEnabled;
             delete ( document as any ).fullscreenElement;
@@ -320,28 +364,28 @@ describe( 'the player', () => {
         try {
             const { asClient } = fakeClient( live() );
             const { container } = render( <EasyStreamApp client={ asClient } title="Launch" /> );
-            const root = container.querySelector( '.estream-theme' )!;
+            const root = container.querySelector( '.wplus-live-stream-theme' )!;
 
             await act( async () => { fireEvent.click( screen.getByLabelText( 'Full screen' ) ); } );
 
             expect( request, 'not the screen' ).not.toHaveBeenCalled();
             expect( lifted ).toEqual( [ root ] );
-            expect( [ root.getAttribute( 'popover' ), root.hasAttribute( 'data-estream-window' ) ] ).toEqual( [ 'manual', true ] );
-            expect( root.className ).toContain( 'estream-theme--full' );
+            expect( [ root.getAttribute( 'popover' ), root.hasAttribute( 'data-wplus-live-stream-window' ) ] ).toEqual( [ 'manual', true ] );
+            expect( root.className ).toContain( 'wplus-live-stream-theme--full' );
             expect( document.documentElement.style.overflow ).toBe( 'hidden' );
-            expect( container.querySelector( '.estream-top__title' )?.textContent ).toBe( 'Launch' );
-            expect( container.querySelector( '.estream-app__side' ), 'the chat goes with it' ).toBeTruthy();
+            expect( container.querySelector( '.wplus-live-stream-top__title' )?.textContent ).toBe( 'Launch' );
+            expect( container.querySelector( '.wplus-live-stream-app__side' ), 'the chat goes with it' ).toBeTruthy();
 
             // Escape closes a menu open in it first, and only then leaves it.
             fireEvent.click( screen.getByLabelText( 'Settings' ) );
             fireEvent.keyDown( screen.getByRole( 'menu' ), { key: 'Escape' } );
             expect( screen.queryByRole( 'menu' ) ).toBeNull();
-            expect( root.className ).toContain( 'estream-theme--full' );
+            expect( root.className ).toContain( 'wplus-live-stream-theme--full' );
 
             await act( async () => { fireEvent.keyDown( document.activeElement ?? document.body, { key: 'Escape' } ); } );
-            expect( root.className ).not.toContain( 'estream-theme--full' );
+            expect( root.className ).not.toContain( 'wplus-live-stream-theme--full' );
             expect( lifted ).toEqual( [] );
-            expect( [ root.hasAttribute( 'popover' ), root.hasAttribute( 'data-estream-window' ) ] ).toEqual( [ false, false ] );
+            expect( [ root.hasAttribute( 'popover' ), root.hasAttribute( 'data-wplus-live-stream-window' ) ] ).toEqual( [ false, false ] );
             expect( document.documentElement.style.overflow ).toBe( '' );
 
             // Its button, and f, both ways.
@@ -373,13 +417,13 @@ describe( 'the player', () => {
         try {
             const { asClient, update } = fakeClient( live() );
             const { container } = render( <EasyStreamApp client={ asClient } title="Launch" /> );
-            const root = container.querySelector( '.estream-theme' )!;
+            const root = container.querySelector( '.wplus-live-stream-theme' )!;
 
             await act( async () => { fireEvent.click( screen.getByLabelText( 'Full screen' ) ); } );
             update( ended );
             expect( screen.getByText( 'This stream has ended' ) ).toBeTruthy();
             await act( async () => { fireEvent.click( screen.getByLabelText( 'Exit full screen' ) ); } );
-            expect( root.className ).not.toContain( 'estream-theme--full' );
+            expect( root.className ).not.toContain( 'wplus-live-stream-theme--full' );
             // On the page, the screen alone.
             expect( screen.queryByLabelText( 'Full screen' ) ).toBeNull();
             cleanup();
@@ -388,9 +432,9 @@ describe( 'the player', () => {
             window.localStorage.setItem( 'wordplus-stream:chat-hidden', 'true' );
             const again = fakeClient( ended );
             const { container : page } = render( <EasyStreamApp client={ again.asClient } title="Launch" /> );
-            expect( page.querySelector( '.estream-app__side' ) ).toBeNull();
+            expect( page.querySelector( '.wplus-live-stream-app__side' ) ).toBeNull();
             fireEvent.click( screen.getByLabelText( 'Show chat' ) );
-            expect( page.querySelector( '.estream-app__side' ) ).toBeTruthy();
+            expect( page.querySelector( '.wplus-live-stream-app__side' ) ).toBeTruthy();
         } finally {
             proto.showPopover = saved.show;
             proto.hidePopover = saved.hide;
@@ -410,13 +454,13 @@ describe( 'the player', () => {
         try {
             const { asClient } = fakeClient( live() );
             const { container } = render( <EasyStreamApp client={ asClient } title="Launch" /> );
-            const root = container.querySelector( '.estream-theme' )!;
+            const root = container.querySelector( '.wplus-live-stream-theme' )!;
 
             await act( async () => { fireEvent.click( screen.getByLabelText( 'Full screen' ) ); } );
             expect( lifted ).toEqual( [ root ] );
             expect( native ).not.toHaveBeenCalled();
-            expect( root.className ).toContain( 'estream-theme--full' );
-            expect( container.querySelector( '.estream-app__side' ), 'the chat goes with it' ).toBeTruthy();
+            expect( root.className ).toContain( 'wplus-live-stream-theme--full' );
+            expect( container.querySelector( '.wplus-live-stream-app__side' ), 'the chat goes with it' ).toBeTruthy();
             await act( async () => { fireEvent.click( screen.getByLabelText( 'Exit full screen' ) ); } );
             expect( lifted ).toEqual( [] );
 
@@ -425,7 +469,7 @@ describe( 'the player', () => {
             delete proto.hidePopover;
             await act( async () => { fireEvent.click( screen.getByLabelText( 'Full screen' ) ); } );
             expect( native ).toHaveBeenCalledTimes( 1 );
-            expect( root.className ).not.toContain( 'estream-theme--full' );
+            expect( root.className ).not.toContain( 'wplus-live-stream-theme--full' );
         } finally {
             proto.showPopover = saved.show;
             proto.hidePopover = saved.hide;
@@ -483,24 +527,24 @@ describe( 'the player', () => {
         vi.useFakeTimers();
         const { asClient } = fakeClient( live() );
         render( <EasyStreamApp client={ asClient } /> );
-        const bar = () => document.querySelector( '.estream-bar' )!;
+        const bar = () => document.querySelector( '.wplus-live-stream-bar' )!;
 
         fireEvent.pointerMove( stage(), { pointerType: 'mouse' } );
-        expect( bar().className ).not.toContain( 'estream-bar--hidden' );
+        expect( bar().className ).not.toContain( 'wplus-live-stream-bar--hidden' );
 
         act( () => { vi.advanceTimersByTime( 3100 ); } );
-        expect( bar().className ).toContain( 'estream-bar--hidden' );
+        expect( bar().className ).toContain( 'wplus-live-stream-bar--hidden' );
 
         fireEvent.pointerMove( stage(), { pointerType: 'mouse' } );
-        expect( bar().className ).not.toContain( 'estream-bar--hidden' );
+        expect( bar().className ).not.toContain( 'wplus-live-stream-bar--hidden' );
     } );
 
     it( 'keeps its controls while the mouse rests on them, and hides them once it leaves or a touch takes over', () => {
         vi.useFakeTimers();
         const { asClient } = fakeClient( live() );
         render( <EasyStreamApp client={ asClient } /> );
-        const bar = () => document.querySelector( '.estream-bar' )!;
-        const hidden = () => bar().className.includes( 'estream-bar--hidden' );
+        const bar = () => document.querySelector( '.wplus-live-stream-bar' )!;
+        const hidden = () => bar().className.includes( 'wplus-live-stream-bar--hidden' );
         // The bar along the bottom of a 640 by 360 picture.
         vi.spyOn( bar(), 'getBoundingClientRect' ).mockReturnValue( { left: 0, right: 640, top: 316, bottom: 360, x: 0, y: 316, width: 640, height: 44 } as DOMRect );
         const onBar = { pointerType: 'mouse', clientX: 600, clientY: 338 };
@@ -633,7 +677,7 @@ describe( 'the screen for each moment', () => {
             topQuality: '1080p'
         } );
         render( <EasyStreamApp client={ asClient } /> );
-        const steps = () => [ ...document.querySelectorAll( '.estream-encoder__steps > li' ) ].map( ( li ) => li.textContent ?? '' );
+        const steps = () => [ ...document.querySelectorAll( '.wplus-live-stream-encoder__steps > li' ) ].map( ( li ) => li.textContent ?? '' );
 
         expect( steps()[3] ).toBe( 'In the same window, set Total Layers to 3 if your OBS has it (version 32.1 or newer). OBS then also sends smaller copies of the picture, so viewers on slow connections keep watching smoothly.' );
         // Full HD with the layers under it, and the single picture everyone can take without them. Then the Advanced

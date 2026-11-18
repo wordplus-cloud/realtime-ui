@@ -48,12 +48,15 @@ export declare class P2PCallSession {
     private iceServers;
     private epoch;
     private lastId;
+    private readonly heardIds;
     private pendingSignals;
     private remoteState;
     private remoteStateKnown;
     private quality;
     private stateTimer;
     private aliveTimer;
+    private aliveAt;
+    private setupAliveTimer;
     private viewTimer;
     private sentView;
     private viewPendingSince;
@@ -76,11 +79,14 @@ export declare class P2PCallSession {
     private traceDropped;
     private pulseTicks;
     private readonly health;
+    private readonly netQuality;
     private qualityEvery;
     private qualityAt;
     private standby;
     private joinedSocket;
     private peerLost;
+    private joining;
+    private sdpHeld;
     private iceExpiresAt;
     private renewTimer;
     private ended;
@@ -98,6 +104,7 @@ export declare class P2PCallSession {
     leaveAfterHandoff(reason: string): void;
     start(): Promise<boolean>;
     private join;
+    private joinNow;
     private startKeepalive;
     private stopKeepalive;
     private pulse;

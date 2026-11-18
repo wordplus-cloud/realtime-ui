@@ -214,30 +214,30 @@ describe( 'EasyStreamApp', () => {
         const { asClient } = fakeClient();
         const { container } = render( <EasyStreamApp client={ asClient } chat={ false } /> );
 
-        expect( container.querySelector( '.estream-app__side' ) ).toBeNull();
-        expect( container.querySelector( '.estream-app--no-chat' ) ).toBeTruthy();
+        expect( container.querySelector( '.wplus-live-stream-app__side' ) ).toBeNull();
+        expect( container.querySelector( '.wplus-live-stream-app--no-chat' ) ).toBeTruthy();
     } );
 
     it( 'wears the site\'s appearance: theme, accent with readable text on it, corners, chat below', () => {
         const { asClient } = fakeClient();
         const { container } = render( <EasyStreamApp client={ asClient } appearance={ { theme: 'dark', accent: '#ffd400', radius: 40, chat: 'below' } } /> );
-        const root = container.querySelector( '.estream-theme' ) as HTMLElement;
+        const root = container.querySelector( '.wplus-live-stream-theme' ) as HTMLElement;
 
-        expect( root.className ).toBe( 'estream-theme wp-exclude-emoji estream-theme--dark estream-theme--chat-below' );
-        expect( root.style.getPropertyValue( '--estream-accent' ) ).toBe( '#ffd400' );
-        expect( root.style.getPropertyValue( '--estream-accent-text' ) ).toBe( '#111111' );
-        expect( root.style.getPropertyValue( '--estream-radius' ) ).toBe( '24px' );
+        expect( root.className ).toBe( 'wplus-live-stream-theme wp-exclude-emoji wplus-live-stream-theme--dark wplus-live-stream-theme--chat-below' );
+        expect( root.style.getPropertyValue( '--wplus-live-stream-accent' ) ).toBe( '#ffd400' );
+        expect( root.style.getPropertyValue( '--wplus-live-stream-accent-text' ) ).toBe( '#111111' );
+        expect( root.style.getPropertyValue( '--wplus-live-stream-radius' ) ).toBe( '24px' );
         // The invitation dialog sits inside the theme root, so it wears the same colours.
-        expect( root.querySelector( '.estream-shell' ) ).toBeTruthy();
+        expect( root.querySelector( '.wplus-live-stream-shell' ) ).toBeTruthy();
     } );
 
     it( 'ignores an accent that is not a colour, and keeps the light theme by default', () => {
         const { asClient } = fakeClient();
         const { container } = render( <EasyStreamApp client={ asClient } appearance={ { accent: 'red;background:url(x)' } } /> );
-        const root = container.querySelector( '.estream-theme' ) as HTMLElement;
+        const root = container.querySelector( '.wplus-live-stream-theme' ) as HTMLElement;
 
-        expect( root.className ).toBe( 'estream-theme wp-exclude-emoji estream-theme--light' );
-        expect( root.style.getPropertyValue( '--estream-accent' ) ).toBe( '' );
+        expect( root.className ).toBe( 'wplus-live-stream-theme wp-exclude-emoji wplus-live-stream-theme--light' );
+        expect( root.style.getPropertyValue( '--wplus-live-stream-accent' ) ).toBe( '' );
     } );
 
     it( 'hides the viewer count from viewers when the site says so, never from hosts', () => {

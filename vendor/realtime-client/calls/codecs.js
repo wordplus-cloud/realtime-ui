@@ -249,6 +249,14 @@ export function probeCodecCaps() {
     }
     return probed.then(withoutBroken);
 }
+// The families this side encodes and decodes in hardware by its probe, as short
+// names ("h264,vp9"), for its report: what a group call's client tells its node.
+export function hardwareFamilies(caps, direction) {
+    return FAMILIES.filter((family) => {
+        const score = caps.families[family]?.[direction];
+        return !!score && score.ok && score.hw;
+    }).map((family) => shortName(family).toLowerCase()).join(',');
+}
 function encodeScore(caps, family) {
     return caps.families[family] ? caps.families[family].enc : NONE;
 }
@@ -367,13 +375,54 @@ export function familyOf(codec) {
     const match = FAMILIES.find((family) => family.toLowerCase() === codec.mimeType.toLowerCase());
     return match ?? null;
 }
+// The parameter a family names its profile with, and the profile it means
+// when the parameter is left out.
+const PROFILE_PARAMETERS = {
+    'video/h265': { key: 'profile-id', absent: '1' },
+    'video/vp9': { key: 'profile-id', absent: '0' },
+    'video/av1': { key: 'profile', absent: '0' }
+};
+function profileOf(codec, key, absent) {
+    for (const part of (codec.sdpFmtpLine ?? '').split(';')) {
+        const [name, value] = part.trim().split('=');
+        if (name === key && value !== undefined)
+            return value;
+    }
+    return absent;
+}
 // The negotiated codec entry of a family, preferring the packetization mode
-// every browser sends H264 with.
-export function negotiatedCodec(codecs, family) {
+// every browser sends H264 with, and for a family listed in several profiles
+// one whose profile this side can send (`sendable`: the sender's own
+// capabilities). A negotiation lists what both sides can receive, so a
+// device that decodes H265 Main 10 lists profile 2 beside profile 1, and a
+// write naming the one this side cannot encode is refused whole, its
+// ceiling and scale with it ("Attempted to use an unsupported codec for
+// layer 0", Chrome 156, reproduced 8 Nov 2026 with an answer of profile 2).
+export function negotiatedCodec(codecs, family, sendable) {
     const candidates = codecs.filter((codec) => codec.mimeType.toLowerCase() === family.toLowerCase());
     if (candidates.length === 0)
         return null;
+    const profile = PROFILE_PARAMETERS[family.toLowerCase()];
+    if (profile && sendable && sendable.length > 0) {
+        const profiles = new Set(sendable
+            .filter((codec) => codec.mimeType.toLowerCase() === family.toLowerCase())
+            .map((codec) => profileOf(codec, profile.key, profile.absent)));
+        const fits = candidates.find((codec) => profiles.has(profileOf(codec, profile.key, profile.absent)));
+        if (fits)
+            return fits;
+    }
     return candidates.find((codec) => /packetization-mode=1/.test(codec.sdpFmtpLine ?? '')) ?? candidates[0];
+}
+// What this browser can send, for negotiatedCodec(); null where it cannot say.
+export function sendCapabilities() {
+    try {
+        if (typeof RTCRtpSender === 'undefined' || typeof RTCRtpSender.getCapabilities !== 'function')
+            return null;
+        return RTCRtpSender.getCapabilities('video')?.codecs ?? null;
+    }
+    catch (e) {
+        return null;
+    }
 }
 // Reorders a video transceiver's codecs: every capability of a family in
 // ranking order, the families not ranked after them, then the rest (RTX,
@@ -409,5 +458,44 @@ export function applyCodecPreferences(transceiver, families) {
     }
     catch (e) {
         console.warn('p2p codec preferences were not accepted', e);
+    }
+}
+// Redundant audio (RED, RFC 2198) on the microphone: each packet carries the one before it again, so a packet lost on
+// the way is played from the next instead of made up. A group call's microphone has had it from the start (room-publish
+// micPublish, mic.red); a direct call's sent plain Opus, and over the direct calls of 31 Oct 2026 a microphone broke up
+// in 31 of the moments something went wrong, a median 8% of its sound made up, with 11% of its packets lost. A
+// browser sends RED only when it leads the negotiated codecs, so both sides put it first, each where it can: one that
+// has none leaves it out of its section, and the call goes on plain Opus that way. The shared screen's sound stays
+// plain, as in a group call: stereo at 128 kbit/s, where a second copy costs most. bm_p2p_red = '0' turns it off.
+export function redWanted() {
+    try {
+        return window.localStorage.getItem('bm_p2p_red') !== '0';
+    }
+    catch (e) {
+        return true;
+    }
+}
+// The audio codecs with RED first, then Opus, then the rest as they were; null when RED is not among them.
+export function redOrder(codecs) {
+    const red = codecs.filter((codec) => codec.mimeType.toLowerCase() === 'audio/red');
+    if (red.length === 0)
+        return null;
+    const opus = codecs.filter((codec) => codec.mimeType.toLowerCase() === 'audio/opus');
+    return [...red, ...opus, ...codecs.filter((codec) => !red.includes(codec) && !opus.includes(codec))];
+}
+// Puts RED first on a microphone's transceiver; answers whether it did.
+export function applyRedPreferences(transceiver) {
+    if (!redWanted() || typeof transceiver.setCodecPreferences !== 'function' || typeof RTCRtpReceiver === 'undefined' || typeof RTCRtpReceiver.getCapabilities !== 'function')
+        return false;
+    const ordered = redOrder(RTCRtpReceiver.getCapabilities('audio')?.codecs ?? []);
+    if (!ordered)
+        return false;
+    try {
+        transceiver.setCodecPreferences(ordered);
+        return true;
+    }
+    catch (e) {
+        console.warn('p2p audio codec preferences were not accepted', e);
+        return false;
     }
 }

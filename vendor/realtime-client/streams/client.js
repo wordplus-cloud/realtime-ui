@@ -9,6 +9,7 @@ import { chosenLayer, layersOf, PlaybackMonitor } from "./playback.js";
 import { TROUBLE_WINDOW_MS, ViewerHold, VIEWER_HOLDS_MS } from "./hold.js";
 import { StreamTrace } from "./trace.js";
 import { SendingReader } from "./sending.js";
+import { openerTest, publishTest, TEST_IDENTITY, testChannel, TestFeed, TestTrack, withdrawTest } from "./test.js";
 import { backupFor, CHROMIUM_H264_ENCODE, cameraCodecFor, cameraRules, fitCameraTrack, hardwareFromCaps, roomCallChoice, screenCodecFor, screenPublish, SCREEN_CONTENT_HINT, SCREEN_DEGRADATION } from "../calls/room-publish.js";
 import { checkedCameraChoice, meshCameraReport, reportMeshCamera } from "../calls/camera-check.js";
 import { probeCodecCaps } from "../calls/codecs.js";
@@ -32,6 +33,11 @@ export function streamCameraPolicy(policy) {
     if (!policy)
         return null;
     return { ...policy, rules: cameraRules(policy).map((rule) => ({ ...rule, camera: [...STREAM_CAMERA_ORDER] })) };
+}
+// The camera's own track under a processor, the room client's source (its `_mediaStreamTrack`, which `mediaStreamTrack`
+// gives only while no processor is on): the one constraints reach. The processed one where the client keeps no other.
+export function sourceTrack(track) {
+    return track._mediaStreamTrack ?? track.mediaStreamTrack;
 }
 const PROBES = { h264: 'video/H264;profile-level-id=42e01f;packetization-mode=1', h265: 'video/H265' };
 export async function cameraCodec(nav = globalThis.navigator, options = {}) {
@@ -165,6 +171,9 @@ const NO_HOURS_RETRY_MS = 60000;
 // The join's refusals of a site whose streams the cloud doesn't take: no key yet (the site's own word), a licence it
 // doesn't know or take, and a plan without streaming. A host's page (options.offlineHost) is `unconnected` after them.
 const UNCONNECTED = new Set(['not_configured', 'not_licensed', 'not_included']);
+// How often the stream's page looks for the studio's test in the window that opened it, and the studio at what it sends
+// of its test (test.ts).
+const TEST_LOOK_MS = 1000;
 // How often a host's page asks what the site has left (the check), so the studio says when new viewers can't join.
 const USAGE_EVERY_MS = 120000;
 // A viewer's picture that stopped coming is taken up again by joining the room afresh, as closing the stream and
@@ -273,7 +282,9 @@ const initialState = {
     sentHere: false,
     stalled: false,
     tooSlow: false,
-    offline: false
+    offline: false,
+    test: null,
+    testElsewhere: false
 };
 // When a stream's state was set: going live sets started_at and clears ended_at, ending sets ended_at,
 // so of two states of one stream the later has the larger (an ended stream may go live again).
@@ -386,6 +397,10 @@ export class EasyStreamClient {
         this.localTracks = [];
         // OBS's key asked for, found sending into the room (findEncoder()).
         this.findingEncoder = false;
+        // Going live, or choosing OBS, under way (goLive(), useEncoder()): one at a time. Each acts on the source it found,
+        // and the two crossed (Stream from OBS pressed in Go live's 3, 2, 1) left a stream live with nothing going out, OBS's
+        // key stopping the camera as Go live published it, or live from the camera with the studio on OBS's steps.
+        this.switching = null;
         // A shared screen's picture and its sound, while shared (setScreenShare()).
         this.screenTracks = [];
         // The camera and microphone chosen (useDevice), for every track opened after.
@@ -444,6 +459,17 @@ export class EasyStreamClient {
         this.screenDensity = 1;
         // The page's listener for the browser going offline and online (followNetwork).
         this.onNetwork = null;
+        // A test stream (test.ts): the one this window sends (`testSent`) or shows, what lets it go, the look for one in the
+        // window that opened this page, the tracks it shows here by their own id, each attached as the RTC client's, and the
+        // browser's channel where a studio says its test runs.
+        this.testWords = null;
+        this.testFeed = null;
+        this.testSent = false;
+        this.testOff = null;
+        this.testTimer = null;
+        this.onTestGone = null;
+        this.testTracks = new Map();
+        this.testSilent = true;
         // For React's useSyncExternalStore.
         this.getState = () => this.state;
         this.subscribe = (listener) => {
@@ -465,6 +491,8 @@ export class EasyStreamClient {
         // browser remembers it, and its next camera goes out in software. The watch follows the track's sender (a full
         // reconnect publishes it on a new one) and ends with the next camera's, or some minutes after this one's.
         this.cameraWatch = null;
+        // Whether the camera measured last went out under an effect, for the trace.
+        this.cameraProcessed = false;
         this.fetch = options.fetch ?? globalThis.fetch.bind(globalThis);
         this.realtime = options.realtime ?? realtime;
         this.random = options.random ?? Math.random;
@@ -479,7 +507,8 @@ export class EasyStreamClient {
         if (this.video)
             return;
         this.video = true;
-        if (this.state.stream && this.state.status === 'ready')
+        // A test shown here has its picture already, from the studio's window.
+        if (this.state.stream && this.state.status === 'ready' && !this.testFeed)
             this.onStreamState(this.state.stream, false);
     }
     // Nothing on the page shows the picture any more (the stream closed beside a Better Messages conversation): the
@@ -522,6 +551,15 @@ export class EasyStreamClient {
         if (!this.stopped)
             this.summarize(true);
         this.trace.stop();
+        // A test this window sends ends with it, and one it shows lets go of it.
+        if (this.testSent && this.testFeed?.endedAt === null) {
+            this.testFeed.end();
+            this.sayTest('off');
+        }
+        this.closeTest();
+        this.stopTestLook();
+        this.testWords?.close();
+        this.testWords = null;
         this.disconnectMedia();
         this.stopLocalTracks();
         this.stopScreenTracks();
@@ -712,10 +750,12 @@ export class EasyStreamClient {
             if (host && UNCONNECTED.has(error)) {
                 // The host here, under the page's name for them, to set up the preview: the best quality a host
                 // sends, as the cloud would give it, and no chat, stage or socket, which only the cloud has.
-                this.set({ status: 'unconnected', error, you: { identity: 'local', role: 'host', name: host.name, chat: 'read', mod: true, stage: false, quality: '1080p' } });
+                this.set({ status: 'unconnected', error, you: { identity: TEST_IDENTITY, role: 'host', name: host.name, chat: 'read', mod: true, stage: false, quality: '1080p' } });
                 this.set(this.sendQualities(this.wantedQuality));
                 if (this.video)
                     this.media().catch(() => { });
+                // The stream's page opened from the studio: the studio's test of it, while it runs.
+                this.followTest();
                 return;
             }
             this.set({ status: 'error', error });
@@ -1660,14 +1700,15 @@ export class EasyStreamClient {
         return this.hiddenKept && !this.handheld
             && !!smallest && smallest.height > 0 && Math.min(smallest.width, smallest.height) <= HIDDEN_LOW_SIDE;
     }
-    // A track's jitter buffer at the viewer's hold (hold.ts), STAGE_JITTER_BUFFER_MS on stage; a browser without the
-    // setting keeps its own.
+    // A track's jitter buffer: a picture's at the viewer's hold (hold.ts), STAGE_JITTER_BUFFER_MS on stage, and a sound's
+    // at the first hold, which then follows its picture (soundFollowsPicture()); a browser without the setting keeps its
+    // own.
     holdArrivals(track) {
         const receiver = track.receiver;
         if (!receiver || !('jitterBufferTarget' in receiver))
             return;
         try {
-            receiver.jitterBufferTarget = this.ownHold();
+            receiver.jitterBufferTarget = String(track.kind) === 'audio' ? this.baseHold() : this.ownHold();
         }
         catch { }
     }
@@ -1711,6 +1752,10 @@ export class EasyStreamClient {
     ownHold() {
         return this.watchingOnly() ? this.viewerHold.ms : STAGE_JITTER_BUFFER_MS;
     }
+    // The least anything is held: a viewer's first hold, or on stage STAGE_JITTER_BUFFER_MS.
+    baseHold() {
+        return this.watchingOnly() ? VIEWER_HOLDS_MS[0] : STAGE_JITTER_BUFFER_MS;
+    }
     // A look at how the stream plays (playback.ts): counted for the trace's next summary, and for a viewer off stage,
     // its hold on arrivals following it (hold.ts).
     looked(look) {
@@ -1721,12 +1766,13 @@ export class EasyStreamClient {
         if (change)
             this.holdMoved(change);
     }
-    // The viewer's hold moved: everything it receives held as long now (each sound then follows its picture,
-    // soundFollowsPicture()), said in the statistics and the trace.
+    // The viewer's hold moved: every picture it receives held as long now, said in the statistics and the trace. The
+    // browser moves a picture's delay a little at a time, and each sound follows its picture's as it goes
+    // (soundFollowsPicture()): set at once, a sound would play up to a second off its picture for the seconds it takes.
     holdMoved(change) {
         for (const participant of this.room?.remoteParticipants.values() ?? []) {
             for (const publication of participant.trackPublications.values()) {
-                if (publication.track)
+                if (publication.track && String(publication.kind) === 'video')
                     this.holdArrivals(publication.track);
             }
         }
@@ -1825,12 +1871,12 @@ export class EasyStreamClient {
         this.syncTimer = null;
     }
     // Each person's sound held as long as the longest of their pictures, less SYNC_SLACK_MS, and never less than this
-    // client's own hold: a person showing nothing, or a browser that can't tell, has their sound held as before.
+    // client's first hold: a person showing nothing, or a browser that can't tell, has their sound held as before.
     async soundFollowsPicture(room) {
         const lk = this.lk;
         if (!lk)
             return;
-        const own = this.ownHold();
+        const own = this.baseHold();
         for (const participant of room.remoteParticipants.values()) {
             let picture = 0;
             const sounds = [];
@@ -1880,10 +1926,14 @@ export class EasyStreamClient {
     // Who is on stage: everyone publishing in the room (viewers are hidden), the local person
     // included when they publish.
     refreshTiles() {
+        // A test shown here: its tiles are the studio's (fromTest()).
+        if (this.testFeed && !this.testSent)
+            return;
         const room = this.room;
         const lk = this.lk;
         if (!room || !lk) {
             this.set({ tiles: this.previewTiles() });
+            this.feedTest();
             return;
         }
         const { Track } = lk;
@@ -2108,6 +2158,13 @@ export class EasyStreamClient {
         const track = this.localTrack(kind);
         return track && !track.isMuted ? track.mediaStreamTrack : null;
     }
+    // The camera or microphone open here, as the room client has it, muted too: for an effect the views put on it (a
+    // processor, as the call screens put theirs: the background blurred or replaced, the noise removed), which the track
+    // keeps through a device switched and sends from its first frame out. Null while none is open. A microphone opened
+    // again for original sound is another track.
+    deviceTrack(kind) {
+        return this.localTrack(kind === 'camera' ? 'video' : 'audio') ?? null;
+    }
     // The picture going out: the screen while it is shared, otherwise the camera. Null before going live.
     async sendingStats() {
         const room = this.room;
@@ -2268,7 +2325,7 @@ export class EasyStreamClient {
         const screenPolicy = node?.has('screen.codecs') ? { screen: node.get('screen.codecs') } : STREAM_SCREEN_POLICY;
         const screen = screenCodecFor(agent, hardwareFromCaps(caps), { ...options, policy: screenPolicy });
         const source = camera.source ?? 'rule';
-        this.trace.add(`codecs: camera ${camera.codec}${camera.hardware ? ' hardware' : ''} by ${source}${camera.height ? ' at ' + camera.height + 'p' : ''}, screen ${screen}`);
+        this.trace.add(`codecs: camera ${camera.codec}${camera.hardware ? ' hardware' : ''} by ${source}${camera.height ? ' at ' + camera.height + 'p' : ''}${this.cameraProcessed ? ' with an effect' : ''}, screen ${screen}`);
         return { camera: camera.codec, screen, backup: camera.backup, height: camera.height ?? 0 };
     }
     // The camera's codec as the stream goes live, H.264 first: measured by the calls' camera check (calls/camera-check.ts:
@@ -2280,9 +2337,15 @@ export class EasyStreamClient {
     // in software) is brought down to them before it goes out, the lines it then has the choice's `height`; any other
     // camera goes out at the size it has (0). No camera, no check, or a check that fails: the codec as before
     // (roomCallChoice()).
+    //
+    // Under an effect (a processor on the camera: the background blurred or replaced) the picture measured is the one
+    // that goes out, the processed one, as the effect's work counts against the encoder's, and the camera brought down
+    // is the source under it, whose size the processor's picture follows: a canvas's track takes no constraints.
     async checkCamera(room, caps, agent, options) {
         const before = () => ({ ...roomCallChoice(caps, agent, options), height: 0 });
-        const track = this.localTrack('video')?.mediaStreamTrack;
+        const local = this.localTrack('video');
+        const track = local?.mediaStreamTrack;
+        this.cameraProcessed = !!local?.getProcessor?.();
         if (!track || options.policy?.check !== true)
             return before();
         const stop = () => this.stopped || track.readyState === 'ended' || this.localTrack('video')?.mediaStreamTrack !== track;
@@ -2296,7 +2359,8 @@ export class EasyStreamClient {
         reportMeshCamera(room, meshCameraReport(choice));
         if (choice.source === 'default' || !choice.height || stop())
             return { ...choice, height: 0 };
-        const height = await fitCameraTrack(track, choice.codec, choice.hardware, choice.height).catch(() => 0);
+        const source = this.cameraProcessed ? sourceTrack(local) : track;
+        const height = await fitCameraTrack(source, choice.codec, choice.hardware, choice.height).catch(() => 0);
         return { ...choice, height: height || choice.height };
     }
     // Every open track not out yet, a shared screen's too: a second call publishes nothing twice.
@@ -2350,12 +2414,24 @@ export class EasyStreamClient {
         return sendQuality;
     }
     // Publishes, then tells everyone the stream is live. Streaming from OBS, the encoder publishes, so its
-    // picture must have come first.
+    // picture must have come first. Not while OBS is being chosen (`switching`): the source it goes live with is the one
+    // it found, and stays so until it is live.
     async goLive() {
         if (this.state.status === 'unconnected')
             return { ok: false, error: this.state.error ?? 'not_configured' };
         if (this.state.you?.role !== 'host')
             return { ok: false, error: 'not_host' };
+        if (this.switching)
+            return { ok: false, error: 'switching' };
+        this.switching = 'live';
+        try {
+            return await this.goLiveNow();
+        }
+        finally {
+            this.switching = null;
+        }
+    }
+    async goLiveNow() {
         if (this.state.encoder) {
             if (!this.state.tiles.some((t) => t.encoder))
                 return { ok: false, error: 'no_encoder' };
@@ -2381,12 +2457,28 @@ export class EasyStreamClient {
         return reply;
     }
     // Streaming from OBS over WHIP: the stream's key and the address the encoder sends to, and the host in the
-    // room to see what it sends. `renew` makes a new key, which cuts off an encoder using the old one.
+    // room to see what it sends. `renew` makes a new key, which cuts off an encoder using the old one. Not while going
+    // live is under way (`switching`), and not once live from the browser (`live_here`, asked on 2026-11-02: "When I press
+    // Go Live from browser the stream from OBS button must be hidden"): a live stream keeps the source it went live
+    // with. Live from OBS, a new key is still asked here.
     async useEncoder(renew = false) {
         if (this.state.status === 'unconnected')
             return { ok: false, error: this.state.error ?? 'not_configured' };
         if (this.state.you?.role !== 'host')
             return { ok: false, error: 'not_host' };
+        if (this.switching)
+            return { ok: false, error: 'switching' };
+        if (this.live() && !this.state.encoder)
+            return { ok: false, error: 'live_here' };
+        this.switching = 'encoder';
+        try {
+            return await this.useEncoderNow(renew);
+        }
+        finally {
+            this.switching = null;
+        }
+    }
+    async useEncoderNow(renew) {
         const reply = await this.ack('ingest', renew ? { renew: true } : {});
         if (!reply.ok)
             return reply;
@@ -2399,11 +2491,14 @@ export class EasyStreamClient {
         this.refreshTiles();
         return { ok: true };
     }
-    // Back to the camera, before going live.
+    // Back to the camera, before going live alone: not while going live from OBS, or choosing it, is under way, and not
+    // once live from OBS, whose stream the browser's camera would then go out in (sendHere(), which a window streaming
+    // from OBS never does).
     leaveEncoder() {
+        if (this.switching || this.live())
+            return;
         this.set({ encoder: null });
-        if (this.state.stream?.state !== 'live')
-            this.disconnectMedia();
+        this.disconnectMedia();
     }
     async end() {
         const reply = await this.ack('end');
@@ -2414,6 +2509,252 @@ export class EasyStreamClient {
             this.stopLocalTracks();
         }
         return reply;
+    }
+    // A test stream, on a site whose streams the cloud doesn't take yet (`unconnected`): this window's camera, microphone
+    // and screen, live for the host alone on the stream's page opened from here, with a chat and reactions the two share
+    // (test.ts). Nothing of it reaches the cloud. The camera and microphone open first where nothing is on.
+    async startTest() {
+        const you = this.state.you;
+        const stream = this.options.stream;
+        if (this.state.status !== 'unconnected' || you?.role !== 'host' || !stream)
+            return { ok: false, error: this.state.error ?? 'not_configured' };
+        if (this.testSent && this.testFeed?.endedAt === null)
+            return { ok: true };
+        if (this.localTracks.length === 0 && this.screenTracks.length === 0)
+            await this.startPreview();
+        this.closeTest();
+        this.stopTestLook();
+        const feed = new TestFeed(stream, { name: you.name, avatar: this.avatar }, Date.now());
+        this.testFeed = feed;
+        this.testSent = true;
+        this.testOff = feed.listen((event) => this.fromTest(event));
+        publishTest(feed);
+        this.sayTest('on');
+        // The host writes in its chat; nothing of the cloud's moderation is there to use.
+        this.set({ you: { ...you, chat: 'write', mod: false }, chat: [], chatConnected: true, reactions: [] });
+        this.feedTest();
+        // What it sends, looked at again each second too: an effect turned on gives the camera another picture.
+        this.testTimer = setInterval(() => this.feedTest(), TEST_LOOK_MS);
+        this.fromTest({ type: 'change' });
+        return { ok: true };
+    }
+    // Ends the test this window sends: its pages show the end as viewers see it, and the devices close, as they do when a
+    // stream ends.
+    endTest() {
+        const feed = this.testSent ? this.testFeed : null;
+        if (!feed || feed.endedAt !== null)
+            return;
+        this.stopTestLook();
+        feed.end();
+        this.sayTest('off');
+        this.stopLocalTracks();
+        void this.stopScreen();
+    }
+    // The studio's word on the browser's channel that its test runs, or no longer does (TEST_CHANNEL).
+    sayTest(test) {
+        const stream = this.options.stream;
+        if (!stream)
+            return;
+        this.testWords ?? (this.testWords = testChannel((word) => this.heardTest(word)));
+        this.testWords?.say({ test, stream });
+    }
+    // In the studio, a page asking: its test runs. On a page, a studio's word: a test of this stream runs in another tab
+    // this page cannot reach while it shows none of its own (`testElsewhere`), or no longer does.
+    heardTest(word) {
+        const stream = this.options.stream;
+        if (word.stream !== stream)
+            return;
+        if (this.testSent) {
+            if (word.test === 'ask' && this.testFeed?.endedAt === null)
+                this.testWords?.say({ test: 'on', stream });
+            return;
+        }
+        if (word.test === 'ask')
+            return;
+        const elsewhere = word.test === 'on' && !this.testFeed;
+        if (elsewhere !== this.state.testElsewhere)
+            this.set({ testElsewhere: elsewhere });
+    }
+    // What this window sends of its test: the preview's camera and screen, the microphone while on and the screen's sound.
+    feedTest() {
+        const feed = this.testSent ? this.testFeed : null;
+        const lk = this.lk;
+        if (!feed || feed.endedAt !== null || !lk)
+            return;
+        const camera = this.localTracks.find((t) => t.kind === lk.Track.Kind.Video && !t.isMuted);
+        const mic = this.localTracks.find((t) => t.kind === lk.Track.Kind.Audio && !t.isMuted);
+        const screen = this.screenTracks.find((t) => t.kind === lk.Track.Kind.Video);
+        const screenSound = this.screenTracks.find((t) => t.kind === lk.Track.Kind.Audio);
+        feed.update({
+            camera: camera?.mediaStreamTrack ?? null,
+            screen: screen?.mediaStreamTrack ?? null,
+            audio: [mic?.mediaStreamTrack, screenSound?.mediaStreamTrack].filter((t) => Boolean(t)),
+            micMuted: !mic
+        });
+    }
+    // The stream's page opened from the studio (a host's, unconnected): the studio's test, from when it starts, again for
+    // each one it starts, while the page is open.
+    followTest() {
+        const stream = this.options.stream;
+        if (this.testTimer || !stream || this.testSent)
+            return;
+        const look = () => {
+            if (this.testSent)
+                return;
+            const feed = openerTest(stream);
+            if (feed && feed !== this.testFeed && feed.endedAt === null)
+                this.watchTest(feed);
+            else if (this.testFeed && feed !== this.testFeed)
+                this.testGone();
+        };
+        this.testTimer = setInterval(look, TEST_LOOK_MS);
+        look();
+        // And whether a test of it runs where this page cannot reach it.
+        this.sayTest('ask');
+    }
+    watchTest(feed) {
+        this.closeTest();
+        let unlisten = () => { };
+        let leave = () => { };
+        try {
+            unlisten = feed.listen((event) => this.fromTest(event));
+            leave = feed.watch();
+        }
+        catch (e) {
+            unlisten();
+            return;
+        }
+        this.testFeed = feed;
+        this.testSent = false;
+        this.testSilent = true;
+        if (this.state.testElsewhere)
+            this.set({ testElsewhere: false });
+        this.testOff = () => {
+            unlisten();
+            leave();
+        };
+        // A tab that closes runs no stop(): it lets go as it goes.
+        if (!this.onTestGone && typeof globalThis.addEventListener === 'function') {
+            this.onTestGone = () => this.closeTest();
+            globalThis.addEventListener('pagehide', this.onTestGone);
+        }
+        this.fromTest({ type: 'change' });
+    }
+    // The test as it is now, in the studio or on a page watching it.
+    fromTest(event) {
+        const feed = this.testFeed;
+        if (!feed)
+            return;
+        if (event.type === 'reaction') {
+            this.addReactions({ [event.kind]: 1 });
+            return;
+        }
+        const ended = feed.endedAt !== null;
+        const test = { started_at: feed.startedAt, ended_at: feed.endedAt, watching: feed.watching, watch: !this.testSent };
+        if (this.testSent) {
+            const you = this.state.you;
+            this.set({ test, chat: feed.chat.slice(), chatConnected: !ended, ...(ended && you ? { you: { ...you, chat: 'read', mod: true } } : {}) });
+            return;
+        }
+        // The stream as a viewer gets it, live with the host's picture, its sound waiting for the host to turn it on.
+        this.set({
+            status: 'ready',
+            error: null,
+            test,
+            you: { identity: TEST_IDENTITY, role: 'viewer', name: this.options.offlineHost?.name ?? feed.host.name, chat: 'write', mod: false, stage: false, offline: 'closed' },
+            stream: { id: feed.stream, state: ended ? 'ended' : 'live', started_at: feed.startedAt, ended_at: feed.endedAt },
+            tiles: ended ? [] : [this.testTile(feed)],
+            media: ended ? 'off' : 'live',
+            chatConnected: !ended,
+            viewers: feed.watching,
+            chat: feed.chat.slice(),
+            audioBlocked: this.testSilent,
+            reactionsOn: true
+        });
+    }
+    // The studio closed, or loaded again, without ending its test: shown here as ended.
+    testGone() {
+        const feed = this.testFeed;
+        if (!feed)
+            return;
+        let endedAt = Date.now();
+        let startedAt = endedAt;
+        let id = this.state.stream?.id ?? '';
+        try {
+            endedAt = feed.endedAt ?? endedAt;
+            startedAt = feed.startedAt;
+            id = feed.stream;
+        }
+        catch (e) { }
+        this.closeTest();
+        const test = this.state.test;
+        this.set({
+            stream: { id, state: 'ended', started_at: startedAt, ended_at: endedAt },
+            tiles: [],
+            media: 'off',
+            chatConnected: false,
+            viewers: 0,
+            test: test ? { ...test, ended_at: endedAt, watching: 0 } : null
+        });
+    }
+    // The host's tile on a page watching the test, its tracks attached here as the RTC client's are.
+    testTile(feed) {
+        const { camera, screen, audio, micMuted } = feed.media;
+        const shown = new Set([camera, screen, ...audio].filter((t) => Boolean(t)).map((t) => t.id));
+        for (const [id, track] of [...this.testTracks]) {
+            if (shown.has(id))
+                continue;
+            track.detach();
+            this.testTracks.delete(id);
+        }
+        const track = (t) => this.testTrack(t);
+        return {
+            identity: 'test:' + TEST_IDENTITY,
+            name: feed.host.name,
+            avatar: feed.host.avatar,
+            role: 'host',
+            local: false,
+            camera: camera ? track(camera) : null,
+            screen: screen ? track(screen) : null,
+            audio: audio.map(track),
+            micMuted,
+            speaking: false,
+            encoder: false
+        };
+    }
+    testTrack(track) {
+        const known = this.testTracks.get(track.id);
+        if (known && known.mediaStreamTrack === track)
+            return known;
+        const made = new TestTrack(track, this.testSilent);
+        this.testTracks.set(track.id, made);
+        return made;
+    }
+    // Lets go of the test this window sends or shows; the studio's own is no longer found by its pages.
+    closeTest() {
+        const off = this.testOff;
+        this.testOff = null;
+        try {
+            off?.();
+        }
+        catch (e) {
+            // A studio gone: nothing of it to let go.
+        }
+        if (this.testFeed && this.testSent)
+            withdrawTest(this.testFeed);
+        this.testFeed = null;
+        this.testSent = false;
+        for (const track of this.testTracks.values())
+            track.detach();
+        this.testTracks.clear();
+    }
+    stopTestLook() {
+        if (this.testTimer)
+            clearInterval(this.testTimer);
+        this.testTimer = null;
+        if (this.onTestGone)
+            globalThis.removeEventListener?.('pagehide', this.onTestGone);
+        this.onTestGone = null;
     }
     async setCamera(on) {
         await this.setDevice('camera', on);
@@ -2581,8 +2922,13 @@ export class EasyStreamClient {
             this.watch(0);
     }
     // Everyone
-    // A message refused for a timeout says until when, which the chat then holds to.
+    // A message refused for a timeout says until when, which the chat then holds to. In a test, the test's chat, which
+    // the studio and the pages watching it share.
     async sendChat(text) {
+        if (this.testFeed) {
+            const said = this.testFeed.say(text);
+            return said ? { ok: true, id: said.id } : { ok: false, error: 'bad_request' };
+        }
         const reply = await this.ack('chat', { text });
         if (!reply.ok && reply.error === 'timeout' && typeof reply.until === 'number') {
             this.set({ timeoutUntil: reply.until });
@@ -2622,8 +2968,12 @@ export class EasyStreamClient {
         return ack;
     }
     muteGuest(identity) { return this.ack('mute', { identity }); }
-    // Nothing while the stream takes no reactions.
+    // Nothing while the stream takes no reactions. In a test, the test's, which float in the studio and on its pages.
     react(kind) {
+        if (this.testFeed) {
+            this.testFeed.react(kind);
+            return;
+        }
         if (this.state.reactionsOn)
             this.send('react', { kind });
     }
@@ -2640,8 +2990,15 @@ export class EasyStreamClient {
                 this.capQuality(publication);
         }
     }
-    // A browser that blocked sound until the page was clicked.
+    // A browser that blocked sound until the page was clicked. A test's sound, which waits for the host here.
     async startAudio() {
+        if (this.testFeed && !this.testSent) {
+            this.testSilent = false;
+            for (const track of this.testTracks.values())
+                track.setSilent(false);
+            this.set({ audioBlocked: false });
+            return;
+        }
         await this.room?.startAudio();
         if (this.room)
             this.set({ audioBlocked: !this.room.canPlaybackAudio });

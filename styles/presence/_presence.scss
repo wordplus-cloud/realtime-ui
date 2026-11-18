@@ -14,10 +14,16 @@
 // `cursor: default` here beat the pointer a conversation row, a picker
 // option or a profile link hands down, so the face was the one spot in a
 // clickable row that did not read as clickable.
+//
+// As tall as the face, never stretched by a row that stretches what it holds:
+// the dot sits at the wrap's corner, so a stretched wrap dropped it to the
+// foot of the row (Live Support's inbox, whose rows hold a face, a name and
+// lines under it). A row that centres its face still does.
 .wplus-avatar-wrap {
     position: relative;
     display: inline-flex;
     flex: 0 0 auto;
+    height: max-content;
     line-height: 0;
 }
 
@@ -27,6 +33,7 @@
 // Components pass a shape prop (inline radius) only as a deliberate
 // per-spot override.
 .wplus-avatar-img,
+.wplus-avatar-letters,
 .wplus-avatar-html,
 .wplus-avatar-loading,
 .wplus-group-avatar,
@@ -58,6 +65,39 @@
 .wplus-avatar-blank {
     display: inline-block;
     background: rgba(var(--wplus-color-bg-hover), 1);
+}
+
+// A person's letters on their colour (Avatar's `letters`), for an app whose
+// people mostly have no picture, as Live Support's visitors and team. The
+// colours come inline, from the app; the letters are sized by the avatar's
+// own size (--wplus-avatar-size, inline too), so one rule fits each size and
+// an app's rule for one spot overrides it. The person's picture lies over
+// them, so one that is see-through where they chose none (WordPress's blank
+// avatar) shows them.
+.wplus-avatar-letters {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: none;
+    overflow: hidden;
+    font-size: calc(var(--wplus-avatar-size, 36px) * 0.38);
+    font-weight: 600;
+    line-height: 1;
+    white-space: nowrap;
+    user-select: none;
+}
+
+.wplus-avatar-letters__picture {
+    position: absolute;
+    inset: 0;
+    object-fit: cover;
+    border-radius: inherit;
+    &:not(#\9) {
+        width: 100%;
+        height: 100%;
+        max-width: none;
+    }
 }
 
 // UX links — user names and avatar profile links — never underline, in
@@ -271,6 +311,12 @@ a.wplus-user:hover,
     .wplus-typing-dots[data-small="1"] & {
         width: 4px;
         height: 4px;
+    }
+
+    // Still where motion is asked to be reduced: the durations' tokens go to 1ms there (_tokens.scss), and this loop,
+    // timed on its own, kept bouncing.
+    @media (prefers-reduced-motion: reduce) {
+        animation: none;
     }
 }
 

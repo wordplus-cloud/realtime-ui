@@ -6,9 +6,10 @@
 
 // What the screens ask of the app they are in.
 export { configureUi, host, setUiUsers, uiUser } from "./host.ts";
-export type { UiHost, UiUser, UiConfirm, UserAvatarProps, UserNameProps, SharedPart } from "./host.ts";
+export type { UiHost, UiUser, UiConfirm, UserAvatarProps, UserNameProps, SharedPart, HostBackground, NoiseDefault } from "./host.ts";
 export { __, _x, _n, _nx, sprintf, applyFilters } from "./inc/globals.ts";
-export { plainName, escapeHtml } from "./inc/names.ts";
+export { plainName, plainLabel, escapeHtml, decodeEntities } from "./inc/names.ts";
+export { markup } from "./inc/markup.tsx";
 
 // The screens' named pieces, which an app replaces with its own (pieces.tsx).
 export { Piece, PiecesProvider, usePieces } from "./pieces.tsx";
@@ -20,11 +21,11 @@ export type {
 // Presence: the avatar with its dot, the stack, typing, the label, read-by; who is online, a person's row, a live
 // count. Views, fed with who is online by whoever draws them.
 export {
-    PresenceDot, Avatar, GroupAvatar, AvatarStack, TypingDots, ActivityIndicator, PresenceLabel, ReadBy,
+    PresenceDot, Avatar, AvatarFace, GroupAvatar, AvatarStack, TypingDots, ActivityIndicator, PresenceLabel, ReadBy,
     SHAPE_RADIUS, avatarSrc, avatarKey, defaultAvatarSrc,
 } from "./components/presence/presence.tsx";
 export type {
-    Presence, PresenceUser, PresenceDotProps, AvatarShape, AvatarProps, GroupAvatarProps, AvatarStackProps, TypingDotsProps,
+    Presence, PresenceUser, PresenceDotProps, AvatarShape, AvatarProps, AvatarFaceProps, AvatarLetters, GroupAvatarProps, AvatarStackProps, TypingDotsProps,
     Activity, ActivityEntry, ActivityIndicatorProps, PresenceLabelProps, ReadByProps,
 } from "./components/presence/presence.tsx";
 export { OnlineList, PersonRow, OnlineCount, RowAction } from "./components/presence/online-list.tsx";
@@ -35,12 +36,12 @@ export type { OnlineListProps, PersonRowProps, RowActionProps } from "./componen
 // filled by whoever draws them.
 export {
     DaySeparator, UnreadDivider, SystemRow, DeletedBubble, MessageStack, MessageBody, MessageText, AiWaiting, StatusTick,
-    MetaPieces, MessageMeta, HoverActions, HoverButton, TypingPinned, EmptyThread,
+    MetaPieces, MessageMeta, HoverActions, HoverButton, TypingPinned, EmptyThread, ActionCard,
 } from "./components/chat/message-parts.tsx";
 export type {
-    DaySeparatorProps, SystemRowProps, SystemTone, DeletedBubbleProps, MessageSide, BubbleFill, MessageStackProps,
+    DaySeparatorProps, SystemRowProps, SystemTone, ActionCardProps, ActionCardTone, DeletedBubbleProps, MessageSide, BubbleFill, MessageStackProps,
     MessageBodyProps, MessageTextProps, DeliveryState, StatusTickProps, MetaPiecesProps, MetaVariant, MessageMetaProps,
-    HoverButtonProps,
+    HoverButtonProps, EmptyThreadProps,
 } from "./components/chat/message-parts.tsx";
 export { ComposerRow } from "./components/chat/composer-row.tsx";
 export type { ComposerRowProps } from "./components/chat/composer-row.tsx";
@@ -58,9 +59,10 @@ export { deepFocus, focusBack, rememberBeforeRing } from "./components/calls/foc
 // Why a camera or microphone would not open, in words the reader can act on.
 export { getPermissionFailure } from "./inc/device-error.ts";
 
-// What shape a picture is: the call grids', and a camera preview's.
+// What shape a picture is: the call grids', and a camera preview's. And how little of a camera filling a box may cut.
 export {
     DEFAULT_TILE_RATIO, TALL_TILE_RATIO, publicationRatio, participantRatio, useMediaRatio, usePictureDrawn, cssRatio,
+    FILL_CUTS_MOST, keptOf, fillsBox,
 } from "./inc/calls/ratio.ts";
 export type { PictureDrawn } from "./inc/calls/ratio.ts";
 // "Optimizing video quality..." over someone's picture while their camera moves to another codec during a call.
@@ -70,8 +72,14 @@ export type { CameraOptimizingState } from "./components/calls/optimizing.tsx";
 export { pictureless, stalledShown, STALLED_VIDEO_CLASS, VideoInterruptedNotice } from "./components/calls/stalled.tsx";
 
 // What the screens stand on.
-export { default as Icon, iconPathD, isRegistryIcon, ResolvedIcon } from "./primitives/icon.tsx";
-export type { IconName, IconSource, ResolvedIconProps } from "./primitives/icon.tsx";
+// The icons: every glyph of the registry through Icon (primitives/icons.tsx); the chat's alone through ChatIcon, as
+// the chat's parts draw them; the sets, and registerIcons() for an app's own glyphs.
+export { default as Icon, iconPathD, isRegistryIcon, ResolvedIcon } from "./primitives/icons.tsx";
+export { default as ChatIcon, registerIcons } from "./primitives/icon.tsx";
+export { CHAT_ICONS } from "./primitives/icons/chat.ts";
+export { CALL_ICONS } from "./primitives/icons/calls.ts";
+export { MESSENGER_ICONS } from "./primitives/icons/messenger.ts";
+export type { IconName, IconProps, IconSource, ResolvedIconProps } from "./primitives/icon.tsx";
 export { default as IconButton } from "./primitives/icon-button.tsx";
 export type { IconButtonEmphasis, IconButtonProps } from "./primitives/icon-button.tsx";
 export { default as BaseTooltip, tooltipContent } from "./primitives/tooltip.tsx";
@@ -81,6 +89,9 @@ export { default as Btn, keepPointerFocus } from "./inc/helpers/btn.tsx";
 export type { BtnProps } from "./inc/helpers/btn.tsx";
 export { default as Resizable } from "./components/helpers/resizable.tsx";
 export { default as ConnectionStatus } from "./components/parts/connection-status.tsx";
+// The badge's warning mark and tip while the person's own upload is jammed, for a screen that says it elsewhere.
+export { useJamTip, uploadJamWords } from "./components/parts/jam-tip.tsx";
+export type { JamTip } from "./components/parts/jam-tip.tsx";
 export { default as UserAvatar, FallbackAvatar } from "./components/users/user-avatar.tsx";
 export { default as UserName, FallbackName } from "./components/users/user-name.tsx";
 export { default as useStateRef } from "./inc/hooks/state-ref.ts";
@@ -91,5 +102,6 @@ export {
 } from "./inc/functions/browser-info.ts";
 export { msToTime, formatSize, getSpeakerHighlightStyles, BMHexToRGBA } from "./inc/functions.ts";
 export type { SpeakerHighlightResult } from "./inc/functions.ts";
-export { sharedTooltips } from "./inc/shared-parts.ts";
+export { sharedTooltips, setOwnTooltips } from "./inc/shared-parts.ts";
+export { ownTooltips } from "./inc/floater.ts";
 export type { Tooltips, TooltipContent, TooltipOptions } from "./inc/shared-parts.ts";

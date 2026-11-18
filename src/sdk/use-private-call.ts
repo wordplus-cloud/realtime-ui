@@ -173,6 +173,8 @@ export function usePrivateCall(
         ...adding,
         iconsReverted: false,
         mutedHint: options.mutedHint,
+        // local-media.ts sends the camera and the microphone with the effects chosen.
+        effects: true,
     } as CallContextInterface;
 }
 

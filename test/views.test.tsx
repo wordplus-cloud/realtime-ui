@@ -71,6 +71,63 @@ describe( 'the connection status', () => {
             vi.useRealTimers();
         }
     } );
+
+    it( 'carries a warning mark while the upload is jammed, and says why on a hover, on focus and after a tap', () => {
+        const { container, rerender } = render( <ConnectionStatus state="connected" quality="good" jammed /> );
+        const badge = () => container.querySelector<HTMLElement>( '.wplus-connection-quality' )!;
+        const tip = () => container.querySelector( '.wplus-call-jam-tip' );
+
+        // The mark in the dot's place, the badge a button named by the jam, and the title said once; no words on screen.
+        expect( badge().className ).toContain( 'wplus-upload-jammed' );
+        expect( badge().querySelector( '.wplus-jam-icon' ) ).not.toBeNull();
+        expect( badge().getAttribute( 'role' ) ).toBe( 'button' );
+        expect( badge().getAttribute( 'tabindex' ) ).toBe( '0' );
+        expect( badge().getAttribute( 'aria-label' ) ).toBe( 'Your upload is jammed' );
+        expect( container.querySelector( '[role="status"]' )!.textContent ).toBe( 'Your upload is jammed' );
+        expect( tip() ).toBeNull();
+        // The node still calls the connection good: a badge that warns doesn't say so beside its mark.
+        expect( badge().querySelector( ':scope > span' )!.textContent ).toBe( 'connected (poor)' );
+        expect( badge().className ).toContain( 'wplus-quality-poor' );
+        expect( badge().className ).not.toContain( 'wplus-quality-good' );
+
+        // A mouse over it, and away.
+        fireEvent.pointerEnter( badge(), { pointerType: 'mouse' } );
+        expect( tip()!.textContent ).toContain( 'Your upload is jammed' );
+        // what it may do to the call for the others, then what may help
+        expect( tip()!.textContent ).toContain( 'Others may see your video freeze or hear your sound break up' );
+        expect( tip()!.textContent ).toContain( 'Pausing other uploads on your network can help' );
+        expect( badge().getAttribute( 'aria-describedby' ) ).toBe( tip()!.id );
+        fireEvent.pointerLeave( badge(), { pointerType: 'mouse' } );
+        expect( tip() ).toBeNull();
+
+        // A finger: its enter opens nothing, its tap does, and a tap anywhere else closes it.
+        fireEvent.pointerEnter( badge(), { pointerType: 'touch' } );
+        expect( tip() ).toBeNull();
+        fireEvent.click( badge() );
+        expect( tip() ).not.toBeNull();
+        expect( badge().getAttribute( 'aria-expanded' ) ).toBe( 'true' );
+        fireEvent.pointerDown( document.body );
+        expect( tip() ).toBeNull();
+
+        // The keyboard: focus shows it, Escape closes it, Enter opens it again, leaving closes it.
+        fireEvent.focus( badge() );
+        expect( tip() ).not.toBeNull();
+        fireEvent.keyDown( badge(), { key: 'Escape' } );
+        expect( tip() ).toBeNull();
+        fireEvent.keyDown( badge(), { key: 'Enter' } );
+        expect( tip() ).not.toBeNull();
+        fireEvent.blur( badge() );
+        expect( tip() ).toBeNull();
+
+        // The jam over: the badge as it was, nothing said.
+        fireEvent.click( badge() );
+        rerender( <ConnectionStatus state="connected" quality="good" /> );
+        expect( tip() ).toBeNull();
+        expect( badge().className ).not.toContain( 'wplus-upload-jammed' );
+        expect( badge().querySelector( '.wplus-jam-icon' ) ).toBeNull();
+        expect( badge().getAttribute( 'role' ) ).toBeNull();
+        expect( container.querySelector( '[role="status"]' )!.textContent ).toBe( '' );
+    } );
 } );
 
 describe( 'the icon button', () => {

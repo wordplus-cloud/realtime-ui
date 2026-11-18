@@ -5,7 +5,7 @@ import {useTooltips} from "./tooltip.ts";
 const Context = createContext<EasyStreamClient | null>( null );
 
 export function EasyStreamProvider( props : { client : EasyStreamClient, children : ReactNode } ){
-    // The tooltips of every control in it (data-estream-tip).
+    // The tooltips of every control in it (data-wplus-live-stream-tip).
     useTooltips();
     return <Context.Provider value={ props.client }>{ props.children }</Context.Provider>;
 }
@@ -23,7 +23,8 @@ export function useStream() : EasyStreamState {
 }
 
 // Whether the stream's chat is there to show: not on a page the cloud refused, nor on a host's page set up without it
-// (`unconnected`), which has no chat to reach.
+// (`unconnected`), which has no chat to reach, but for the chat of a test stream it runs (the engine's startTest()).
 export function chatReached( state : EasyStreamState ) : boolean {
-    return state.status !== 'error' && state.status !== 'unconnected';
+    if( state.status === 'unconnected' ) return Boolean( state.test && ! state.test.watch && state.test.ended_at === null );
+    return state.status !== 'error';
 }

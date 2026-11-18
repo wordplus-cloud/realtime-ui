@@ -9,12 +9,12 @@ import { fakeRoom, fakeRooms } from './fake-rooms.ts';
 
 it( 'loads every entry without a browser, as built for apps too', async () => {
     expect( typeof window ).toBe( 'undefined' );
-    for ( const entry of [ '../src/index.ts', '../src/calls.ts', '../src/react.tsx', '../dist/index.js', '../dist/calls.js', '../dist/react.js' ] ) {
+    for ( const entry of [ '../src/index.ts', '../src/calls.ts', '../src/react.tsx', '../src/chat.ts', '../dist/index.js', '../dist/calls.js', '../dist/react.js', '../dist/chat.js' ] ) {
         await expect( import( /* @vite-ignore */ entry ), entry ).resolves.toBeTruthy();
     }
     const { screenShareSupport, pictureInPictureSupport } = await import( '../src/calls.ts' );
     expect( [ screenShareSupport, pictureInPictureSupport ] ).toEqual( [ false, false ] );
-}, 30_000 ); // six entries transformed and loaded afresh: several seconds while the other files run beside it
+}, 30_000 ); // eight entries transformed and loaded afresh: several seconds while the other files run beside it
 
 it( 'renders every React component on the server, with or without the page\'s rt', async () => {
     const { CallScreen, CallButton, GroupCallButton, OnlineList, OnlineCount, Typing, Chat } = await import( '../src/react.tsx' );

@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type MouseEvent as ReactMouseEvent } from "react";
+import React, { useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type MouseEvent as ReactMouseEvent } from "react";
 import Btn from "../inc/helpers/btn.tsx";
 import Icon from "../primitives/icon.tsx";
 import { _x, sprintf } from "../inc/globals.ts";
@@ -226,6 +226,144 @@ export interface StagedFile {
     error?: string;
     /** As the app's server keeps it, once up. */
     file?: ChatFile;
+}
+
+/** A picked file as it goes up, then as the app's server keeps it. */
+interface Picked extends StagedFile {
+    abort: AbortController;
+}
+
+export interface StagedFilesOptions {
+    /** The chat's room, which `routeUploader` sends with each file: for an app that hands the hook its route. */
+    room?: string;
+    /** The largest file, in bytes, refused at once in the package's words: 0 for none, as an uploader can refuse it. */
+    maxFileSize?: number;
+    /** The most files one message takes: 10 by default. */
+    maxFiles?: number;
+}
+
+/** The files picked for the next message, as useStagedFiles() keeps them. */
+export interface StagedFilesState {
+    /** Whether files can be picked at all: there is an uploader. */
+    can: boolean;
+    uploader: ChatUploader | undefined;
+    staged: StagedFile[];
+    /** Takes files picked, pasted or dropped: each goes up at once. */
+    add: ( picked: File[] ) => void;
+    /** Takes a file out, stopping it where it is still going up. */
+    remove: ( key: string ) => void;
+    /** The files that went up, for the message. */
+    ready: () => ChatFile[];
+    /** The message went: the files that went up leave, those refused stay, saying why. */
+    sent: () => void;
+    /** Whether a file is still on its way up, which holds Send back. */
+    uploading: boolean;
+}
+
+/**
+ * The files the user picked for the next message: each goes up to the app's server at once, so Send has nothing left
+ * to wait for, and a picture shows from this page while it does. Refused at once when over the size or the count. The
+ * kit's Chat keeps its files with it, and so can an app that draws its own composer with the kit's parts and keeps its
+ * own engine (Live Support's visitor panel and inbox): `upload` is its route, or its own uploader, which may refuse a
+ * file in its own words by throwing them (an Error whose message the file shows).
+ */
+export function useStagedFiles( upload: string | ChatUploader | undefined, { room = "", maxFileSize = 0, maxFiles = 10 }: StagedFilesOptions = {} ): StagedFilesState {
+    const [ staged, setStaged ] = useState<Picked[]>( [] );
+    const uploader = useMemo<ChatUploader | undefined>( () => ( typeof upload === "string" ? routeUploader( upload, room ) : upload ), [ upload, room ] );
+    const update = ( key: string, change: Partial<Picked> ) => setStaged( ( list ) => list.map( ( s ) => ( s.key === key ? { ...s, ...change } : s ) ) );
+    const forget = ( s: Picked ) => {
+        s.abort.abort();
+        if ( s.preview ) URL.revokeObjectURL( s.preview );
+    };
+    // The pictures made on this page, let go with the chat.
+    const current = useRef( staged );
+    current.current = staged;
+    useEffect( () => () => current.current.forEach( forget ), [] );
+
+    const add = ( picked: File[] ) => {
+        if ( ! uploader ) return;
+        const left = Math.max( 0, maxFiles - current.current.length );
+        for ( const file of picked.slice( 0, left ) ) {
+            const key = `f${ Date.now() }-${ Math.random().toString( 36 ).slice( 2 ) }`;
+            const tooLarge = maxFileSize > 0 && file.size > maxFileSize;
+            const entry: Picked = {
+                key, name: file.name, type: file.type, size: file.size, abort: new AbortController(),
+                preview: file.type.startsWith( "image/" ) && typeof URL.createObjectURL === "function" ? URL.createObjectURL( file ) : null,
+                status: tooLarge ? "error" : "uploading", progress: 0,
+                error: tooLarge ? sprintf( _x( "Exceeds maximum size of %s MB", "Native uploader: rejected oversized file", "bp-better-messages" ), Math.round( maxFileSize / 1024 / 1024 * 10 ) / 10 ) : undefined,
+            };
+            setStaged( ( list ) => [ ...list, entry ] );
+            if ( tooLarge ) continue;
+            uploader( file, ( done ) => update( key, { progress: Math.min( 1, Math.max( 0, done ) ) } ), entry.abort.signal ).then(
+                ( kept ) => update( key, { status: "done", progress: 1, file: kept } ),
+                ( error: unknown ) => {
+                    if ( entry.abort.signal.aborted ) return;
+                    update( key, { status: "error", error: error instanceof Error ? error.message : "" } );
+                },
+            );
+        }
+    };
+    const remove = ( key: string ) => {
+        const gone = current.current.find( ( s ) => s.key === key );
+        if ( gone ) forget( gone );
+        setStaged( ( list ) => list.filter( ( s ) => s.key !== key ) );
+    };
+    const ready = () => staged.flatMap( ( s ) => ( s.status === "done" && s.file ? [ s.file ] : [] ) );
+    // Sent: the files that went up leave the composer, their pictures with them. Those that failed stay, saying why.
+    const sent = () => {
+        for ( const s of current.current ) if ( s.status === "done" && s.preview ) URL.revokeObjectURL( s.preview );
+        setStaged( ( list ) => list.filter( ( s ) => s.status !== "done" ) );
+    };
+
+    return { can: !! uploader, uploader, staged, add, remove, ready, sent, uploading: staged.some( ( s ) => s.status === "uploading" ) };
+}
+
+/** What useFileDrop() gives: whether files are dragged over, and the handlers for the element they are dropped on. */
+export interface FileDrop {
+    dragging: boolean;
+    dropping: {
+        onDragEnter?: ( e: React.DragEvent ) => void;
+        onDragOver?: ( e: React.DragEvent ) => void;
+        onDragLeave?: ( e: React.DragEvent ) => void;
+        onDrop?: ( e: React.DragEvent ) => void;
+    };
+}
+
+/**
+ * Files dragged over an element, for its DropStrip, and handed to `add` when dropped there: the element's handlers,
+ * none where `on` is false. Only a drag that carries files counts, and one over the element's children too.
+ */
+export function useFileDrop( add: ( files: File[] ) => void, on = true ): FileDrop {
+    const [ dragging, setDragging ] = useState( false );
+    const depth = useRef( 0 );
+    const carriesFiles = ( e: React.DragEvent ) => Array.from( e.dataTransfer?.types ?? [] ).includes( "Files" );
+    const dropping = on ? {
+        onDragEnter: ( e: React.DragEvent ) => {
+            if ( ! carriesFiles( e ) ) return;
+            e.preventDefault();
+            depth.current += 1;
+            setDragging( true );
+        },
+        onDragOver: ( e: React.DragEvent ) => {
+            if ( ! carriesFiles( e ) ) return;
+            e.preventDefault();
+            e.dataTransfer.dropEffect = "copy";
+        },
+        onDragLeave: ( e: React.DragEvent ) => {
+            if ( ! carriesFiles( e ) ) return;
+            depth.current = Math.max( 0, depth.current - 1 );
+            if ( depth.current === 0 ) setDragging( false );
+        },
+        onDrop: ( e: React.DragEvent ) => {
+            if ( ! carriesFiles( e ) ) return;
+            e.preventDefault();
+            depth.current = 0;
+            setDragging( false );
+            add( Array.from( e.dataTransfer.files ) );
+        },
+    } : {};
+
+    return { dragging: on && dragging, dropping };
 }
 
 export interface StagedFilesProps {

@@ -7,6 +7,7 @@ import {Icon} from "./icons.tsx";
 import {useNow} from "./player.tsx";
 import {Stage} from "./stage.tsx";
 import {CopyField, EncoderLost, Guests, StudioBar, StudioBody, StudioStatus, useStudio} from "./studio.tsx";
+import {TestStatus, testRunning} from "./test-stream.tsx";
 
 // The studio as a page of its own, where a host goes live with room for everything at once (the WordPress
 // plugin's Easy Stream → Studio): the picture large with the controls under it, and beside it the chat, the
@@ -54,44 +55,44 @@ function StreamTab( props : { options : StudioPageOptions, page : string, onPage
     };
 
     return (
-        <div className="estream-studio-page__details">
+        <div className="wplus-live-stream-studio-page__details">
             <section>
-                <h2 className="estream-studio-page__heading">{ __( 'Where viewers watch', 'wordplus-live-stream' ) }</h2>
+                <h2 className="wplus-live-stream-studio-page__heading">{ __( 'Where viewers watch', 'wordplus-live-stream' ) }</h2>
                 { props.page ? (
                     <>
                         <CopyField label={ __( 'Link to share', 'wordplus-live-stream' ) } value={ props.page } />
-                        <a className="estream-button estream-button--quiet" href={ props.page } target="_blank" rel="noopener noreferrer">
+                        <a className="wplus-live-stream-button wplus-live-stream-button--quiet" href={ props.page } target="_blank" rel="noopener noreferrer">
                             <Icon name="external" />
                             { __( 'Open the page', 'wordplus-live-stream' ) }
                         </a>
                     </>
                 ) : (
                     <>
-                        <p className="estream-studio-page__note">{ __( 'No page shows this stream yet, so nobody can watch it.', 'wordplus-live-stream' ) }</p>
+                        <p className="wplus-live-stream-studio-page__note">{ __( 'No page shows this stream yet, so nobody can watch it.', 'wordplus-live-stream' ) }</p>
                         { options.createPage && (
-                            <button type="button" className="estream-button estream-button--primary" disabled={ making } onClick={ () => void create() }>
+                            <button type="button" className="wplus-live-stream-button wplus-live-stream-button--primary" disabled={ making } onClick={ () => void create() }>
                                 { making ? __( 'Making the page…', 'wordplus-live-stream' ) : __( 'Create a page for this stream', 'wordplus-live-stream' ) }
                             </button>
                         ) }
-                        { failed && <p className="estream-controls__error" role="alert">{ failed }</p> }
+                        { failed && <p className="wplus-live-stream-controls__error" role="alert">{ failed }</p> }
                     </>
                 ) }
             </section>
 
             { props.scheduled ? (
                 <section>
-                    <h2 className="estream-studio-page__heading">{ __( 'Planned', 'wordplus-live-stream' ) }</h2>
-                    <p className="estream-studio-page__note">{ dateTime( props.scheduled ) }</p>
+                    <h2 className="wplus-live-stream-studio-page__heading">{ __( 'Planned', 'wordplus-live-stream' ) }</h2>
+                    <p className="wplus-live-stream-studio-page__note">{ dateTime( props.scheduled ) }</p>
                 </section>
             ) : null }
 
             <section>
-                <h2 className="estream-studio-page__heading">{ __( 'Streaming from OBS', 'wordplus-live-stream' ) }</h2>
-                <p className="estream-studio-page__note">{ __( 'Choose "Stream from OBS" under the picture for the server and key to enter in OBS.', 'wordplus-live-stream' ) }</p>
+                <h2 className="wplus-live-stream-studio-page__heading">{ __( 'Streaming from OBS', 'wordplus-live-stream' ) }</h2>
+                <p className="wplus-live-stream-studio-page__note">{ __( 'Choose "Stream from OBS" under the picture for the server and key to enter in OBS.', 'wordplus-live-stream' ) }</p>
             </section>
 
             { options.settings && (
-                <a className="estream-button estream-button--quiet" href={ options.settings }>
+                <a className="wplus-live-stream-button wplus-live-stream-button--quiet" href={ options.settings }>
                     <Icon name="settings" />
                     { __( 'Stream settings', 'wordplus-live-stream' ) }
                 </a>
@@ -120,55 +121,62 @@ export function StudioPage( props : { options : StudioPageOptions, chat : boolea
         { key: 'stream', label: _x( 'Stream', 'the tab with the stream\'s details', 'wordplus-live-stream' ) }
     ];
 
+    const test = testRunning( state );
     const when = live && stream?.started_at ? sprintf( _x( 'Live since %s', 'a time of day', 'wordplus-live-stream' ), timeOfDay( stream.started_at ) )
+        : test ? sprintf( _x( 'Testing since %s', 'a time of day', 'wordplus-live-stream' ), timeOfDay( test.started_at ) )
         : ended && stream?.ended_at ? sprintf( _x( 'Ended %s', 'a time, as "5 minutes ago"', 'wordplus-live-stream' ), relative( stream.ended_at, now ) )
             : player.scheduled && player.scheduled > now ? sprintf( _x( 'Starts %s', 'a date and time', 'wordplus-live-stream' ), dateTime( player.scheduled ) )
                 : __( 'Not live', 'wordplus-live-stream' );
 
     return (
-        <div className="estream-studio-page">
-            <header className="estream-studio-page__head">
+        <div className="wplus-live-stream-studio-page">
+            <header className="wplus-live-stream-studio-page__head">
                 { props.options.back && (
-                    <a className="estream-studio-page__back" href={ props.options.back } aria-label={ __( 'Back to your streams', 'wordplus-live-stream' ) } data-estream-tip={ __( 'Back to your streams', 'wordplus-live-stream' ) }>
+                    <a className="wplus-live-stream-studio-page__back" href={ props.options.back } aria-label={ __( 'Back to your streams', 'wordplus-live-stream' ) } data-wplus-live-stream-tip={ __( 'Back to your streams', 'wordplus-live-stream' ) }>
                         <Icon name="arrow-left" />
                     </a>
                 ) }
-                <div className="estream-studio-page__name">
-                    <h1 className="estream-studio-page__title">{ player.title || __( 'Studio', 'wordplus-live-stream' ) }</h1>
-                    { when && <p className="estream-studio-page__when">{ when }</p> }
+                <div className="wplus-live-stream-studio-page__name">
+                    <h1 className="wplus-live-stream-studio-page__title">{ player.title || __( 'Studio', 'wordplus-live-stream' ) }</h1>
+                    { when && <p className="wplus-live-stream-studio-page__when">{ when }</p> }
                 </div>
-                <span className="estream-studio-page__spacer" />
+                <span className="wplus-live-stream-studio-page__spacer" />
                 { page && (
-                    <a className="estream-button estream-button--quiet" href={ page } target="_blank" rel="noopener noreferrer">
+                    <a className="wplus-live-stream-button wplus-live-stream-button--quiet" href={ page } target="_blank" rel="noopener noreferrer">
                         <Icon name="external" />
                         { __( 'View page', 'wordplus-live-stream' ) }
                     </a>
                 ) }
             </header>
 
-            <div className="estream-studio-page__body">
-                <main className="estream-studio-page__main">
-                    <div ref={ props.root as RefObject<HTMLDivElement | null> } className={ 'estream-studio-page__picture' + ( player.fullscreen ? ' estream-studio-page__picture--full' : '' ) }>
+            <div className="wplus-live-stream-studio-page__body">
+                <main className="wplus-live-stream-studio-page__main">
+                    <div ref={ props.root as RefObject<HTMLDivElement | null> } className={ 'wplus-live-stream-studio-page__picture' + ( player.fullscreen ? ' wplus-live-stream-studio-page__picture--full' : '' ) }>
                         <Stage studio />
                     </div>
                     {/* Right under the picture, which nothing here moves: while live, what matters at a glance, where the
                         host's eyes are; the bar with Go live; then what the moment needs (setting up, OBS), as long as
                         it is, scrolling the column under the picture where it doesn't fit. */}
-                    <div className="estream-studio-page__controls">
+                    <div className="wplus-live-stream-studio-page__controls">
                         { live && (
-                            <div className="estream-studio-page__stats" role="group" aria-label={ __( 'Statistics', 'wordplus-live-stream' ) }>
+                            <div className="wplus-live-stream-studio-page__stats" role="group" aria-label={ __( 'Statistics', 'wordplus-live-stream' ) }>
                                 <StudioStatus stats={ sending } tally />
+                            </div>
+                        ) }
+                        { ! live && test && (
+                            <div className="wplus-live-stream-studio-page__stats" role="group" aria-label={ __( 'Test stream', 'wordplus-live-stream' ) }>
+                                <TestStatus />
                             </div>
                         ) }
                         <EncoderLost />
                         <StudioBar studio={ studio } />
-                        { error && <p className="estream-controls__error" role="alert">{ error }</p> }
-                        <StudioBody studio={ studio } />
+                        { error && <p className="wplus-live-stream-controls__error" role="alert">{ error }</p> }
+                        <StudioBody studio={ studio } watchUrl={ page } />
                     </div>
                 </main>
 
-                <aside className="estream-studio-page__side">
-                    <div className="estream-studio-page__tabs" role="tablist" aria-label={ __( 'Studio', 'wordplus-live-stream' ) }>
+                <aside className="wplus-live-stream-studio-page__side">
+                    <div className="wplus-live-stream-studio-page__tabs" role="tablist" aria-label={ __( 'Studio', 'wordplus-live-stream' ) }>
                         { tabs.map( ( t ) => (
                             <button
                                 key={ t.key }
@@ -177,19 +185,19 @@ export function StudioPage( props : { options : StudioPageOptions, chat : boolea
                                 id={ id + t.key }
                                 aria-selected={ shown === t.key }
                                 aria-controls={ id + 'panel' }
-                                className={ 'estream-studio-page__tab' + ( shown === t.key ? ' estream-studio-page__tab--on' : '' ) }
+                                className={ 'wplus-live-stream-studio-page__tab' + ( shown === t.key ? ' wplus-live-stream-studio-page__tab--on' : '' ) }
                                 onClick={ () => setTab( t.key ) }
                             >
                                 { t.label }
-                                { t.badge ? <span className="estream-studio-page__badge">{ count( t.badge ) }</span> : null }
+                                { t.badge ? <span className="wplus-live-stream-studio-page__badge">{ count( t.badge ) }</span> : null }
                             </button>
                         ) ) }
                     </div>
-                    <div className={ 'estream-studio-page__panel estream-studio-page__panel--' + shown } role="tabpanel" id={ id + 'panel' } aria-labelledby={ id + shown }>
+                    <div className={ 'wplus-live-stream-studio-page__panel wplus-live-stream-studio-page__panel--' + shown } role="tabpanel" id={ id + 'panel' } aria-labelledby={ id + shown }>
                         { shown === 'chat' && <Chat /> }
                         { shown === 'guests' && (
                             <Guests empty={ (
-                                <p className="estream-studio-page__note">
+                                <p className="wplus-live-stream-studio-page__note">
                                     { live
                                         ? __( 'Nobody has asked to join the stage yet. Viewers who are logged in ask from the page of the stream, and you invite them here.', 'wordplus-live-stream' )
                                         : __( 'Once you are live, viewers can ask to join you on stage, and you invite them here.', 'wordplus-live-stream' ) }

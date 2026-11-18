@@ -7,7 +7,8 @@
  * the two differ, so a change to the protocol is made in both.
  */
 export { EasyStreamClient, cameraCodec, canShareScreen, personOf } from './client.js';
-export type { CameraCodec, ConnectionHealth, DeviceChoice, Devices, EasyStreamOptions, EasyStreamState, FloatingReaction, GrantSource, MediaPhase, MediaStats, Tally, Tile, VideoChoice } from './client.js';
+export type { CameraCodec, ConnectionHealth, DeviceChoice, Devices, EasyStreamOptions, EasyStreamState, FloatingReaction, GrantSource, MediaPhase, MediaStats, Tally, TestState, Tile, VideoChoice } from './client.js';
+export { TEST_CHANNEL, TEST_REGISTRY, TestFeed, openerTest, type TestMedia } from './test.js';
 export { pageMedia, type Media } from './media.js';
 export { choosableLayers, chosenLayer } from './playback.js';
 export type { AudioIn, AudioOut, LayerOut, LayerQuality, MediaServer, PictureLayer, PlaybackEvent, PlaybackEventKind, PlaybackSession, PlaybackStats, SendingStats, SendLimit, TransportIn, TransportOut, VideoIn, VideoOut } from './playback-types.js';

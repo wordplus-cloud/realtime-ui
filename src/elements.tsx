@@ -2,7 +2,7 @@
 // and the ring for the page's user wherever they are.
 //
 //     <call-button to="34" call="support:34:42" type="video" name="Ann" avatar="https://…">Call Ann</call-button>
-//     <room-button room="meeting:daily" type="video" title="Daily meeting">Join the meeting</room-button>
+//     <group-call-button call="meeting:daily" type="video" title="Daily meeting">Join the meeting</group-call-button>
 //     <online-list room="shop" call="support:{pair}" type="video"></online-list>
 //     <typing-line room="chat:34:42"></typing-line>
 //     <online-count room="shop"></online-count>
@@ -16,7 +16,7 @@
 // time a page asks for the call screen, and starts it on the page's calls.
 import React, { type ComponentType } from "react";
 import { createRoot, type Root } from "react-dom/client";
-import { configureUi, setUiUsers } from "./host.ts";
+import { configureUi, setUiUsers, type HostBackground } from "./host.ts";
 import { controllerFor, joinMedia, showingName, type CallsController, type OwnedCall } from "./sdk/controller.ts";
 import CallsApp, { type CallView } from "./sdk/calls-app.tsx";
 import { callUserOf, type CallUser, type SdkCalls } from "./sdk/types.ts";
@@ -57,6 +57,27 @@ export interface ElementsSettings {
      * here defines its names from now on, beside those the script defined as it ran.
      */
     prefix?: string;
+    /**
+     * Where the app serves the call effects, this package's dist/effects (`/realtime/effects/`): the device settings
+     * then offer a blurred or replaced background, loaded from there once someone turns one on.
+     */
+    effects?: string;
+    /**
+     * Where the app serves AI Noise Removal, this package's dist/noise (`/realtime/noise/`): the device settings then
+     * offer it, loaded from there once someone turns it on (UiHost.noiseUrl).
+     */
+    noise?: string;
+    /**
+     * AI Noise Removal before a person chooses: `off` (the default), or `auto`, which turns it on where the device can run
+     * it, with a notice that says so and offers Turn Off (UiHost.noiseDefault). It needs `noise` too.
+     */
+    noiseDefault?: 'off' | 'auto';
+    /** Pictures of the app's own for the effects' backgrounds, after the built-in ones (UiHost.backgrounds). */
+    backgrounds?: HostBackground[];
+    /** The pictures of WordPlus's catalog the app serves, by their ids in it (UiHost.builtInBackgrounds). */
+    builtInBackgrounds?: HostBackground[];
+    /** True lets people use a picture of their own device as the background, kept by their browser (UiHost.ownBackgrounds). */
+    ownBackgrounds?: boolean;
 }
 
 /**
@@ -99,6 +120,18 @@ export function start( settings: ElementsSettings = {} ): boolean {
     define( settings.prefix ?? given.prefix );
     lang = settings.lang ?? given.lang ?? ( document.documentElement.lang || 'en' );
     configureUi( translator( lang, { ...given.strings, ...settings.strings } ) );
+    const effects = settings.effects ?? given.effects;
+    if ( effects !== undefined ) configureUi( { effectsUrl: () => effects } );
+    const noise = settings.noise ?? given.noise;
+    if ( noise !== undefined ) configureUi( { noiseUrl: () => noise } );
+    const noiseDefault = settings.noiseDefault ?? given.noiseDefault;
+    if ( noiseDefault !== undefined ) configureUi( { noiseDefault: () => noiseDefault === 'auto' ? 'auto' : 'off' } );
+    const backgrounds = settings.backgrounds ?? given.backgrounds;
+    if ( backgrounds !== undefined ) configureUi( { backgrounds: () => backgrounds } );
+    const builtIn = settings.builtInBackgrounds ?? given.builtInBackgrounds;
+    if ( builtIn !== undefined ) configureUi( { builtInBackgrounds: () => builtIn } );
+    const own = settings.ownBackgrounds ?? given.ownBackgrounds;
+    if ( own !== undefined ) configureUi( { ownBackgrounds: () => own } );
     // The controls' tooltips, from the WordPlus SDK's floater where the page has it, else the package's own.
     if ( ! tooltipsSet ) {
         setOwnTooltips( ownTooltips() );
@@ -150,7 +183,7 @@ const claims: Array<{ pattern: string; take: ( call: OwnedCall ) => void; releas
 
 /**
  * A plugin's own screen for the calls it declares (`wordplusRealtimeUi.own( 'support:{a}:{b}', ( call ) => … )`): their
- * rings, the calls `<call-button>` places and the group calls `<room-button>` joins come to `take`, in place of our
+ * rings, the calls `<call-button>` places and the group calls `<group-call-button>` joins come to `take`, in place of our
  * screen, as the SDK's own objects (`call.kind`: `ring`, `call` or `group`). Better Messages' calls are its own and
  * never come here. Answers a function that takes the claim back.
  */
@@ -242,10 +275,16 @@ export async function place( call: string, to: CallUser, type: 'audio' | 'video'
     await controller!.place( call, to, type, peer );
 }
 
-/** Joins the group call `room`: what `<room-button>` does. */
-export async function join( room: string, type: 'audio' | 'video', title: string ): Promise<void> {
+/** Calls `to` with a token from the app's own route: what `<call-button token-url>` does. */
+export async function placeWithToken( url: string, to: CallUser, type: 'audio' | 'video', peer: { name: string; avatar?: string } ): Promise<void> {
     if ( ! controller && ! start() ) return;
-    await controller!.join( room, type, title );
+    await controller!.placeWithToken( url, to, type, peer );
+}
+
+/** Joins the group call `room`: what `<group-call-button>` does, with a token from the app's own route where `tokenUrl` names it. */
+export async function join( room: string, type: 'audio' | 'video', title: string, tokenUrl?: string | null ): Promise<void> {
+    if ( ! controller && ! start() ) return;
+    await controller!.join( room, type, title, undefined, tokenUrl );
 }
 
 const BUTTON_CSS = `
@@ -272,8 +311,10 @@ function button( element: HTMLElement, onClick: () => void ): void {
 }
 
 /**
- * `<call-button>`: a button that places a call. `call` names it, `{pair}` there filled in as `<online-list>` fills
- * it: the page user and `to`, in order (`support:{pair}` is `support:34:42` either way round).
+ * `<call-button>`: a button that places a call, with a token from the route of the app's own that `token-url` names, which
+ * gets `?to=34&type=video` and answers `{ token }`. `call` in its place names a call a `calls()` rule owns, `{pair}` there
+ * filled in as `<online-list>` fills it: the page user and `to`, in order (`support:{pair}` is `support:34:42` either way
+ * round).
  */
 class CallButton extends HTMLElement {
     static readonly tag = 'call-button';
@@ -282,31 +323,44 @@ class CallButton extends HTMLElement {
         super();
         button( this, () => {
             const to = callUserOf( this.getAttribute( 'to' ) );
+            const type = this.getAttribute( 'type' ) === 'audio' ? 'audio' : 'video';
+            const peer = { name: this.getAttribute( 'name' ) ?? '', avatar: this.getAttribute( 'avatar' ) ?? undefined };
+            const tokenUrl = this.getAttribute( 'token-url' );
+            if ( to !== null && tokenUrl ) {
+                void placeWithToken( tokenUrl, to, type, peer );
+                return;
+            }
             const named = this.getAttribute( 'call' ) ?? '';
             const user = pageRooms()?.user ?? null;
             if ( to === null || ! named || ( user === null && /\{(pair|me)\}/.test( named ) ) ) return;
             const call = callName( named, user, String( to ) );
-            const type = this.getAttribute( 'type' ) === 'audio' ? 'audio' : 'video';
-            const peer = { name: this.getAttribute( 'name' ) ?? '', avatar: this.getAttribute( 'avatar' ) ?? undefined };
             setUiUsers( [ [ to, peer ] ] );
             void place( call, to, type, peer );
         } );
     }
 }
 
-/** `<room-button>`: a button that joins a group call. */
-class RoomButton extends HTMLElement {
-    static readonly tag = 'room-button';
+/**
+ * `<group-call-button>`: a button that joins the group call `call` names, with a token from the route of the app's own that
+ * `token-url` names, which gets `?call=meeting:7&type=video` and answers `{ token }`. With no `token-url`, a `groupCalls()` rule owns it.
+ */
+class GroupCallButton extends HTMLElement {
+    static readonly tag: string = 'group-call-button';
 
     constructor() {
         super();
         button( this, () => {
-            const room = this.getAttribute( 'room' ) ?? '';
-            if ( ! room ) return;
+            const call = this.getAttribute( 'call' ) ?? this.getAttribute( 'room' ) ?? '';
+            if ( ! call ) return;
             const type = this.getAttribute( 'type' ) === 'audio' ? 'audio' : 'video';
-            void join( room, type, this.getAttribute( 'title' ) ?? room );
+            void join( call, type, this.getAttribute( 'title' ) ?? call, this.getAttribute( 'token-url' ) );
         } );
     }
+}
+
+/** `<room-button room="…">`: the same under the name it had first, which pages already written go on using. */
+class RoomButton extends GroupCallButton {
+    static readonly tag: string = 'room-button';
 }
 
 // The elements on a room (presence, typing, the count, the chat): each draws in a shadow root of its own, on the page's
@@ -318,7 +372,7 @@ abstract class RoomElement extends HTMLElement {
     static readonly hostCss: string = '';
     /** Its holder's class beside `realtime-calls`, which the shared stylesheet styles it by. */
     static readonly holderClass: string = '';
-    static readonly observedAttributes = [ 'room', 'call', 'type', 'title', 'event', 'reactions', 'placeholder', 'max-length', 'messages', 'to', 'name', 'avatar', 'start-call',
+    static readonly observedAttributes = [ 'room', 'call', 'token-url', 'type', 'title', 'event', 'reactions', 'placeholder', 'max-length', 'messages', 'to', 'name', 'avatar', 'start-call',
         'upload', 'accept', 'max-file-size', 'max-files', 'file-hosts' ];
     private holder: HTMLDivElement | null = null;
     private root: Root | null = null;
@@ -380,8 +434,9 @@ abstract class RoomElement extends HTMLElement {
 export { callName };
 
 /**
- * `<online-list room="shop" call="support:{pair}" type="video audio" title="In the shop">`: who is in a presence
- * room, with a call button for each of the others where `call` names the call (and the page has calls).
+ * `<online-list room="shop" token-url="/api/call-token" type="video audio" title="In the shop">`: who is in a presence
+ * room, with a call button for each of the others (where the page has calls), which asks the route of the app's own that
+ * `token-url` names, as `<call-button>` does. `call` in its place names a call a `calls()` rule owns, each row asking it first.
  */
 class OnlineElement extends RoomElement {
     static readonly tag = 'online-list';
@@ -391,24 +446,28 @@ class OnlineElement extends RoomElement {
 
     protected view( rt: SdkRooms, room: string ): React.ReactElement {
         const call = this.getAttribute( 'call' );
+        const tokenUrl = this.getAttribute( 'token-url' );
         const types = ( this.getAttribute( 'type' ) ?? 'video' ).split( /\s+/ ).filter( ( t ): t is 'audio' | 'video' => t === 'audio' || t === 'video' );
-        const calls = call ? pageCalls() : null;
-        // Each row's buttons once the app's rules let the page's user call that member (MayCall, may-call.tsx).
-        const actions = call && calls
+        const calls = call || tokenUrl ? pageCalls() : null;
+        const buttons = ( member: RoomPerson, to: CallUser, starts: ( type: 'audio' | 'video', peer: { name: string; avatar?: string } ) => void ) => types.map( ( type ) => (
+            <RowAction key={ type }
+                       icon={ type === 'audio' ? 'phone' : 'video' }
+                       label={ type === 'audio' ? _x( 'Audio Call', 'Users List', 'bp-better-messages' ) : _x( 'Video Call', 'Users List', 'bp-better-messages' ) }
+                       onClick={ () => {
+                           const peer = { name: member.name, avatar: member.avatar };
+                           setUiUsers( [ [ member.id, peer ] ] );
+                           starts( type, peer );
+                       } } />
+        ) );
+        // Each row's buttons: asking the app's route as each is pressed, or once the app's rules let the page's user call that
+        // member (MayCall, may-call.tsx).
+        const actions = ( call || tokenUrl ) && calls
             ? ( member: RoomPerson ) => {
                 const to = callUserOf( member.id );
                 if ( to === null ) return null;
-                const name = callName( call, rt.user, member.id );
-                return <MayCall calls={ calls } call={ name } to={ to }>{ types.map( ( type ) => (
-                    <RowAction key={ type }
-                               icon={ type === 'audio' ? 'phone' : 'video' }
-                               label={ type === 'audio' ? _x( 'Audio Call', 'Users List', 'bp-better-messages' ) : _x( 'Video Call', 'Users List', 'bp-better-messages' ) }
-                               onClick={ () => {
-                                   const peer = { name: member.name, avatar: member.avatar };
-                                   setUiUsers( [ [ member.id, peer ] ] );
-                                   void place( name, to, type, peer );
-                               } } />
-                ) ) }</MayCall>;
+                if ( tokenUrl ) return <>{ buttons( member, to, ( type, peer ) => void placeWithToken( tokenUrl, to, type, peer ) ) }</>;
+                const name = callName( call!, rt.user, member.id );
+                return <MayCall calls={ calls } call={ name } to={ to }>{ buttons( member, to, ( type, peer ) => void place( name, to, type, peer ) ) }</MayCall>;
             }
             : undefined;
         const List = views.OnlineList ?? RoomOnline;
@@ -498,6 +557,7 @@ class ChatElement extends RoomElement {
                      name={ this.getAttribute( 'name' ) ?? undefined }
                      avatar={ this.getAttribute( 'avatar' ) ?? undefined }
                      call={ call === null ? undefined : call === '' || call === 'true' ? true : call }
+                     tokenUrl={ this.getAttribute( 'token-url' ) ?? undefined }
                      startCall={ start === 'video' || start === 'audio' ? start : undefined }
                      components={ this.components() } />
         </PageCalls.Provider>;
@@ -526,15 +586,15 @@ const spots = new Set<CallSpotElement>();
 /**
  * `<call-spot call="match:{a}:{b}">`: a place in the page for the calls it names (a call's name, a pattern as the
  * server's rules write them, or every call with no `call`), in place of the window in the corner. A call moves in when
- * it starts, or once the spot is on the page, and back to the window when the spot goes, going on throughout. Its
- * children show while no call is in it, and with none it is hidden until a call comes. `data-call` holds the call's
- * name while one is here. With `join` (`video`, or `audio`), the group call `call` names is joined as the spot comes
- * onto the page, as its `<room-button>` would: once, so someone who leaves it isn't brought back while the spot stays.
+ * it starts, or once the spot is on the page, the page scrolling to it where it is off the screen, and back to the window
+ * when the spot goes, going on throughout. Its children show while no call is in it, and with none it is hidden until a
+ * call comes. `data-call` holds the call's name while one is here. With `join` (`video`, or `audio`), the group call `call` names is joined as the spot comes
+ * onto the page, as its `<group-call-button>` would: once, so someone who leaves it isn't brought back while the spot stays.
  * It joins with the camera and the microphone off, unless `join-with` names them (`microphone`, `camera`, or both).
  */
 class CallSpotElement extends HTMLElement {
     static readonly tag = 'call-spot';
-    static readonly observedAttributes = [ 'call', 'join' ];
+    static readonly observedAttributes = [ 'call', 'join', 'token-url' ];
     private place: HTMLDivElement | null = null;
     private release: ( () => void ) | null = null;
     private unplace: ( () => void ) | null = null;
@@ -580,7 +640,7 @@ class CallSpotElement extends HTMLElement {
         const join = this.getAttribute( 'join' );
         if ( join === null || ! call || call.includes( '{' ) || this.joined === call ) return;
         this.joined = call;
-        void controller.join( call, join === 'audio' ? 'audio' : 'video', call, joinMedia( this.getAttribute( 'join-with' ) ) );
+        void controller.join( call, join === 'audio' ? 'audio' : 'video', call, joinMedia( this.getAttribute( 'join-with' ) ), this.getAttribute( 'token-url' ) );
     }
 
     private unclaim(): void {
@@ -612,7 +672,7 @@ let prefix = loadPrefix;
  */
 export function define( given?: string ): void {
     if ( given !== undefined ) prefix = validPrefix( given );
-    defineElements( [ CallButton, RoomButton, OnlineElement, TypingElement, CountElement, ChatElement, CallScreenElement, CallSpotElement ], prefix );
+    defineElements( [ CallButton, GroupCallButton, RoomButton, OnlineElement, TypingElement, CountElement, ChatElement, CallScreenElement, CallSpotElement ], prefix );
 }
 
 export { configureUi, setUiUsers };

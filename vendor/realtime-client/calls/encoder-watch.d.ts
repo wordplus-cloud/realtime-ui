@@ -17,7 +17,9 @@ import { type CallSettings, type CameraCodec, type CameraTune } from "./room-pub
  * - the camera goes out in H.264 or H.265, a layer it sends in hardware;
  * - its source gives at least HARDWARE_DROP_MIN_CAPTURED frames a second;
  * - the browser says nothing limits a layer it sends (no CPU, no bandwidth);
- * - and the hardware takes at most HARDWARE_DROP_MAX_ENCODE_MS a frame, so it isn't a slow machine;
+ * - and the hardware keeps up with its source: it takes no longer a frame than HARDWARE_DROP_MAX_ENCODE_MS, or than
+ *   HARDWARE_KEEP_UP_SHARE of the time between two of its source's frames where that is longer (hardwareSlowMs()), so
+ *   it isn't a slow machine;
  * when the layer that keeps the most encodes HARDWARE_DROP_SHARE or less of the frames its source gave in all: the whole
  * camera's taken off. A software encoder short of bits drops its own layer's frames alone (the lab's VP8 under heavy
  * grain: 720p at 2 of 15, its 360p and 180p at 15), and a dim room's camera gives fewer frames, which every layer sends.
@@ -28,8 +30,9 @@ export declare const HARDWARE_DROP_READ_MS = 5000;
 export declare const HARDWARE_DROP_READINGS = 6;
 export declare const HARDWARE_DROP_WARMUP = 2;
 export declare const HARDWARE_DROP_SHARE = 0.7;
-export declare const HARDWARE_DROP_MIN_CAPTURED = 10;
+export declare const HARDWARE_DROP_MIN_CAPTURED = 5;
 export declare const HARDWARE_DROP_MAX_ENCODE_MS = 25;
+export declare const HARDWARE_KEEP_UP_SHARE = 0.8;
 export declare const HARDWARE_DROP_MIN_TARGET = 100000;
 export declare const HARDWARE_DROP_MIN_SENT = 0.25;
 export declare const HARDWARE_WATCH_GONE_MS: number;
@@ -93,6 +96,12 @@ export interface EncoderReading {
 export declare function cpuHeld(readings: EncoderReading[], count?: number, share?: number): boolean;
 /** How many readings readMs apart make `seconds` (the policy's dropWatchS, cpuWatchS): one at least. */
 export declare const readingsFor: (seconds: number, readMs?: number) => number;
+/**
+ * The longest a hardware encoder may take a frame and still be keeping up with a source giving `captured` frames a
+ * second: the node's maxEncodeMs (25 by default), or HARDWARE_KEEP_UP_SHARE of the time between two frames where that
+ * is longer (27 ms at 30 a second, 53 at 15, 80 at 10).
+ */
+export declare function hardwareSlowMs(captured: number, n?: WatchNumbers): number;
 /**
  * A reading of a hardware encoder that isn't held back by anything the browser names (above): the frames a second of
  * the layer it sends that keeps the most, and its source's; null for any other.

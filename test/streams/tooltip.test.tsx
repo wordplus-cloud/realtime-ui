@@ -12,16 +12,16 @@ function controls(){
     const { asClient } = fakeClient();
     return render(
         <EasyStreamProvider client={ asClient }>
-            <button type="button" aria-label="Mute" data-estream-tip="Mute (m)">a</button>
-            <button type="button" data-estream-tip="Picture-in-picture (p)"><span>b</span></button>
-            <span data-estream-tip="Slow mode" aria-description="Slow mode" tabIndex={ 0 }>10s</span>
+            <button type="button" aria-label="Mute" data-wplus-live-stream-tip="Mute (m)">a</button>
+            <button type="button" data-wplus-live-stream-tip="Picture-in-picture (p)"><span>b</span></button>
+            <span data-wplus-live-stream-tip="Slow mode" aria-description="Slow mode" tabIndex={ 0 }>10s</span>
         </EasyStreamProvider>
     );
 }
 
-const tip = () => document.getElementById( 'estream-tooltip' );
-const showing = () => tip()?.classList.contains( 'estream-tooltip--on' ) ? tip()!.textContent : null;
-const button = ( text : string ) => document.querySelector<HTMLElement>( '[data-estream-tip="' + text + '"]' )!;
+const tip = () => document.getElementById( 'wplus-live-stream-tooltip' );
+const showing = () => tip()?.classList.contains( 'wplus-live-stream-tooltip--on' ) ? tip()!.textContent : null;
+const button = ( text : string ) => document.querySelector<HTMLElement>( '[data-wplus-live-stream-tip="' + text + '"]' )!;
 
 describe( 'our own tooltips', () => {
     it( 'shows a control\'s at once over it, moves on to the next, and hides on a click or leaving', () => {
@@ -69,7 +69,7 @@ describe( 'our own tooltips', () => {
         const first = controls();
         const second = controls();
         fireEvent.focusIn( button( 'Slow mode' ) );
-        expect( document.querySelectorAll( '#estream-tooltip' ).length ).toBe( 1 );
+        expect( document.querySelectorAll( '#wplus-live-stream-tooltip' ).length ).toBe( 1 );
 
         first.unmount();
         expect( tip() ).not.toBeNull();

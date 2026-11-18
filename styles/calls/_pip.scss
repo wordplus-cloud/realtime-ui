@@ -1,0 +1,11 @@
+// A group call's picture-in-picture window (group-pip.tsx) is the browser's own of this video, which plays the canvas
+// pip-canvas.ts draws: on the page and out of sight, laid out so the browser plays it. The window itself has no rules.
+.wplus-call-wrap .wplus-pip-source {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 2px;
+    height: 2px;
+    opacity: 0;
+    pointer-events: none;
+}

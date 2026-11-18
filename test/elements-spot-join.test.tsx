@@ -35,6 +35,7 @@ it( 'joins the group call of a <call-spot join> as the spot comes onto the page,
     const group = Object.assign( new Emitter(), { state: 'connected', people: () => [], setTrack: vi.fn( async () => {} ), leave: vi.fn() } );
     const calls = Object.assign( new Emitter(), { start: vi.fn(), group: vi.fn( async () => group ), people: vi.fn( async () => [] ) } );
     ( globalThis as Record<string, unknown> ).wordplusRealtimeCalls = { page: () => ( { rt: { user: '42' }, calls } ) };
+    const into = vi.spyOn( Element.prototype, 'scrollIntoView' ).mockImplementation( () => {} );
 
     // On the page before the screens start: joined once they do. A pattern's spot joins nothing, as it names no one call.
     document.body.insertAdjacentHTML( 'beforeend', '<call-spot call="meeting:daily" join="video"><p>The daily meeting</p></call-spot><call-spot call="meeting:{id}" join></call-spot>' );
@@ -44,6 +45,9 @@ it( 'joins the group call of a <call-spot join> as the spot comes onto the page,
     expect( calls.group.mock.calls ).toEqual( [ [ 'meeting:daily', { type: 'video' } ] ] );
     const spot = document.querySelector( 'call-spot' )!;
     expect( spot.getAttribute( 'data-call' ) ).toBe( 'meeting:daily' );
+    // Joined by the page and not by the person: the page stays where they are reading it.
+    expect( into ).not.toHaveBeenCalled();
+    into.mockRestore();
     // In with the camera and the microphone off: the browser asked for neither, "You are muted" included, which listens
     // only once the microphone was on in the call.
     expect( navigator.mediaDevices.getUserMedia ).not.toHaveBeenCalled();

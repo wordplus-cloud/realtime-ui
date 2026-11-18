@@ -61,6 +61,7 @@ export class Connector {
                 store: this.options.store?.() ?? null,
                 doc: this.options.doc ?? null,
                 options: { transports: ['websocket'], ...this.options.options },
+                direct: this.options.direct !== false,
                 manager: this.options.manager,
                 random: this.options.random,
             });

@@ -1,10 +1,11 @@
 import { calls as callsOf } from './calls.js';
 export { calls, Calls, Call, Incoming } from './calls.js';
-export { GroupCall } from './group-call.js';
+export { GroupCall, CALL_ACTS, BASE_ACTS, ASK_ANSWERS, actsOf, } from './group-call.js';
 export { callUserOf } from '../calls/users.js';
+export { listDevices } from './devices.js';
 export { Invite } from './invite.js';
 export { Stream } from './stream.js';
-export { loadLiveKit } from './media.js';
+export { loadRoomClient, loadLiveKit } from './media.js';
 export { supportsP2P } from '../calls/index.js';
 let shared = null;
 /**

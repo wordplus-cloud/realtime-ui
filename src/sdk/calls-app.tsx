@@ -9,7 +9,7 @@ import { infoOf, type SdkCall, type SdkGroupCall } from "./types.ts";
 import type { CallsController, JoinMedia, Showing } from "./controller.ts";
 import { soundOn, useSoundHeld } from "./sound.ts";
 import { Piece } from "../pieces.tsx";
-import Icon from "../primitives/icon.tsx";
+import Icon from "../primitives/icons.tsx";
 import { _x } from "../inc/globals.ts";
 
 /**
@@ -43,6 +43,16 @@ export default function CallsApp( { controller, view = CallScreen }: { controlle
             holder.remove();
         };
     }, [ controller, holder ] );
+
+    // A call arriving in a spot off the screen would show nowhere: whoever just answered it sees nothing, and the other side,
+    // told nothing here shows its camera, stops sending it until they scroll to it (realtime-client's calls/view.ts). Once,
+    // as it arrives: the page is theirs to scroll after that. A group call the page joined by itself (`media`) leaves it
+    // where they are reading.
+    const spot = shown.spot;
+    useLayoutEffect( () => {
+        const showing = controller.snapshot().showing;
+        if ( spot && ! ( showing?.kind === 'group' && showing.media ) ) spot.scrollIntoView( { block: "nearest" } );
+    }, [ controller, spot ] );
 
     return <>
         { shown.rings.length > 0 && <div className="realtime-call-rings">

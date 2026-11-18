@@ -1,5 +1,6 @@
 import { browserLabel, platformLabel } from "./platform.js";
 import { randomId } from "./types.js";
+import { selectedPair } from "./pair.js";
 /**
  * What a one-to-one call that runs over LiveKit was between.
  *
@@ -12,8 +13,8 @@ import { randomId } from "./types.js";
  * SFU-mode record without a joined session, and this sends it.
  *
  * The leg described is the one this side actually has: client to SFU. Both of
- * LiveKit's peer connections are read and the first selected pair wins, since
- * they run over the same transport.
+ * LiveKit's peer connections are read and the publisher's pair in use wins,
+ * since they run over the same transport.
  */
 const REPORT_INTERVAL = 15000;
 function pairFrom(report) {
@@ -24,25 +25,17 @@ function pairFrom(report) {
         if (entry && entry.id)
             byId.set(entry.id, entry);
     });
-    let pair = null;
-    report.forEach((entry) => {
-        if (pair)
-            return;
-        if (entry.type !== 'candidate-pair')
-            return;
-        if (entry.state !== 'succeeded')
-            return;
-        if (!entry.selected && !entry.nominated)
-            return;
-        const local = byId.get(entry.localCandidateId);
-        const remote = byId.get(entry.remoteCandidateId);
-        pair = {
-            local: local ? String(local.candidateType ?? '') : '',
-            remote: remote ? String(remote.candidateType ?? '') : '',
-            protocol: local ? String(local.relayProtocol ?? local.protocol ?? '') : ''
-        };
-    });
-    return pair;
+    // The pair in use, not any pair once nominated (pair.ts).
+    const entry = selectedPair(report);
+    if (!entry)
+        return null;
+    const local = byId.get(entry.localCandidateId);
+    const remote = byId.get(entry.remoteCandidateId);
+    return {
+        local: local ? String(local.candidateType ?? '') : '',
+        remote: remote ? String(remote.candidateType ?? '') : '',
+        protocol: local ? String(local.relayProtocol ?? local.protocol ?? '') : ''
+    };
 }
 export class SfuReporter {
     constructor(transport, callId) {

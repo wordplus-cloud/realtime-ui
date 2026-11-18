@@ -27,14 +27,31 @@
  *   any key missing is fetched from the app's server. The realtime server reads none of it, and never hands out a key.
  * - **The app's users:** `users( ids )` reads the directory every plugin on a site shares, names, avatars and profile
  *   links sealed with the day's key, which this socket may read once the app vouched for its user (`identify`).
+ * - **On another website** (`embedded`, for a chat outside WordPress): a page whose origin the site lists in
+ *   WordPlus Cloud, which the realtime server takes by its Origin alone. Its connection is in the page and through the
+ *   realtime server's own name alone (embedded.ts), its requests go to the site's absolute routes without cookies
+ *   (site.ts), and a refusal of the page itself (`wrong_origin`, also met after the realtime server let it go) is
+ *   final: `unavailable` says so once, and the plugin goes on over its own REST routes.
  */
 import { type AttachOptions, Channel, type Listener, type PendingSocket } from './channel.js';
+import { RealtimeError, type RealtimeErrorCode, type RealtimeErrorEvent } from './errors.js';
 import { Keyring } from './keys.js';
 import { type RealtimeOptions } from './registry.js';
+import type { VisitorSource } from './visitor.js';
+export { RealtimeError, type RealtimeErrorCode, type RealtimeErrorEvent };
 export declare const ROOMS_NAMESPACE = "/channels";
-export interface Member {
+/**
+ * The refusals of a page on another website that no retry mends: its origin isn't one the site lists live (removed,
+ * paused, or waiting for a site of the licence), or the site has no realtime at all. The page goes on without the
+ * realtime server (`unavailable`).
+ */
+export declare const EMBEDDED_FINAL: string[];
+/** How long a page on another website waits to connect again, by how many times it has in a row. */
+export declare const EMBEDDED_RETRY_MS: number[];
+/** Someone in a presence room: `Info` is what your rule's `info` or the user's profile gives them, when you name it. */
+export interface Member<Info = unknown> {
     id: string;
-    info: unknown;
+    info: Info;
 }
 /** What the app's auth route answers: one token for the rooms it allows, and why it refused the others. */
 export interface Grant {
@@ -104,16 +121,43 @@ export interface RoomsOptions extends RealtimeOptions {
      * one connection, which Better Messages' messenger also rides on WordPress.
      */
     perUser?: boolean;
-}
-/** An error the realtime server or the app's server answered, by its code (`forbidden`, `rate_limited`, `too_large` …). */
-export declare class RealtimeError extends Error {
-    readonly code: string;
-    constructor(code: string);
+    /**
+     * The page is on another website than the site's own, one whose origin the site lists in WordPlus Cloud (Live
+     * Support's chat on a website outside WordPress):
+     * - the connection is in the page, never the site's SharedWorker, which another origin cannot start, and through
+     *   the realtime server's own name alone, never a node directly, so the website's CSP needs `wss://ws.wordplus.cloud`
+     *   and nothing more (embedded.ts);
+     * - the auth, keys and calls routes are asked at their absolute address alone, the site's REST base, without
+     *   cookies, carrying the visitor (`visitor`), and a relative one is never asked (site.ts);
+     * - the realtime server refusing the page (EMBEDDED_FINAL: `wrong_origin`, also when the page connects again after
+     *   the server let it go, as when the site took the website off) ends its rooms: `unavailable` ({ code }) fires
+     *   once, every room fails with the code, and nothing is tried again, so the plugin goes on over its own REST routes.
+     *   A refusal a later try may pass (`try_later`, `over_capacity`), and the server letting the page go, connect again
+     *   after 1, 2, 4, 8, 15 and then every 30 seconds.
+     */
+    embedded?: boolean;
+    /**
+     * The visitor's token for the site's routes (X-WordPlus-Visitor), or a function that answers it at each request,
+     * which stands over the page's shared one (`window.wordplusVisitor`, localStorage). On another website the page's are
+     * that website's, so a plugin gives its own there.
+     */
+    visitor?: VisitorSource;
 }
 /** The page's rooms: open one per site or app with `rooms()`. */
 export declare function rooms(options: RoomsOptions): Rooms;
 /** The events of `Rooms` itself: the connection's, and whatever the app's server sends the user. */
-export type RoomsEvent = 'connected' | 'disconnected' | 'error' | 'moved' | 'signed_out' | (string & {});
+export type RoomsEvent = 'connected' | 'disconnected' | 'error' | 'moved' | 'signed_out' | 'unavailable' | (string & {});
+/** What the connection's own events give their listeners. */
+export interface ConnectionEvents {
+    connected: [];
+    disconnected: [reason: string];
+    moved: [];
+    signed_out: [];
+    error: [error: RealtimeErrorEvent];
+    unavailable: [error: {
+        code: RealtimeErrorCode;
+    }];
+}
 /** What a page answers the app's server's ask with (`answer()`): the reply, or a promise of it. */
 export type Answerer = (data: unknown, meta: {
     at: number;
@@ -152,8 +196,21 @@ export declare class Rooms {
     /** Events waiting for a key, delivered in the order they came. */
     private queue;
     private waiting;
+    /** Gives the keyring back as this connection closes (keys.ts, lend()). */
+    private readonly releaseKeys;
+    /** On another website (`embedded`): why the realtime server will not take the page, once it said so for good. */
+    private ended;
+    /** On another website: the next try to connect, how many came in a row, and since when the socket is up. */
+    private retry;
+    private retries;
+    private upSince;
     constructor(options: RoomsOptions);
     get connected(): boolean;
+    /**
+     * On another website (`embedded`): why the realtime server will not take this page (EMBEDDED_FINAL), once it said
+     * so, or null while it may. `unavailable` fired then.
+     */
+    get unavailable(): string | null;
     /** The user the app vouched for on this page, or null. */
     get user(): string | null;
     /**
@@ -162,8 +219,14 @@ export declare class Rooms {
      * as `not_included`), `moved`: the connection moved to another node without a drop, and `signed_out`: the app's
      * server disconnected the user, whose identity and rooms the page asks it for again.
      */
-    on(event: RoomsEvent, fn: Listener): this;
-    once(event: RoomsEvent, fn: Listener): this;
+    on<K extends keyof ConnectionEvents>(event: K, fn: (...args: ConnectionEvents[K]) => void): this;
+    on<T = any>(event: RoomsEvent, fn: (data: T, meta: {
+        at?: number;
+    }) => void): this;
+    once<K extends keyof ConnectionEvents>(event: K, fn: (...args: ConnectionEvents[K]) => void): this;
+    once<T = any>(event: RoomsEvent, fn: (data: T, meta: {
+        at?: number;
+    }) => void): this;
     off(event?: RoomsEvent, fn?: Listener): this;
     /**
      * Answers what the app's server asks this user's pages (`user( id ).ask( event, data )`): `fn( data, { at } )`
@@ -188,19 +251,32 @@ export declare class Rooms {
      * the page's user, `timeout` off line.
      */
     users(ids: Array<number | string>): Promise<Record<string, UserProfile>>;
-    /** A room of the app, joined: the same one again for the same name. */
-    join(name: string): Room;
+    /**
+     * A room of the app, joined: the same one again for the same name. `Events` says what its events carry and `Info`
+     * what its members bring, for your own checking and nothing else: `rt.join<{ message: { text: string } }>( 'chat:1' )`.
+     */
+    join<Events extends RoomEvents = RoomEvents, Info = unknown>(name: string): Room<Events, Info>;
     /** A room this tab joined, or undefined. */
-    room(name: string): Room | undefined;
+    room<Events extends RoomEvents = RoomEvents, Info = unknown>(name: string): Room<Events, Info> | undefined;
     /** Leaves a room: the browser's other tabs keep theirs. */
     leave(name: string): void;
     /** Leaves every room: the browser's other tabs keep the socket, the last one closes it. */
     close(): void;
     /**
+     * On another website: connects again after a wait that grows with each try in a row (EMBEDDED_RETRY_MS), the first
+     * wait again once a connection stayed up a minute. Nobody else asks again for a page the server let go or put off.
+     */
+    private connectAgain;
+    /**
+     * On another website: the realtime server will not take the page (EMBEDDED_FINAL). Its rooms fail with the code, the
+     * connection is let go and nothing is tried again; `unavailable` tells the plugin, which goes on over its REST routes.
+     */
+    private end;
+    /**
      * @internal Room.emit(): sealed with the room's newest key held, which those in it hold, binary parts carried in
      * it; as it is in a room the app gave no key for. Answers the cloud's ack, or null when none was asked.
      */
-    send(room: Room, event: string, data: unknown, mode: {
+    send(room: Room<any, any>, event: string, data: unknown, mode: {
         ack: boolean;
         volatile?: boolean;
         timeout?: number;
@@ -208,21 +284,24 @@ export declare class Rooms {
         id: string;
         at: number;
     } | null>;
+    /**
+     * An emit nothing waits for. The server answers only when asked, so with no answer a page never learns its rule left
+     * an event out: the first of each event in a room asks, and a refusal is said once (Room.refused()). The rest go
+     * without an answer, as they always went.
+     */
+    private sendPlain;
     /** @internal Room.history(): a page of the room's history, opened, oldest first. */
-    history(room: Room, ask: {
+    history<Events extends RoomEvents>(room: Room<Events, any>, ask: {
         before?: string;
         after?: string;
         limit?: number;
     }): Promise<{
-        events: Array<{
-            event: string;
-            data: unknown;
-        } & EventMeta>;
+        events: Array<HistoryEvent<Events>>;
         more: boolean;
     }>;
     /** @internal Room.members(): a page of a presence room's members, opened. */
-    membersPage(room: Room, cursor?: string, limit?: number): Promise<{
-        list: Member[];
+    membersPage<Info>(room: Room<any, Info>, cursor?: string, limit?: number): Promise<{
+        list: Array<Member<Info>>;
         next: string;
     }>;
     /** @internal Online: a request on the socket, needing the page's user. */
@@ -286,23 +365,45 @@ export declare class Rooms {
     private deliver;
 }
 export type RoomState = 'joining' | 'joined' | 'failed' | 'left';
+/** What a room's events carry, by name: any event and any data, until you say which (`rt.join<Events>()`). */
+export type RoomEvents = Record<string, any>;
+/** What a room's own events give their listeners. */
+export interface RoomOwnEvents<Info = unknown> {
+    joined: [members: Array<Member<Info>>];
+    join: [member: Member<Info>];
+    leave: [member: {
+        id: string;
+    }];
+    count: [count: number];
+    error: [error: RealtimeErrorEvent];
+    kicked: [error: {
+        code: 'kicked';
+    }];
+}
+/** An event of the room's history: its name and data as `Events` says, and what comes with every event. */
+export type HistoryEvent<Events extends RoomEvents = RoomEvents> = {
+    [K in keyof Events & string]: {
+        event: K;
+        data: Events[K];
+    } & EventMeta;
+}[keyof Events & string];
 /** An emitter for a room with one setting: `room.volatile`, `room.timeout( ms )`. */
-export interface RoomEmitter {
-    emit(event: string, data?: unknown): void;
-    emitWithAck(event: string, data?: unknown): Promise<{
+export interface RoomEmitter<Events extends RoomEvents = RoomEvents> {
+    emit<K extends keyof Events & string>(event: K, data?: Events[K]): void;
+    emitWithAck<K extends keyof Events & string>(event: K, data?: Events[K]): Promise<{
         id: string;
         at: number;
     }>;
 }
 /** A room this tab joined: its events, what it may send, and for a presence room who is in it. */
-export declare class Room {
+export declare class Room<Events extends RoomEvents = RoomEvents, Info = unknown> {
     private readonly owner;
     readonly name: string;
     state: RoomState;
     /** Why it failed: `forbidden`, `expired`, `bad_token`, `full`, `kicked`, `auth_failed` … */
-    error: string | null;
+    error: RealtimeErrorCode | null;
     /** A presence room's members, as many as the server listed and the changes since, by id. */
-    readonly members: Map<string, unknown>;
+    readonly members: Map<string, Info>;
     /** How many are in the room, for a room that counts (presence, or its rule's `count`); null for one that doesn't. */
     count: number | null;
     /** Resolves once the room is joined; an emit before then waits for it. */
@@ -312,50 +413,59 @@ export declare class Room {
     private resolveReady;
     private rejectReady;
     private readonly listeners;
+    private readonly asked;
     constructor(owner: Rooms, name: string);
     /**
      * An event of the room, `fn( data, meta )` with meta `{ from, id, at, replayed? }`; or the room's own: `joined`
      * (the members), `join` ({ id, info }), `leave` ({ id }), `count` (n), `error` ({ code }) and `kicked`.
      */
-    on(event: string, fn: Listener): this;
-    once(event: string, fn: Listener): this;
+    on<K extends keyof RoomOwnEvents<Info>>(event: K, fn: (...args: RoomOwnEvents<Info>[K]) => void): this;
+    on<K extends keyof Events & string>(event: K, fn: (data: Events[K], meta: EventMeta) => void): this;
+    once<K extends keyof RoomOwnEvents<Info>>(event: K, fn: (...args: RoomOwnEvents<Info>[K]) => void): this;
+    once<K extends keyof Events & string>(event: K, fn: (data: Events[K], meta: EventMeta) => void): this;
     off(event?: string, fn?: Listener): this;
     /** Every event of the room, `fn( event, data, meta )`, as Socket.IO's `onAny`. */
     onAny(fn: Listener): this;
     offAny(fn?: Listener): this;
-    /** Sends an event to the room's others, as its rule allows; nothing is waited for. */
-    emit(event: string, data?: unknown): void;
+    /**
+     * Sends an event to the room's others, as its rule allows; nothing is waited for. An event the rule or the server
+     * turns away is said once, in the console and as the room's `error` ({ code, event }).
+     */
+    emit<K extends keyof Events & string>(event: K, data?: Events[K]): void;
     /** Sends an event and waits for the cloud to take it (checked, kept, sent): `{ id, at }`, or a RealtimeError. */
-    emitWithAck(event: string, data?: unknown): Promise<{
+    emitWithAck<K extends keyof Events & string>(event: K, data?: Events[K]): Promise<{
         id: string;
         at: number;
     }>;
     /** Sends without waiting and without keeping: dropped rather than queued while off line, as Socket.IO's `volatile`. */
-    get volatile(): RoomEmitter;
+    get volatile(): RoomEmitter<Events>;
     /** An emitter whose acks wait at most `ms`. */
-    timeout(ms: number): RoomEmitter;
+    timeout(ms: number): RoomEmitter<Events>;
     /** A page of the room's history, oldest first: the newest `limit` (50), or those before or after an event's id. */
     history(ask?: {
         before?: string;
         after?: string;
         limit?: number;
     }): Promise<{
-        events: Array<{
-            event: string;
-            data: unknown;
-        } & EventMeta>;
+        events: HistoryEvent<Events>[];
         more: boolean;
     }>;
     /** A page of a presence room's members past the first ones listed, from `cursor` ('0' first); `next` is '0' after the last. */
     membersPage(cursor?: string, limit?: number): Promise<{
-        list: Member[];
+        list: Member<Info>[];
         next: string;
     }>;
     leave(): void;
+    /** @internal Whether this is the first plain emit of the event in the room, which asks for an answer. */
+    firstOf(event: string): boolean;
+    /** @internal A plain emit was turned away: said once for each event, as a page sends it again and again. */
+    refused(event: string, code: RealtimeErrorCode): void;
+    /** A plain emit that could not leave. A room left on purpose says nothing: the page knows, and may well say goodbye. */
+    private emitFailed;
     /** @internal */
     joined(members?: {
         count?: number;
-        list?: Member[];
+        list?: Array<Member<Info>>;
     }, count?: number): void;
     /** @internal */
     failed(code: string): void;

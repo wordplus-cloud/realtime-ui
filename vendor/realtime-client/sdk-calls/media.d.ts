@@ -1,8 +1,3 @@
-/**
- * The mesh's room client: WordPlus Mesh's @wordplus/rtc-client, built as a script of its own
- * (`realtime-rooms.min.js`, window.WordPlusRTC) and loaded only when a page first needs a room: a group call,
- * or a call between two people that leaves the direct path. Every page that only places direct calls never loads it.
- */
 /** The parts of the room client the kit uses, as loose as the library's own types would make them here. */
 export interface LiveKit {
     Room: new (options?: Record<string, unknown>) => any;
@@ -22,8 +17,12 @@ export interface LiveKit {
     };
     isE2EESupported?: () => boolean;
 }
+/** The room client as the kit uses it. */
+export type RoomClient = LiveKit;
 /** The room client, from `url` the first time: the script the PHP package names in the page's settings (`rooms`). */
-export declare function loadLiveKit(url: string | undefined): Promise<LiveKit>;
+export declare function loadRoomClient(url: string | undefined): Promise<RoomClient>;
+/** @deprecated The same under its old name: `loadRoomClient()`. */
+export declare const loadLiveKit: typeof loadRoomClient;
 /**
  * The room client's encryption worker, which encrypts and decrypts every frame: `realtime-rooms-e2ee.worker.js` beside the
  * rooms script unless the page names it. A worker starts only from the page's own address, so one served from another

@@ -1,17 +1,17 @@
 // Easy Stream's look: the player dark, the rest light, dark, or as the visitor's system is set. Every
-// colour is a custom property on the theme root (.estream-theme, which EasyStreamApp renders), so a site
+// colour is a custom property on the theme root (.wplus-live-stream-theme, which EasyStreamApp renders), so a site
 // can restyle it without overriding rules; the accent and the corners also come from its appearance
 // settings (appearance.ts) as inline properties.
 
 // Dark paints a card of its own, so its light text never lands on a light page.
 @mixin dark {
-    --estream-text: #eceef1;
-    --estream-muted: #9aa0aa;
-    --estream-surface: #17191d;
-    --estream-surface-2: #21242a;
-    --estream-border: #30343c;
-    --estream-background: #0e1013;
-    --estream-padding: 14px;
+    --wplus-live-stream-text: #eceef1;
+    --wplus-live-stream-muted: #9aa0aa;
+    --wplus-live-stream-surface: #17191d;
+    --wplus-live-stream-surface-2: #21242a;
+    --wplus-live-stream-border: #30343c;
+    --wplus-live-stream-background: #0e1013;
+    --wplus-live-stream-padding: 14px;
     color-scheme: dark;
 }
 
@@ -30,54 +30,54 @@
     }
 }
 
-.estream-theme {
-    --estream-accent: #2f6fde;
-    --estream-accent-text: #fff;
-    --estream-live: #e0322b;
-    --estream-danger: #c62828;
-    --estream-text: #1d1f23;
-    --estream-muted: #6b7079;
-    --estream-surface: #fff;
-    --estream-surface-2: #f4f5f7;
-    --estream-border: #e3e5e9;
-    --estream-stage: #0c0d0f;
-    --estream-radius: 8px;
-    --estream-font: inherit;
+.wplus-live-stream-theme {
+    --wplus-live-stream-accent: #2f6fde;
+    --wplus-live-stream-accent-text: #fff;
+    --wplus-live-stream-live: #e0322b;
+    --wplus-live-stream-danger: #c62828;
+    --wplus-live-stream-text: #1d1f23;
+    --wplus-live-stream-muted: #6b7079;
+    --wplus-live-stream-surface: #fff;
+    --wplus-live-stream-surface-2: #f4f5f7;
+    --wplus-live-stream-border: #e3e5e9;
+    --wplus-live-stream-stage: #0c0d0f;
+    --wplus-live-stream-radius: 8px;
+    --wplus-live-stream-font: inherit;
     // Behind the whole player: the page's own, unless the theme paints a card.
-    --estream-background: transparent;
-    --estream-padding: 0px;
+    --wplus-live-stream-background: transparent;
+    --wplus-live-stream-padding: 0px;
     // What sits over the picture: always light on dark, whatever the theme.
-    --estream-over: rgba(18, 20, 24, 0.88);
-    --estream-over-text: #f4f5f7;
+    --wplus-live-stream-over: rgba(18, 20, 24, 0.88);
+    --wplus-live-stream-over-text: #f4f5f7;
 }
 
-.estream-theme--dark {
+.wplus-live-stream-theme--dark {
     @include dark;
 }
 
 @media (prefers-color-scheme: dark) {
-    .estream-theme--auto {
+    .wplus-live-stream-theme--auto {
         @include dark;
     }
 }
 
 // The shell is what the layout measures: a sidebar's width of chat beside the player when there is
 // room, below it when there isn't, whatever the page's own width. Named, for what inside it goes by its width alone.
-.estream-shell {
-    container: estream-shell / inline-size;
+.wplus-live-stream-shell {
+    container: wplus-live-stream-shell / inline-size;
     width: 100%;
 }
 
-.estream-app {
+.wplus-live-stream-app {
     display: grid;
     grid-template-columns: minmax(0, 1fr) 340px;
     gap: 16px;
     position: relative;
-    padding: var(--estream-padding);
-    border-radius: calc(var(--estream-radius) + var(--estream-padding) / 2);
-    background: var(--estream-background);
-    color: var(--estream-text);
-    font-family: var(--estream-font);
+    padding: var(--wplus-live-stream-padding);
+    border-radius: calc(var(--wplus-live-stream-radius) + var(--wplus-live-stream-padding) / 2);
+    background: var(--wplus-live-stream-background);
+    color: var(--wplus-live-stream-text);
+    font-family: var(--wplus-live-stream-font);
     font-size: 15px;
     line-height: 1.45;
     text-align: left;
@@ -100,13 +100,13 @@
 }
 
 // No chat, or chat always below the stream.
-.estream-app--no-chat,
-.estream-theme--chat-below .estream-app {
+.wplus-live-stream-app--no-chat,
+.wplus-live-stream-theme--chat-below .wplus-live-stream-app {
     grid-template-columns: minmax(0, 1fr);
 }
 
 @container (max-width: 760px) {
-    .estream-app {
+    .wplus-live-stream-app {
         grid-template-columns: minmax(0, 1fr);
     }
 }
@@ -114,11 +114,11 @@
 // Browsers without container queries go by the window instead.
 @supports not (container-type: inline-size) {
     @media (max-width: 760px) {
-        .estream-app { grid-template-columns: minmax(0, 1fr); }
+        .wplus-live-stream-app { grid-template-columns: minmax(0, 1fr); }
     }
 }
 
-.estream-icon {
+.wplus-live-stream-icon {
     width: 1.25em;
     height: 1.25em;
     flex: none;
@@ -127,37 +127,37 @@
 
 // No outline from a click, only from the keyboard: WordPress's global styles put one on everything focused on a page
 // (`.wp-site-blocks *:focus`), so the item a menu gives focus to as it opens showed a ring after a mouse click.
-.estream-theme :focus:not(:focus-visible) {
+.wplus-live-stream-theme :focus:not(:focus-visible) {
     outline: none;
 }
 
 // The player's headings set their own type and colour: themes and the WordPress admin style h2 and h3
 // for themselves (`.entry-content h2` and the like), which would leave a dark card's title dark.
-.estream-theme {
-    .estream-info__title,
-    .estream-studio__title,
-    .estream-chat__title,
-    .estream-summary__title,
-    .estream-queue__title,
-    .estream-dialog__box h2 {
+.wplus-live-stream-theme {
+    .wplus-live-stream-info__title,
+    .wplus-live-stream-studio__title,
+    .wplus-live-stream-chat__title,
+    .wplus-live-stream-summary__title,
+    .wplus-live-stream-queue__title,
+    .wplus-live-stream-dialog__box h2 {
         margin-top: 0;
         padding: 0;
         border: 0;
-        color: var(--estream-text);
-        font-family: var(--estream-font);
+        color: var(--wplus-live-stream-text);
+        font-family: var(--wplus-live-stream-font);
         letter-spacing: normal;
         text-transform: none;
         text-align: left;
     }
 
-    .estream-queue__title {
-        color: var(--estream-muted);
+    .wplus-live-stream-queue__title {
+        color: var(--wplus-live-stream-muted);
         text-transform: uppercase;
         letter-spacing: 0.04em;
     }
 }
 
-.estream-badge {
+.wplus-live-stream-badge {
     display: inline-flex;
     align-items: center;
     gap: 5px;
@@ -172,13 +172,13 @@
     color: #fff;
     white-space: nowrap;
 
-    .estream-icon {
+    .wplus-live-stream-icon {
         width: 1.2em;
         height: 1.2em;
     }
 
     &--live {
-        background: var(--estream-live);
+        background: var(--wplus-live-stream-live);
 
         &::before {
             content: "";
@@ -186,45 +186,50 @@
             height: 6px;
             border-radius: 50%;
             background: currentColor;
-            animation: estream-pulse 2s ease-in-out infinite;
+            animation: wplus-live-stream-pulse 2s ease-in-out infinite;
         }
     }
 }
 
-@keyframes estream-pulse {
+@keyframes wplus-live-stream-pulse {
     50% { opacity: 0.35; }
 }
 
 // The picture
 
-.estream-stage {
+.wplus-live-stream-stage {
     position: relative;
     aspect-ratio: 16 / 9;
-    background: var(--estream-stage);
-    border-radius: var(--estream-radius);
+    background: var(--wplus-live-stream-stage);
+    border-radius: var(--wplus-live-stream-radius);
     overflow: hidden;
-    color: var(--estream-over-text);
+    color: var(--wplus-live-stream-over-text);
     isolation: isolate;
 
     &:focus-visible {
-        outline: 2px solid var(--estream-accent);
+        outline: 2px solid var(--wplus-live-stream-accent);
         outline-offset: 2px;
     }
 
     // At rest over the picture, the pointer goes too.
-    &--picture.estream-stage--idle {
+    &--picture.wplus-live-stream-stage--idle {
         cursor: none;
     }
 }
 
-// What the stage shows without a picture: a moment of the stream, centred.
-.estream-screen {
+// What the stage shows without a picture: a moment of the stream, centred. Where it is taller than the picture, as
+// the words, the countdown and Add to calendar before a scheduled stream on a phone, it starts at the top and scrolls,
+// where centred it ran out of both edges (`center` first, for a browser without `safe`).
+.wplus-live-stream-screen {
     position: absolute;
     inset: 0;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
+    justify-content: safe center;
+    overflow: hidden auto;
+    overscroll-behavior: contain;
     gap: 10px;
     padding: 24px;
     text-align: center;
@@ -239,7 +244,7 @@
         background: rgba(255, 255, 255, 0.08);
         color: #d6d9de;
 
-        .estream-icon {
+        .wplus-live-stream-icon {
             width: 26px;
             height: 26px;
         }
@@ -272,8 +277,8 @@
     }
 
     // Buttons over the dark stage, whatever the theme.
-    .estream-button,
-    .estream-menu__button:not(.estream-icon-button) {
+    .wplus-live-stream-button,
+    .wplus-live-stream-menu__button:not(.wplus-live-stream-icon-button) {
         background: rgba(255, 255, 255, 0.1);
         border-color: rgba(255, 255, 255, 0.16);
         color: #fff;
@@ -285,7 +290,7 @@
 }
 
 @container (max-width: 420px) {
-    .estream-screen {
+    .wplus-live-stream-screen {
         gap: 6px;
         padding: 12px;
 
@@ -293,10 +298,25 @@
             width: 40px;
             height: 40px;
         }
+
+        // A countdown says the time itself: its clock goes, and the lines draw closer, so the words, the countdown,
+        // when and Add to calendar fit a phone's picture.
+        &:has(.wplus-live-stream-countdown) {
+            gap: 4px;
+            padding: 8px 12px;
+
+            .wplus-live-stream-countdown {
+                margin: 0;
+            }
+        }
+
+        &:has(.wplus-live-stream-countdown) &__icon {
+            display: none;
+        }
     }
 }
 
-.estream-countdown {
+.wplus-live-stream-countdown {
     display: flex;
     gap: 8px;
     margin: 4px 0;
@@ -307,7 +327,7 @@
         align-items: center;
         min-width: 58px;
         padding: 8px 6px 6px;
-        border-radius: calc(var(--estream-radius) * 0.75);
+        border-radius: calc(var(--wplus-live-stream-radius) * 0.75);
         background: rgba(255, 255, 255, 0.08);
     }
 
@@ -327,23 +347,23 @@
 }
 
 @container (max-width: 420px) {
-    .estream-countdown__unit {
+    .wplus-live-stream-countdown__unit {
         min-width: 46px;
         padding: 6px 4px 4px;
     }
 
-    .estream-countdown__number {
+    .wplus-live-stream-countdown__number {
         font-size: 1.25em;
     }
 }
 
-.estream-spinner {
+.wplus-live-stream-spinner {
     width: 28px;
     height: 28px;
     border-radius: 50%;
     border: 3px solid rgba(255, 255, 255, 0.2);
     border-top-color: #fff;
-    animation: estream-spin 0.9s linear infinite;
+    animation: wplus-live-stream-spin 0.9s linear infinite;
 
     &--small {
         width: 14px;
@@ -352,11 +372,11 @@
     }
 }
 
-@keyframes estream-spin {
+@keyframes wplus-live-stream-spin {
     to { transform: rotate(360deg); }
 }
 
-.estream-tiles {
+.wplus-live-stream-tiles {
     position: absolute;
     inset: 0;
     display: grid;
@@ -385,7 +405,7 @@
         gap: 4px;
         min-height: 0;
 
-        .estream-tile {
+        .wplus-live-stream-tile {
             flex: 0 0 auto;
             height: auto;
             aspect-ratio: 16 / 9;
@@ -399,7 +419,7 @@
         bottom: 14px;
         width: clamp(96px, 22%, 360px);
         aspect-ratio: 16 / 9;
-        border-radius: calc(var(--estream-radius) * 0.75);
+        border-radius: calc(var(--wplus-live-stream-radius) * 0.75);
         overflow: hidden;
         box-shadow: 0 2px 12px rgba(0, 0, 0, 0.45);
         transition: bottom 0.25s;
@@ -413,7 +433,7 @@
             touch-action: none;
 
             &:focus-visible {
-                outline: 2px solid var(--estream-accent);
+                outline: 2px solid var(--wplus-live-stream-accent);
                 outline-offset: 2px;
             }
         }
@@ -426,11 +446,11 @@
 }
 
 // Out of the bar's way while it shows.
-.estream-stage:has(> .estream-bar:not(.estream-bar--hidden)) .estream-tiles__corner {
+.wplus-live-stream-stage:has(> .wplus-live-stream-bar:not(.wplus-live-stream-bar--hidden)) .wplus-live-stream-tiles__corner {
     bottom: 58px;
 }
 
-.estream-tile {
+.wplus-live-stream-tile {
     position: relative;
     min-width: 0;
     min-height: 0;
@@ -449,7 +469,7 @@
     }
 
     &--speaking::after {
-        border-color: var(--estream-accent);
+        border-color: var(--wplus-live-stream-accent);
     }
 
     &__name {
@@ -480,7 +500,7 @@
         display: flex;
         color: #ff8a80;
 
-        .estream-icon {
+        .wplus-live-stream-icon {
             width: 14px;
             height: 14px;
         }
@@ -488,13 +508,13 @@
 }
 
 // Names step up out of the controls' way while they show, but in the corner, which steps up whole.
-.estream-stage:not(.estream-stage--idle) .estream-tiles--n1 > .estream-tile .estream-tile__name,
-.estream-stage:not(.estream-stage--idle) .estream-tiles--n2 .estream-tile__name,
-.estream-stage:not(.estream-stage--idle) .estream-tiles__main .estream-tile__name {
+.wplus-live-stream-stage:not(.wplus-live-stream-stage--idle) .wplus-live-stream-tiles--n1 > .wplus-live-stream-tile .wplus-live-stream-tile__name,
+.wplus-live-stream-stage:not(.wplus-live-stream-stage--idle) .wplus-live-stream-tiles--n2 .wplus-live-stream-tile__name,
+.wplus-live-stream-stage:not(.wplus-live-stream-stage--idle) .wplus-live-stream-tiles__main .wplus-live-stream-tile__name {
     transform: translateY(-44px);
 }
 
-.estream-video {
+.wplus-live-stream-video {
     position: absolute;
     inset: 0;
     width: 100%;
@@ -513,11 +533,11 @@
 
 // Someone without a picture: their avatar (or initials) in a circle as large as the tile allows, their name under it.
 // Sized to the tile (a container), so a small tile beside a shared screen keeps them small.
-.estream-tile {
+.wplus-live-stream-tile {
     container-type: size;
 }
 
-.estream-theme .estream-person {
+.wplus-live-stream-theme .wplus-live-stream-person {
     position: absolute;
     inset: 0;
     display: flex;
@@ -526,10 +546,10 @@
     justify-content: center;
     gap: clamp(6px, 4cqmin, 14px);
     padding: 8px;
-    color: var(--estream-over-text);
+    color: var(--wplus-live-stream-over-text);
 
-    .estream-person__avatar,
-    .estream-initials {
+    .wplus-live-stream-person__avatar,
+    .wplus-live-stream-initials {
         flex: none;
         width: clamp(36px, 34cqmin, 120px);
         height: clamp(36px, 34cqmin, 120px);
@@ -540,12 +560,12 @@
         box-shadow: none;
     }
 
-    .estream-person__avatar {
+    .wplus-live-stream-person__avatar {
         object-fit: cover;
         background: #33363c;
     }
 
-    .estream-initials {
+    .wplus-live-stream-initials {
         display: flex;
         align-items: center;
         justify-content: center;
@@ -555,7 +575,7 @@
         line-height: 1;
     }
 
-    .estream-person__name {
+    .wplus-live-stream-person__name {
         max-width: 100%;
         overflow: hidden;
         font-size: clamp(12px, 5cqmin, 16px);
@@ -568,17 +588,17 @@
 
 // A small tile: the circle alone.
 @container (max-height: 90px) {
-    .estream-theme .estream-person__name {
+    .wplus-live-stream-theme .wplus-live-stream-person__name {
         display: none;
     }
 }
 
-.estream-audio {
+.wplus-live-stream-audio {
     display: none;
 }
 
 // Over the picture: the Live badge and what the viewer needs to know, along the top.
-.estream-top {
+.wplus-live-stream-top {
     position: absolute;
     top: 0;
     left: 0;
@@ -623,7 +643,7 @@
 }
 
 // The controls along the bottom, on a flat band that keeps them readable over any picture (no gradients).
-.estream-bar {
+.wplus-live-stream-bar {
     position: absolute;
     left: 0;
     right: 0;
@@ -655,7 +675,7 @@
     }
 }
 
-.estream-icon-button {
+.wplus-live-stream-icon-button {
     appearance: none;
     display: inline-flex;
     align-items: center;
@@ -678,14 +698,14 @@
         outline-offset: -2px;
     }
 
-    .estream-icon {
+    .wplus-live-stream-icon {
         width: 22px;
         height: 22px;
     }
 }
 
 // Sound: the button, and the slider opening beside it on hover or focus.
-.estream-volume {
+.wplus-live-stream-volume {
     display: flex;
     align-items: center;
 
@@ -705,13 +725,13 @@
 }
 
 @media (pointer: coarse) {
-    .estream-volume__slider {
+    .wplus-live-stream-volume__slider {
         display: none;
     }
 }
 
 // A volume slider, white over the picture: the bar's, and in a Better Messages conversation, its sheet's.
-@mixin estream-slider {
+@mixin wplus-live-stream-slider {
     appearance: none;
     box-sizing: border-box;
     height: 18px;
@@ -727,7 +747,7 @@
     &::-webkit-slider-runnable-track {
         height: 4px;
         border-radius: 2px;
-        background: linear-gradient(to right, #fff var(--estream-level, 100%), rgba(255, 255, 255, 0.3) var(--estream-level, 100%));
+        background: linear-gradient(to right, #fff var(--wplus-live-stream-level, 100%), rgba(255, 255, 255, 0.3) var(--wplus-live-stream-level, 100%));
     }
 
     &::-webkit-slider-thumb {
@@ -778,30 +798,30 @@
 }
 
 // Inside the player's theme, over a theme's `input[type="range"]`.
-.estream-theme .estream-volume__slider {
-    @include estream-slider;
+.wplus-live-stream-theme .wplus-live-stream-volume__slider {
+    @include wplus-live-stream-slider;
 }
 
 // A menu opening from its button: the player's settings, "Add to calendar", later the studio's devices.
-.estream-menu {
+.wplus-live-stream-menu {
     position: relative;
 
-    &__button:not(.estream-icon-button) {
+    &__button:not(.wplus-live-stream-icon-button) {
         appearance: none;
         display: inline-flex;
         align-items: center;
         gap: 6px;
         padding: 7px 14px;
-        border: 1px solid var(--estream-border);
+        border: 1px solid var(--wplus-live-stream-border);
         border-radius: 6px;
-        background: var(--estream-surface);
-        color: var(--estream-text);
+        background: var(--wplus-live-stream-surface);
+        color: var(--wplus-live-stream-text);
         font: inherit;
         font-size: 0.92em;
         font-weight: 500;
         cursor: pointer;
 
-        .estream-icon {
+        .wplus-live-stream-icon {
             width: 1.15em;
             height: 1.15em;
         }
@@ -813,10 +833,10 @@
         min-width: 200px;
         max-width: min(280px, 80vw);
         padding: 6px;
-        border-radius: calc(var(--estream-radius) * 0.75 + 2px);
-        background: var(--estream-surface);
-        color: var(--estream-text);
-        border: 1px solid var(--estream-border);
+        border-radius: calc(var(--wplus-live-stream-radius) * 0.75 + 2px);
+        background: var(--wplus-live-stream-surface);
+        color: var(--wplus-live-stream-text);
+        border: 1px solid var(--wplus-live-stream-border);
         box-shadow: 0 10px 30px rgba(0, 0, 0, 0.22);
         text-align: left;
         // No taller than the room beside its button (menu.tsx, the SDK's menus): the rest scrolls.
@@ -831,7 +851,7 @@
 
     &__heading {
         padding: 6px 10px 4px;
-        color: var(--estream-muted);
+        color: var(--wplus-live-stream-muted);
         font-size: 0.75em;
         font-weight: 700;
         letter-spacing: 0.05em;
@@ -855,12 +875,12 @@
 
         &:hover,
         &:focus-visible {
-            background: var(--estream-surface-2);
+            background: var(--wplus-live-stream-surface-2);
             outline: none;
         }
 
         &--danger {
-            @include button-colours( var(--estream-danger) );
+            @include button-colours( var(--wplus-live-stream-danger) );
         }
     }
 
@@ -869,7 +889,7 @@
         width: 18px;
         flex: none;
 
-        .estream-icon {
+        .wplus-live-stream-icon {
             width: 18px;
             height: 18px;
         }
@@ -880,7 +900,7 @@
     }
 
     &__hint {
-        color: var(--estream-muted);
+        color: var(--wplus-live-stream-muted);
         font-size: 0.85em;
     }
 
@@ -888,7 +908,7 @@
     &__note {
         display: block;
         margin-top: 2px;
-        color: var(--estream-muted);
+        color: var(--wplus-live-stream-muted);
         font-size: 0.8em;
         font-weight: 400;
         line-height: 1.35;
@@ -898,7 +918,7 @@
 // Our own tooltip (tooltip.ts), where the page has no WordPlus SDK or the browser no popovers: one for the page, in
 // its body or the element shown full screen, outside any stream's theme, so it brings its own type. Dark on any
 // theme, as over the picture.
-.estream-tooltip {
+.wplus-live-stream-tooltip {
     position: fixed;
     top: 0;
     left: 0;
@@ -926,7 +946,7 @@
 }
 
 // The same look on the WordPlus SDK's floater, where the page has it (tooltip.ts): it reads these on our class.
-.wplus-tooltip.estream-tip {
+.wplus-tooltip.wplus-live-stream-tip {
     --wplus-tooltip-bg: 18, 20, 24;
     --wplus-tooltip-ink: 244, 245, 247;
     --wplus-tooltip-radius: 6px;
@@ -940,24 +960,24 @@
 }
 
 // Over the picture a menu is always dark.
-.estream-stage .estream-menu__list {
-    background: var(--estream-over);
-    color: var(--estream-over-text);
+.wplus-live-stream-stage .wplus-live-stream-menu__list {
+    background: var(--wplus-live-stream-over);
+    color: var(--wplus-live-stream-over-text);
     border-color: rgba(255, 255, 255, 0.08);
     backdrop-filter: blur(8px);
 
-    .estream-menu__heading,
-    .estream-menu__hint {
+    .wplus-live-stream-menu__heading,
+    .wplus-live-stream-menu__hint {
         color: #a4a8b0;
     }
 
-    .estream-menu__item:hover,
-    .estream-menu__item:focus-visible {
+    .wplus-live-stream-menu__item:hover,
+    .wplus-live-stream-menu__item:focus-visible {
         background: rgba(255, 255, 255, 0.1);
     }
 }
 
-.estream-reconnecting {
+.wplus-live-stream-reconnecting {
     position: absolute;
     top: 12px;
     left: 50%;
@@ -968,13 +988,13 @@
     gap: 8px;
     padding: 5px 12px;
     border-radius: 999px;
-    background: var(--estream-over);
+    background: var(--wplus-live-stream-over);
     font-size: 0.85em;
     font-weight: 600;
 }
 
 // A stalled picture: a spinner in its middle until frames come again, said to screen readers.
-.estream-buffering {
+.wplus-live-stream-buffering {
     position: absolute;
     inset: 0;
     z-index: 4;
@@ -995,7 +1015,7 @@
 
 // A connection too slow for the picture (the engine's tooSlow): its last frame dimmed, what happens said in its middle,
 // and its buttons. Under the controls, which stay usable.
-.estream-slow {
+.wplus-live-stream-slow {
     position: absolute;
     inset: 0;
     z-index: 4;
@@ -1009,7 +1029,7 @@
     color: #fff;
     text-align: center;
 
-    > .estream-icon {
+    > .wplus-live-stream-icon {
         width: 28px;
         height: 28px;
     }
@@ -1041,11 +1061,11 @@
         @include button-colours( #111, #fff );
 
         &:focus-visible {
-            outline: 3px solid var(--estream-accent);
+            outline: 3px solid var(--wplus-live-stream-accent);
             outline-offset: 2px;
         }
 
-        .estream-icon {
+        .wplus-live-stream-icon {
             width: 18px;
             height: 18px;
         }
@@ -1055,7 +1075,7 @@
 // The statistics over the picture (stats.tsx), read while the stream plays behind them, scrolling within the picture:
 // under the badges along the top, the Live badge among them, and over the controls along the bottom. Headings are the
 // panel's own: a theme's h2 and h3 never reach them.
-.estream-stats {
+.wplus-live-stream-stats {
     position: absolute;
     top: 44px;
     inset-inline-start: 12px;
@@ -1072,7 +1092,7 @@
     font-variant-numeric: tabular-nums;
 
     &:focus-visible {
-        outline: 2px solid var(--estream-accent);
+        outline: 2px solid var(--wplus-live-stream-accent);
         outline-offset: 2px;
     }
 
@@ -1121,7 +1141,7 @@
         cursor: pointer;
         @include button-colours( inherit, rgba(255, 255, 255, 0.12) );
 
-        .estream-icon {
+        .wplus-live-stream-icon {
             width: 14px;
             height: 14px;
         }
@@ -1131,7 +1151,7 @@
         }
 
         &:focus-visible {
-            outline: 2px solid var(--estream-accent);
+            outline: 2px solid var(--wplus-live-stream-accent);
             outline-offset: 1px;
         }
     }
@@ -1182,14 +1202,14 @@
 }
 
 @media (forced-colors: active) {
-    .estream-stats {
+    .wplus-live-stream-stats {
         border: 1px solid CanvasText;
         background: Canvas;
         color: CanvasText;
     }
 }
 
-.estream-unmute {
+.wplus-live-stream-unmute {
     position: absolute;
     left: 50%;
     top: 50%;
@@ -1208,12 +1228,12 @@
     @include button-colours( #111, #fff );
 
     &:focus-visible {
-        outline: 3px solid var(--estream-accent);
+        outline: 3px solid var(--wplus-live-stream-accent);
         outline-offset: 2px;
     }
 }
 
-.estream-floating {
+.wplus-live-stream-floating {
     position: absolute;
     inset: 0;
     pointer-events: none;
@@ -1224,29 +1244,29 @@
         position: absolute;
         bottom: 40px;
         font-size: 28px;
-        animation: estream-float 3.2s cubic-bezier(0.2, 0.6, 0.35, 1) forwards;
+        animation: wplus-live-stream-float 3.2s cubic-bezier(0.2, 0.6, 0.35, 1) forwards;
         opacity: 0;
         will-change: transform, opacity;
     }
 }
 
-@keyframes estream-float {
+@keyframes wplus-live-stream-float {
     0% { transform: translate(0, 0) scale(0.6); opacity: 0; }
     12% { transform: translate(0, -20px) scale(1.15); opacity: 1; }
-    100% { transform: translate(var(--estream-drift, 0), -240px) scale(1); opacity: 0; }
+    100% { transform: translate(var(--wplus-live-stream-drift, 0), -240px) scale(1); opacity: 0; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-    .estream-floating__item {
-        animation: estream-fade 1.6s ease-out forwards;
+    .wplus-live-stream-floating__item {
+        animation: wplus-live-stream-fade 1.6s ease-out forwards;
     }
 
-    .estream-spinner { animation-duration: 2s; }
-    .estream-badge--live::before { animation: none; }
-    .estream-bar { transition: none; }
+    .wplus-live-stream-spinner { animation-duration: 2s; }
+    .wplus-live-stream-badge--live::before { animation: none; }
+    .wplus-live-stream-bar { transition: none; }
 }
 
-@keyframes estream-fade {
+@keyframes wplus-live-stream-fade {
     0% { opacity: 0; }
     20% { opacity: 1; }
     100% { opacity: 0; }
@@ -1254,49 +1274,49 @@
 
 // Full screen: the theme root fills the screen, the picture takes all the height there is, and the chat
 // stays beside it where there is room.
-.estream-theme--full {
+.wplus-live-stream-theme--full {
     width: 100%;
     height: 100%;
     background: #000;
     overflow: hidden;
 
-    .estream-shell {
+    .wplus-live-stream-shell {
         height: 100%;
     }
 
-    .estream-app {
+    .wplus-live-stream-app {
         height: 100%;
         gap: 0;
         padding: 0;
         border-radius: 0;
-        background: var(--estream-surface);
+        background: var(--wplus-live-stream-surface);
     }
 
-    .estream-app__main {
+    .wplus-live-stream-app__main {
         min-height: 0;
         height: 100%;
     }
 
-    .estream-stage {
+    .wplus-live-stream-stage {
         flex: 1;
         min-height: 0;
         aspect-ratio: auto;
         border-radius: 0;
     }
 
-    .estream-info,
-    .estream-studio,
-    .estream-controls--studio {
+    .wplus-live-stream-info,
+    .wplus-live-stream-studio,
+    .wplus-live-stream-controls--studio {
         display: none;
     }
 
-    .estream-app__side {
+    .wplus-live-stream-app__side {
         min-height: 0;
         height: 100%;
-        border-left: 1px solid var(--estream-border);
+        border-left: 1px solid var(--wplus-live-stream-border);
     }
 
-    .estream-chat {
+    .wplus-live-stream-chat {
         max-height: none;
         min-height: 0;
         border: 0;
@@ -1306,8 +1326,8 @@
 
 // Full screen in the browser's window, a desktop's: the player lifted over the page as a popover fills the window edge
 // to edge, as the screen's full screen fills the screen, with none of a popover's own box, frame or colours.
-.estream-theme--full[data-estream-window],
-.estream-studio-page__picture--full[data-estream-window] {
+.wplus-live-stream-theme--full[data-wplus-live-stream-window],
+.wplus-live-stream-studio-page__picture--full[data-wplus-live-stream-window] {
     position: fixed;
     inset: 0;
     width: 100%;
@@ -1326,32 +1346,32 @@
 
 // The Appearance tab's choices.
 
-.estream-theme--system-font {
-    --estream-font: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+.wplus-live-stream-theme--system-font {
+    --wplus-live-stream-font: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
 }
 
-.estream-theme--standard .estream-stage {
+.wplus-live-stream-theme--standard .wplus-live-stream-stage {
     aspect-ratio: 4 / 3;
 }
 
 // Upright, as from a phone: no taller than most of the window, centred in its column.
-.estream-theme--upright .estream-stage {
+.wplus-live-stream-theme--upright .wplus-live-stream-stage {
     aspect-ratio: 9 / 16;
     width: min(100%, calc(min(80vh, 780px) * 9 / 16));
     align-self: center;
 }
 
-.estream-theme--full .estream-stage {
+.wplus-live-stream-theme--full .wplus-live-stream-stage {
     width: auto;
     align-self: stretch;
 }
 
 // Beside the stream, the chat is as tall as the column beside it: it adds no height of its own to the row.
-.estream-app__side {
+.wplus-live-stream-app__side {
     position: relative;
     min-height: 360px;
 
-    > .estream-chat {
+    > .wplus-live-stream-chat {
         position: absolute;
         inset: 0;
         height: auto;
@@ -1360,46 +1380,46 @@
 }
 
 // Below it, the chat is the height the site chose.
-.estream-theme--chat-below .estream-app__side {
+.wplus-live-stream-theme--chat-below .wplus-live-stream-app__side {
     position: static;
     min-height: 0;
 
-    > .estream-chat {
+    > .wplus-live-stream-chat {
         position: static;
-        height: var(--estream-chat-height, 480px);
+        height: var(--wplus-live-stream-chat-height, 480px);
     }
 }
 
 @container (max-width: 760px) {
-    .estream-app__side {
+    .wplus-live-stream-app__side {
         position: static;
         min-height: 0;
 
-        > .estream-chat {
+        > .wplus-live-stream-chat {
             position: static;
-            height: var(--estream-chat-height, 480px);
+            height: var(--wplus-live-stream-chat-height, 480px);
         }
     }
 }
 
 @supports not (container-type: inline-size) {
     @media (max-width: 760px) {
-        .estream-app__side { position: static; min-height: 0; }
-        .estream-app__side > .estream-chat { position: static; height: var(--estream-chat-height, 480px); }
+        .wplus-live-stream-app__side { position: static; min-height: 0; }
+        .wplus-live-stream-app__side > .wplus-live-stream-chat { position: static; height: var(--wplus-live-stream-chat-height, 480px); }
     }
 }
 
 // Full screen keeps the chat beside the picture, wherever the site puts it on the page: a sidebar's width, and at most
 // two fifths of a narrow screen's, a phone's held sideways.
-.estream-theme.estream-theme--full {
-    .estream-app:not(.estream-app--no-chat) {
+.wplus-live-stream-theme.wplus-live-stream-theme--full {
+    .wplus-live-stream-app:not(.wplus-live-stream-app--no-chat) {
         grid-template-columns: minmax(0, 1fr) min(340px, 40%);
     }
 
-    .estream-app__side {
+    .wplus-live-stream-app__side {
         position: relative;
 
-        > .estream-chat {
+        > .wplus-live-stream-chat {
             position: absolute;
             inset: 0;
             height: auto;
@@ -1412,38 +1432,38 @@
 // the rest, its button showing and hiding it as beside. Hidden, the picture has it all. A column kept beside it there
 // squeezed the picture into a strip with its controls cut off. Held sideways, the chat stays beside it, narrower.
 @mixin chat-below {
-    .estream-theme.estream-theme--full {
-        .estream-app:not(.estream-app--no-chat) {
+    .wplus-live-stream-theme.wplus-live-stream-theme--full {
+        .wplus-live-stream-app:not(.wplus-live-stream-app--no-chat) {
             grid-template-columns: minmax(0, 1fr);
             grid-template-rows: auto minmax(0, 1fr);
 
-            .estream-app__main {
+            .wplus-live-stream-app__main {
                 height: auto;
             }
 
-            .estream-stage {
+            .wplus-live-stream-stage {
                 flex: none;
                 height: min(calc(100vw * 9 / 16), 50vh);
             }
 
-            .estream-app__side {
+            .wplus-live-stream-app__side {
                 border-left: 0;
-                border-top: 1px solid var(--estream-border);
+                border-top: 1px solid var(--wplus-live-stream-border);
             }
         }
 
-        &.estream-theme--standard .estream-app:not(.estream-app--no-chat) .estream-stage {
+        &.wplus-live-stream-theme--standard .wplus-live-stream-app:not(.wplus-live-stream-app--no-chat) .wplus-live-stream-stage {
             height: min(calc(100vw * 3 / 4), 50vh);
         }
 
-        &.estream-theme--upright .estream-app:not(.estream-app--no-chat) .estream-stage {
+        &.wplus-live-stream-theme--upright .wplus-live-stream-app:not(.wplus-live-stream-app--no-chat) .wplus-live-stream-stage {
             height: 50vh;
         }
     }
 }
 
 @media (orientation: portrait) {
-    @container estream-shell (max-width: 760px) {
+    @container wplus-live-stream-shell (max-width: 760px) {
         @include chat-below;
     }
 }
@@ -1456,18 +1476,18 @@
 
 // A Better Messages room in the player's full screen is used where it is: Better Messages' Tap to open messages, which
 // it lays over a room on a phone, would take the room out of the full screen to the page's body, where nobody sees it.
-.estream-theme--full .estream-bm-room .wplus-tap-to-open:not(#\9) {
+.wplus-live-stream-theme--full .wplus-live-stream-bm-room .wplus-tap-to-open:not(#\9) {
     display: none;
 }
 
-.estream-theme--no-avatars .estream-message__avatar {
+.wplus-live-stream-theme--no-avatars .wplus-live-stream-message__avatar {
     display: none;
 }
 
 // Where the logo keeps to: the picture's own box in the stage (usePictureBox), without the bars a picture of another
 // shape leaves, so that its place and width, shares of it, cover the same part of the picture in every player. The
 // whole stage where it shows no one picture.
-.estream-logo-frame {
+.wplus-live-stream-logo-frame {
     position: absolute;
     inset: 0;
     z-index: 4;
@@ -1475,7 +1495,7 @@
 }
 
 // The site's logo over the picture, out of the badges' and the controls' way.
-.estream-logo {
+.wplus-live-stream-logo {
     position: absolute;
     z-index: 4;
     max-width: 40%;
@@ -1491,13 +1511,13 @@
 
     // The distance the site set from the corner's side, and from its top or bottom.
     &--x {
-        &.estream-logo--top-left, &.estream-logo--bottom-left { left: var(--estream-logo-x); }
-        &.estream-logo--top-right, &.estream-logo--bottom-right { right: var(--estream-logo-x); }
+        &.wplus-live-stream-logo--top-left, &.wplus-live-stream-logo--bottom-left { left: var(--wplus-live-stream-logo-x); }
+        &.wplus-live-stream-logo--top-right, &.wplus-live-stream-logo--bottom-right { right: var(--wplus-live-stream-logo-x); }
     }
 
     &--y {
-        &.estream-logo--top-left, &.estream-logo--top-right { top: var(--estream-logo-y); }
-        &.estream-logo--bottom-left, &.estream-logo--bottom-right { bottom: var(--estream-logo-y); }
+        &.wplus-live-stream-logo--top-left, &.wplus-live-stream-logo--top-right { top: var(--wplus-live-stream-logo-y); }
+        &.wplus-live-stream-logo--bottom-left, &.wplus-live-stream-logo--bottom-right { bottom: var(--wplus-live-stream-logo-y); }
     }
 
     // In a settings page's preview, dragged into place, and sized with the handle at its outer corner.
@@ -1509,7 +1529,7 @@
         &:active { cursor: grabbing; }
 
         &:hover,
-        &.estream-logo--sizing {
+        &.wplus-live-stream-logo--sizing {
             outline: 1px dashed rgba(255, 255, 255, 0.85);
             outline-offset: 3px;
         }
@@ -1527,7 +1547,7 @@
         width: 14px;
         height: 14px;
         box-sizing: border-box;
-        border: 2px solid var(--estream-accent);
+        border: 2px solid var(--wplus-live-stream-accent);
         border-radius: 50%;
         background: #fff;
         box-shadow: 0 1px 4px rgba(0, 0, 0, 0.45);
@@ -1550,27 +1570,27 @@
 
 // A screen without hover, a tablet's, shows it always: there is no other way to find it there.
 @media (hover: none) {
-    .estream-logo__size {
+    .wplus-live-stream-logo__size {
         opacity: 1;
     }
 }
 
 // Out of the bar's way while it shows, however close to the bottom it was set: less where the picture's foot is above
 // the stage's.
-.estream-stage--picture:not(.estream-stage--idle) {
-    .estream-logo--bottom-left,
-    .estream-logo--bottom-right {
-        bottom: max(14px, calc(58px - var(--estream-picture-below, 0px)));
+.wplus-live-stream-stage--picture:not(.wplus-live-stream-stage--idle) {
+    .wplus-live-stream-logo--bottom-left,
+    .wplus-live-stream-logo--bottom-right {
+        bottom: max(14px, calc(58px - var(--wplus-live-stream-picture-below, 0px)));
     }
 
-    .estream-logo--y.estream-logo--bottom-left,
-    .estream-logo--y.estream-logo--bottom-right {
-        bottom: max(var(--estream-logo-y), calc(58px - var(--estream-picture-below, 0px)));
+    .wplus-live-stream-logo--y.wplus-live-stream-logo--bottom-left,
+    .wplus-live-stream-logo--y.wplus-live-stream-logo--bottom-right {
+        bottom: max(var(--wplus-live-stream-logo-y), calc(58px - var(--wplus-live-stream-picture-below, 0px)));
     }
 }
 
 // The cover before the start and after the end, darkened for the words over it.
-.estream-cover {
+.wplus-live-stream-cover {
     position: absolute;
     inset: 0;
     background-position: center;
@@ -1584,14 +1604,14 @@
         background: rgba(0, 0, 0, 0.55);
     }
 
-    + .estream-screen {
+    + .wplus-live-stream-screen {
         background: none;
         text-shadow: 0 1px 8px rgba(0, 0, 0, 0.5);
     }
 }
 
 // Under the picture: the title, when and how many, and what the viewer can do.
-.estream-info {
+.wplus-live-stream-info {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
@@ -1614,7 +1634,7 @@
         display: flex;
         flex-wrap: wrap;
         margin: 2px 0 0;
-        color: var(--estream-muted);
+        color: var(--wplus-live-stream-muted);
         font-size: 0.88em;
 
         > span + span::before {
@@ -1633,7 +1653,7 @@
 
 // Controls
 
-.estream-controls {
+.wplus-live-stream-controls {
     display: flex;
     flex-direction: column;
     gap: 8px;
@@ -1651,24 +1671,24 @@
 
     &__hint {
         margin: 0;
-        color: var(--estream-muted);
+        color: var(--wplus-live-stream-muted);
         font-size: 0.9em;
     }
 
     &__error {
         margin: 0;
-        color: var(--estream-danger);
+        color: var(--wplus-live-stream-danger);
         font-size: 0.9em;
     }
 }
 
-.estream-button {
+.wplus-live-stream-button {
     appearance: none;
     display: inline-flex;
     align-items: center;
     gap: 6px;
     padding: 7px 14px;
-    border: 1px solid var(--estream-border);
+    border: 1px solid var(--wplus-live-stream-border);
     border-radius: 6px;
     font: inherit;
     font-size: 0.92em;
@@ -1676,15 +1696,15 @@
     line-height: 1.3;
     cursor: pointer;
     white-space: nowrap;
-    @include button-colours( var(--estream-text), var(--estream-surface) );
+    @include button-colours( var(--wplus-live-stream-text), var(--wplus-live-stream-surface) );
 
-    .estream-icon {
+    .wplus-live-stream-icon {
         width: 1.15em;
         height: 1.15em;
     }
 
     &:hover:not(:disabled) {
-        background: var(--estream-surface-2);
+        background: var(--wplus-live-stream-surface-2);
     }
 
     &:disabled {
@@ -1693,46 +1713,46 @@
     }
 
     &:focus-visible {
-        outline: 2px solid var(--estream-accent);
+        outline: 2px solid var(--wplus-live-stream-accent);
         outline-offset: 2px;
     }
 
     &--primary {
-        border-color: var(--estream-accent);
-        @include button-colours( var(--estream-accent-text), var(--estream-accent) );
+        border-color: var(--wplus-live-stream-accent);
+        @include button-colours( var(--wplus-live-stream-accent-text), var(--wplus-live-stream-accent) );
 
         &:hover:not(:disabled) {
-            background: var(--estream-accent);
+            background: var(--wplus-live-stream-accent);
             filter: brightness(1.08);
         }
     }
 
     &--danger {
-        @include button-colours( var(--estream-danger) );
+        @include button-colours( var(--wplus-live-stream-danger) );
     }
 
     &--danger-solid {
-        border-color: var(--estream-danger);
-        @include button-colours( #fff, var(--estream-danger) );
+        border-color: var(--wplus-live-stream-danger);
+        @include button-colours( #fff, var(--wplus-live-stream-danger) );
 
         &:hover:not(:disabled) {
-            background: var(--estream-danger);
+            background: var(--wplus-live-stream-danger);
             filter: brightness(1.08);
         }
     }
 
     &--on {
-        border-color: var(--estream-accent);
-        @include button-colours( var(--estream-accent) );
+        border-color: var(--wplus-live-stream-accent);
+        @include button-colours( var(--wplus-live-stream-accent) );
     }
 
     &--off {
-        @include button-colours( var(--estream-muted) );
+        @include button-colours( var(--wplus-live-stream-muted) );
     }
 
     &--quiet {
         border-color: transparent;
-        @include button-colours( $background: var(--estream-surface-2) );
+        @include button-colours( $background: var(--wplus-live-stream-surface-2) );
     }
 
     &--small {
@@ -1743,27 +1763,27 @@
 
 // A link drawn as a button (Connect to go live) keeps the button's look over a page's own rules for links, a
 // WordPress admin page's among them: no underline, and a primary one its text's colour.
-.estream-theme a.estream-button {
+.wplus-live-stream-theme a.wplus-live-stream-button {
     text-decoration: none;
 
-    &.estream-button--primary,
-    &.estream-button--primary:where(:hover, :focus, :active, :visited) {
-        color: var(--estream-accent-text);
+    &.wplus-live-stream-button--primary,
+    &.wplus-live-stream-button--primary:where(:hover, :focus, :active, :visited) {
+        color: var(--wplus-live-stream-accent-text);
     }
 }
 
 // The studio: a card under the picture, its head with what matters while live, its body for the moment,
 // and one bar of controls.
-.estream-studio {
+.wplus-live-stream-studio {
     // Its bar fits to its own width, whatever is beside it.
-    container: estream-studio / inline-size;
+    container: wplus-live-stream-studio / inline-size;
     display: flex;
     flex-direction: column;
     gap: 12px;
     padding: 14px;
-    border: 1px solid var(--estream-border);
-    border-radius: var(--estream-radius);
-    background: var(--estream-surface);
+    border: 1px solid var(--wplus-live-stream-border);
+    border-radius: var(--wplus-live-stream-radius);
+    background: var(--wplus-live-stream-surface);
 
     &__head {
         display: flex;
@@ -1786,7 +1806,7 @@
     }
 
     &__numbers {
-        color: var(--estream-muted);
+        color: var(--wplus-live-stream-muted);
         font-size: 0.82em;
         font-variant-numeric: tabular-nums;
     }
@@ -1797,7 +1817,19 @@
         align-items: center;
         gap: 8px;
         padding-top: 12px;
-        border-top: 1px solid var(--estream-border);
+        border-top: 1px solid var(--wplus-live-stream-border);
+
+        // One height for everything in it, a labelled button's: its line (1.3 of its 0.92em), 7px above and below, and its
+        // border, 33.9 px at the theme's 15 px (asked on 2026-11-02: "the 3 dots button should be same height as other
+        // neighbours buttons"). Measured live in the admin's studio before: the devices 31.9, a button showing its icon
+        // alone (a narrow bar) 31.9, the menu buttons 36. Go live, larger on purpose, keeps its size.
+        > .wplus-live-stream-button {
+            min-height: calc(1.3em + 16px);
+        }
+
+        > .wplus-live-stream-device {
+            min-height: calc(0.92 * 1.3em + 16px);
+        }
     }
 
     // Going live, or ending, at the bar's end, on the right even when it wraps.
@@ -1805,23 +1837,30 @@
         margin-left: auto;
     }
 
-    &__tool .estream-icon-button {
-        width: 36px;
-        height: 36px;
-        border: 1px solid var(--estream-border);
+    // Go live waiting for the effects (preparingText()), beside its Cancel: Go live's look, with its spinner, not pressed.
+    &__preparing {
+        gap: 8px;
+        cursor: default;
+    }
+
+    // A menu's button in the bar (the layout's), square, as tall as the bar's buttons beside it.
+    &__tool .wplus-live-stream-icon-button {
+        width: calc(0.92 * 1.3em + 16px);
+        height: calc(0.92 * 1.3em + 16px);
+        border: 1px solid var(--wplus-live-stream-border);
         border-radius: 6px;
-        background: var(--estream-surface);
-        color: var(--estream-text);
+        background: var(--wplus-live-stream-surface);
+        color: var(--wplus-live-stream-text);
 
         &:hover {
-            background: var(--estream-surface-2);
+            background: var(--wplus-live-stream-surface-2);
         }
 
         &:focus-visible {
-            outline-color: var(--estream-accent);
+            outline-color: var(--wplus-live-stream-accent);
         }
 
-        .estream-icon {
+        .wplus-live-stream-icon {
             width: 18px;
             height: 18px;
         }
@@ -1829,8 +1868,8 @@
 }
 
 // Where the bar is narrow, its buttons show their icons; their names stay for screen readers.
-@container estream-studio (max-width: 640px) {
-    .estream-studio__bar .estream-label {
+@container wplus-live-stream-studio (max-width: 640px) {
+    .wplus-live-stream-studio__bar .wplus-live-stream-label {
         position: absolute;
         width: 1px;
         height: 1px;
@@ -1840,7 +1879,7 @@
     }
 }
 
-.estream-chip {
+.wplus-live-stream-chip {
     display: inline-flex;
     align-items: center;
     gap: 5px;
@@ -1849,9 +1888,9 @@
     font-size: 0.82em;
     font-weight: 600;
     white-space: nowrap;
-    @include button-colours( var(--estream-text), var(--estream-surface-2) );
+    @include button-colours( var(--wplus-live-stream-text), var(--wplus-live-stream-surface-2) );
 
-    .estream-icon {
+    .wplus-live-stream-icon {
         width: 15px;
         height: 15px;
     }
@@ -1861,7 +1900,7 @@
     }
 
     &__sub {
-        color: var(--estream-muted);
+        color: var(--wplus-live-stream-muted);
         font-weight: 500;
 
         &::before {
@@ -1880,7 +1919,7 @@
     }
 
     &--live {
-        background: var(--estream-live);
+        background: var(--wplus-live-stream-live);
         color: #fff;
         text-transform: uppercase;
         letter-spacing: 0.03em;
@@ -1905,29 +1944,29 @@
 
         &:hover,
         &[aria-pressed="true"] {
-            background: var(--estream-accent);
-            color: var(--estream-accent-text, #fff);
+            background: var(--wplus-live-stream-accent);
+            color: var(--wplus-live-stream-accent-text, #fff);
         }
 
         &:focus-visible {
-            outline: 2px solid var(--estream-accent);
+            outline: 2px solid var(--wplus-live-stream-accent);
             outline-offset: 2px;
         }
     }
 }
 
-.estream-theme--dark .estream-chip--good { color: #5fd08f; }
-.estream-theme--dark .estream-chip--warn { background: #3a2c10; color: #f3c46b; }
+.wplus-live-stream-theme--dark .wplus-live-stream-chip--good { color: #5fd08f; }
+.wplus-live-stream-theme--dark .wplus-live-stream-chip--warn { background: #3a2c10; color: #f3c46b; }
 
 @media (prefers-color-scheme: dark) {
-    .estream-theme--auto .estream-chip--good { color: #5fd08f; }
-    .estream-theme--auto .estream-chip--warn { background: #3a2c10; color: #f3c46b; }
+    .wplus-live-stream-theme--auto .wplus-live-stream-chip--good { color: #5fd08f; }
+    .wplus-live-stream-theme--auto .wplus-live-stream-chip--warn { background: #3a2c10; color: #f3c46b; }
 }
 
 // Before anything is on: the camera here, or OBS, sharing the width between them, one under the other where it is
 // narrow. (A grid of auto-fit columns kept an empty third column on a wide card: the title spans every column, so
 // none was empty enough to drop.)
-.estream-sources {
+.wplus-live-stream-sources {
     display: flex;
     flex-wrap: wrap;
     gap: 10px;
@@ -1940,28 +1979,28 @@
     }
 }
 
-.estream-source {
+.wplus-live-stream-source {
     flex: 1 1 220px;
     appearance: none;
     display: flex;
     align-items: flex-start;
     gap: 12px;
     padding: 14px;
-    border: 1px solid var(--estream-border);
-    border-radius: var(--estream-radius);
+    border: 1px solid var(--wplus-live-stream-border);
+    border-radius: var(--wplus-live-stream-radius);
     font: inherit;
     text-align: left;
     cursor: pointer;
     transition: border-color 0.15s, box-shadow 0.15s;
-    @include button-colours( var(--estream-text), var(--estream-surface) );
+    @include button-colours( var(--wplus-live-stream-text), var(--wplus-live-stream-surface) );
 
     &:hover:not(:disabled) {
-        border-color: var(--estream-accent);
-        box-shadow: 0 0 0 1px var(--estream-accent);
+        border-color: var(--wplus-live-stream-accent);
+        box-shadow: 0 0 0 1px var(--wplus-live-stream-accent);
     }
 
     &:focus-visible {
-        outline: 2px solid var(--estream-accent);
+        outline: 2px solid var(--wplus-live-stream-accent);
         outline-offset: 2px;
     }
 
@@ -1978,8 +2017,8 @@
         width: 40px;
         height: 40px;
         border-radius: 50%;
-        background: color-mix(in srgb, var(--estream-accent) 14%, transparent);
-        color: var(--estream-accent);
+        background: color-mix(in srgb, var(--wplus-live-stream-accent) 14%, transparent);
+        color: var(--wplus-live-stream-accent);
     }
 
     &__text {
@@ -1992,14 +2031,14 @@
         }
 
         span {
-            color: var(--estream-muted);
+            color: var(--wplus-live-stream-muted);
             font-size: 0.88em;
         }
     }
 }
 
 // Setting up the devices before going live.
-.estream-setup {
+.wplus-live-stream-setup {
     display: flex;
     flex-direction: column;
     gap: 10px;
@@ -2011,8 +2050,8 @@
         gap: 8px 12px;
 
         > label,
-        > .estream-setup__label {
-            color: var(--estream-muted);
+        > .wplus-live-stream-setup__label {
+            color: var(--wplus-live-stream-muted);
             font-size: 0.9em;
         }
     }
@@ -2039,7 +2078,7 @@
 
     &__note {
         margin: 0;
-        color: var(--estream-muted);
+        color: var(--wplus-live-stream-muted);
         font-size: 0.85em;
     }
 
@@ -2047,7 +2086,7 @@
 
 // A switch, on or off (the setup's countdown): a checkbox, drawn as a track and a knob whatever the page does to
 // checkboxes (WordPress's admin draws its own).
-.estream-switch {
+.wplus-live-stream-switch {
     position: relative;
     display: inline-flex;
     align-items: center;
@@ -2073,7 +2112,7 @@
         width: 34px;
         height: 20px;
         border-radius: 999px;
-        background: var(--estream-border);
+        background: var(--wplus-live-stream-border);
         transition: background 0.15s ease;
 
         &::after {
@@ -2091,7 +2130,7 @@
     }
 
     input:checked + &__track {
-        background: var(--estream-accent);
+        background: var(--wplus-live-stream-accent);
 
         &::after {
             transform: translateX(14px);
@@ -2099,7 +2138,7 @@
     }
 
     input:focus-visible + &__track {
-        outline: 2px solid var(--estream-accent);
+        outline: 2px solid var(--wplus-live-stream-accent);
         outline-offset: 2px;
     }
 
@@ -2112,7 +2151,7 @@
 }
 
 // The quality to send: HD, or Full HD where the plan has it, each with the upload it needs.
-.estream-quality {
+.wplus-live-stream-quality {
     flex-wrap: wrap;
     gap: 8px;
 
@@ -2123,8 +2162,8 @@
         gap: 8px;
         max-width: 260px;
         padding: 8px 12px;
-        border: 1px solid var(--estream-border);
-        border-radius: var(--estream-radius);
+        border: 1px solid var(--wplus-live-stream-border);
+        border-radius: var(--wplus-live-stream-radius);
         cursor: pointer;
 
         input {
@@ -2132,7 +2171,7 @@
             width: 16px;
             height: 16px;
             margin: 2px 0 0;
-            accent-color: var(--estream-accent);
+            accent-color: var(--wplus-live-stream-accent);
         }
 
         strong {
@@ -2142,50 +2181,50 @@
 
         small {
             display: block;
-            color: var(--estream-muted);
+            color: var(--wplus-live-stream-muted);
             font-size: 0.85em;
         }
 
         &:has(input:checked) {
-            border-color: var(--estream-accent);
-            box-shadow: inset 0 0 0 1px var(--estream-accent);
+            border-color: var(--wplus-live-stream-accent);
+            box-shadow: inset 0 0 0 1px var(--wplus-live-stream-accent);
         }
 
         &--off {
             cursor: default;
 
             strong {
-                color: var(--estream-muted);
+                color: var(--wplus-live-stream-muted);
             }
         }
     }
 }
 
 @container (max-width: 480px) {
-    .estream-setup__row {
+    .wplus-live-stream-setup__row {
         grid-template-columns: minmax(0, 1fr);
     }
 
-    .estream-quality__option {
+    .wplus-live-stream-quality__option {
         max-width: none;
     }
 }
 
 // How loud the microphone is.
-.estream-level {
+.wplus-live-stream-level {
     position: relative;
     flex: 1;
     max-width: 160px;
     height: 6px;
     border-radius: 3px;
-    background: var(--estream-surface-2);
-    box-shadow: inset 0 0 0 1px var(--estream-border);
+    background: var(--wplus-live-stream-surface-2);
+    box-shadow: inset 0 0 0 1px var(--wplus-live-stream-border);
     overflow: hidden;
 
     &__bar {
         position: absolute;
         inset: 0 auto 0 0;
-        width: var(--estream-level, 0%);
+        width: var(--wplus-live-stream-level, 0%);
         border-radius: 3px;
         // Green, then amber, then red near the top: flat bands, not a gradient.
         background: linear-gradient(to right, #2fbf71 0 70%, #f0b429 70% 85%, #e0322b 85%);
@@ -2202,12 +2241,12 @@
 }
 
 // A device's button in the bar, and its menu of the others.
-.estream-device {
+.wplus-live-stream-device {
     display: inline-flex;
     align-items: stretch;
-    border: 1px solid var(--estream-border);
+    border: 1px solid var(--wplus-live-stream-border);
     border-radius: 6px;
-    background: var(--estream-surface);
+    background: var(--wplus-live-stream-surface);
 
     &__toggle {
         appearance: none;
@@ -2220,39 +2259,41 @@
         font: inherit;
         font-size: 0.92em;
         font-weight: 500;
+        // A button's line, as its neighbours in the bar have it: with the theme's 1.45 its name made it 2 px taller.
+        line-height: 1.3;
         cursor: pointer;
-        @include button-colours( var(--estream-text), transparent );
+        @include button-colours( var(--wplus-live-stream-text), transparent );
 
-        .estream-icon {
+        .wplus-live-stream-icon {
             width: 1.15em;
             height: 1.15em;
         }
 
         &:hover {
-            background: var(--estream-surface-2);
+            background: var(--wplus-live-stream-surface-2);
         }
 
         &:focus-visible {
-            outline: 2px solid var(--estream-accent);
+            outline: 2px solid var(--wplus-live-stream-accent);
             outline-offset: 1px;
         }
     }
 
     &__menu {
         display: flex;
-        border-left: 1px solid var(--estream-border);
+        border-left: 1px solid var(--wplus-live-stream-border);
 
-        .estream-icon-button {
+        .wplus-live-stream-icon-button {
             width: 30px;
             height: auto;
             border-radius: 0 5px 5px 0;
-            color: var(--estream-muted);
+            color: var(--wplus-live-stream-muted);
 
             &:hover {
-                background: var(--estream-surface-2);
+                background: var(--wplus-live-stream-surface-2);
             }
 
-            .estream-icon {
+            .wplus-live-stream-icon {
                 width: 16px;
                 height: 16px;
             }
@@ -2261,22 +2302,22 @@
 
     // Off, as in calls: plain to see.
     &--off {
-        border-color: color-mix(in srgb, var(--estream-danger) 40%, var(--estream-border));
-        background: color-mix(in srgb, var(--estream-danger) 10%, var(--estream-surface));
+        border-color: color-mix(in srgb, var(--wplus-live-stream-danger) 40%, var(--wplus-live-stream-border));
+        background: color-mix(in srgb, var(--wplus-live-stream-danger) 10%, var(--wplus-live-stream-surface));
 
-        .estream-device__toggle {
-            color: var(--estream-danger);
+        .wplus-live-stream-device__toggle {
+            color: var(--wplus-live-stream-danger);
         }
     }
 }
 
-.estream-button--large {
+.wplus-live-stream-button--large {
     padding: 9px 18px;
     font-weight: 650;
 }
 
 // 3, 2, 1 over the picture.
-.estream-going {
+.wplus-live-stream-going {
     position: absolute;
     inset: 0;
     z-index: 6;
@@ -2294,7 +2335,7 @@
         line-height: 1;
         color: #fff;
         text-shadow: 0 4px 24px rgba(0, 0, 0, 0.5);
-        animation: estream-tick 1s ease-out;
+        animation: wplus-live-stream-tick 1s ease-out;
     }
 
     &__label {
@@ -2305,25 +2346,25 @@
     }
 }
 
-@keyframes estream-tick {
+@keyframes wplus-live-stream-tick {
     0% { transform: scale(1.6); opacity: 0; }
     20% { transform: scale(1); opacity: 1; }
     100% { transform: scale(0.9); opacity: 0.85; }
 }
 
 @container (max-width: 480px) {
-    .estream-going__number {
+    .wplus-live-stream-going__number {
         font-size: 64px;
     }
 }
 
-.estream-badge--preview {
+.wplus-live-stream-badge--preview {
     background: rgba(255, 255, 255, 0.18);
     backdrop-filter: blur(6px);
 }
 
 // The end, summed up.
-.estream-summary {
+.wplus-live-stream-summary {
     display: flex;
     flex-direction: column;
     align-items: flex-start;
@@ -2348,11 +2389,11 @@
         flex-direction: column-reverse;
         gap: 2px;
         padding: 10px 12px;
-        border-radius: calc(var(--estream-radius) * 0.75);
-        background: var(--estream-surface-2);
+        border-radius: calc(var(--wplus-live-stream-radius) * 0.75);
+        background: var(--wplus-live-stream-surface-2);
 
         dt {
-            color: var(--estream-muted);
+            color: var(--wplus-live-stream-muted);
             font-size: 0.8em;
         }
 
@@ -2366,7 +2407,7 @@
 }
 
 // Streaming from OBS: the steps, the address and key to paste into it, and whether its picture has come.
-.estream-encoder {
+.wplus-live-stream-encoder {
     display: flex;
     flex-direction: column;
     gap: 10px;
@@ -2385,16 +2426,16 @@
         margin: 0;
         padding: 0;
         list-style: none;
-        counter-reset: estream-step;
+        counter-reset: wplus-live-stream-step;
 
         > li {
             position: relative;
             padding-left: 32px;
-            counter-increment: estream-step;
+            counter-increment: wplus-live-stream-step;
             font-size: 0.92em;
 
             &::before {
-                content: counter(estream-step);
+                content: counter(wplus-live-stream-step);
                 position: absolute;
                 left: 0;
                 top: 0;
@@ -2404,8 +2445,8 @@
                 width: 22px;
                 height: 22px;
                 border-radius: 50%;
-                background: var(--estream-surface-2);
-                color: var(--estream-muted);
+                background: var(--wplus-live-stream-surface-2);
+                color: var(--wplus-live-stream-muted);
                 font-size: 0.8em;
                 font-weight: 700;
             }
@@ -2418,21 +2459,21 @@
         gap: 8px;
         margin: 0;
         font-weight: 600;
-        color: var(--estream-muted);
+        color: var(--wplus-live-stream-muted);
 
         &::before {
             content: "";
             width: 8px;
             height: 8px;
             border-radius: 50%;
-            background: var(--estream-border);
+            background: var(--wplus-live-stream-border);
         }
 
         &--on {
-            color: var(--estream-text);
+            color: var(--wplus-live-stream-text);
 
             &::before {
-                background: var(--estream-accent);
+                background: var(--wplus-live-stream-accent);
             }
         }
     }
@@ -2444,20 +2485,34 @@
 
         label {
             font-size: 0.85em;
-            color: var(--estream-muted);
+            color: var(--wplus-live-stream-muted);
         }
     }
 }
 
-.estream-reactions {
+.wplus-live-stream-reactions {
     display: flex;
     gap: 2px;
     padding: 2px;
     border-radius: 999px;
-    background: var(--estream-surface-2);
+    background: var(--wplus-live-stream-surface-2);
 }
 
-.estream-reaction {
+// The same row in full screen, in a menu from the player's bar (stage.tsx, FullScreenReactions), as wide as the row.
+.wplus-live-stream-bar__reactions {
+    .wplus-live-stream-menu__list {
+        min-width: 0;
+        max-width: none;
+        padding: 4px;
+    }
+
+    .wplus-live-stream-reactions {
+        padding: 0;
+        background: none;
+    }
+}
+
+.wplus-live-stream-reaction {
     appearance: none;
     width: 34px;
     height: 34px;
@@ -2471,7 +2526,7 @@
     @include button-colours( inherit, transparent );
 
     &:hover {
-        background: var(--estream-surface);
+        background: var(--wplus-live-stream-surface);
         transform: scale(1.12);
     }
 
@@ -2480,15 +2535,15 @@
     }
 
     &:focus-visible {
-        outline: 2px solid var(--estream-accent);
+        outline: 2px solid var(--wplus-live-stream-accent);
         outline-offset: 0;
     }
 }
 
 // The guests: who is on stage, and who asks to come.
-.estream-queue {
+.wplus-live-stream-queue {
     padding-top: 12px;
-    border-top: 1px solid var(--estream-border);
+    border-top: 1px solid var(--wplus-live-stream-border);
 
     &__title {
         display: flex;
@@ -2499,14 +2554,14 @@
         font-weight: 700;
         letter-spacing: 0.04em;
         text-transform: uppercase;
-        color: var(--estream-muted);
+        color: var(--wplus-live-stream-muted);
     }
 
     &__count {
         padding: 0 6px;
         border-radius: 999px;
-        background: var(--estream-accent);
-        color: var(--estream-accent-text);
+        background: var(--wplus-live-stream-accent);
+        color: var(--wplus-live-stream-accent-text);
         letter-spacing: 0;
     }
 
@@ -2531,7 +2586,7 @@
         width: 30px;
         height: 30px;
         border-radius: 50%;
-        background: var(--estream-surface-2);
+        background: var(--wplus-live-stream-surface-2);
         font-size: 0.75em;
         font-weight: 700;
     }
@@ -2549,11 +2604,11 @@
         display: inline-flex;
         align-items: center;
         gap: 4px;
-        color: var(--estream-muted);
+        color: var(--wplus-live-stream-muted);
         font-size: 0.82em;
         font-weight: 400;
 
-        .estream-icon {
+        .wplus-live-stream-icon {
             width: 13px;
             height: 13px;
         }
@@ -2562,15 +2617,15 @@
 
 // Chat
 
-.estream-chat {
+.wplus-live-stream-chat {
     flex: 1;
     display: flex;
     flex-direction: column;
     min-height: 320px;
-    height: var(--estream-chat-height, 480px);
-    border: 1px solid var(--estream-border);
-    border-radius: var(--estream-radius);
-    background: var(--estream-surface);
+    height: var(--wplus-live-stream-chat-height, 480px);
+    border: 1px solid var(--wplus-live-stream-border);
+    border-radius: var(--wplus-live-stream-radius);
+    background: var(--wplus-live-stream-surface);
     overflow: hidden;
 
     &__header {
@@ -2579,7 +2634,7 @@
         gap: 8px;
         min-height: 44px;
         padding: 4px 6px 4px 14px;
-        border-bottom: 1px solid var(--estream-border);
+        border-bottom: 1px solid var(--wplus-live-stream-border);
     }
 
     &__title {
@@ -2594,12 +2649,12 @@
         gap: 4px;
         padding: 1px 8px;
         border-radius: 999px;
-        background: var(--estream-surface-2);
-        color: var(--estream-muted);
+        background: var(--wplus-live-stream-surface-2);
+        color: var(--wplus-live-stream-muted);
         font-size: 0.8em;
         font-weight: 600;
 
-        .estream-icon {
+        .wplus-live-stream-icon {
             width: 14px;
             height: 14px;
         }
@@ -2633,10 +2688,10 @@
         align-items: center;
         gap: 4px;
         padding: 40px 16px;
-        color: var(--estream-muted);
+        color: var(--wplus-live-stream-muted);
         text-align: center;
 
-        .estream-icon {
+        .wplus-live-stream-icon {
             width: 28px;
             height: 28px;
             margin-bottom: 4px;
@@ -2665,9 +2720,9 @@
         white-space: nowrap;
         box-shadow: 0 4px 14px rgba(0, 0, 0, 0.2);
         cursor: pointer;
-        @include button-colours( var(--estream-accent-text), var(--estream-accent) );
+        @include button-colours( var(--wplus-live-stream-accent-text), var(--wplus-live-stream-accent) );
 
-        .estream-icon {
+        .wplus-live-stream-icon {
             width: 16px;
             height: 16px;
         }
@@ -2676,12 +2731,12 @@
     &__note {
         margin: 0;
         padding: 8px 12px;
-        color: var(--estream-muted);
+        color: var(--wplus-live-stream-muted);
         font-size: 0.85em;
-        border-top: 1px solid var(--estream-border);
+        border-top: 1px solid var(--wplus-live-stream-border);
 
         &--error {
-            color: var(--estream-danger);
+            color: var(--wplus-live-stream-danger);
         }
 
         &--action {
@@ -2689,7 +2744,7 @@
             justify-content: center;
             padding: 10px 12px;
 
-            .estream-button {
+            .wplus-live-stream-button {
                 text-decoration: none;
             }
         }
@@ -2700,7 +2755,7 @@
         align-items: center;
         gap: 6px;
         padding: 8px;
-        border-top: 1px solid var(--estream-border);
+        border-top: 1px solid var(--wplus-live-stream-border);
     }
 
     &__field {
@@ -2709,11 +2764,11 @@
         min-width: 0;
         display: flex;
 
-        .estream-input {
+        .wplus-live-stream-input {
             padding-right: 40px;
         }
 
-        .estream-emoji {
+        .wplus-live-stream-emoji {
             position: absolute;
             right: 2px;
             top: 50%;
@@ -2723,13 +2778,13 @@
 
     &__left {
         min-width: 2ch;
-        color: var(--estream-muted);
+        color: var(--wplus-live-stream-muted);
         font-size: 0.8em;
         font-variant-numeric: tabular-nums;
         text-align: right;
 
         &--low {
-            color: var(--estream-danger);
+            color: var(--wplus-live-stream-danger);
             font-weight: 600;
         }
     }
@@ -2747,21 +2802,21 @@
     }
 
     // On the chat's surface, icon buttons take the theme's colours.
-    .estream-icon-button {
+    .wplus-live-stream-icon-button {
         width: 34px;
         height: 34px;
-        color: var(--estream-muted);
+        color: var(--wplus-live-stream-muted);
 
         &:hover {
-            background: var(--estream-surface-2);
-            color: var(--estream-text);
+            background: var(--wplus-live-stream-surface-2);
+            color: var(--wplus-live-stream-text);
         }
 
         &:focus-visible {
-            outline-color: var(--estream-accent);
+            outline-color: var(--wplus-live-stream-accent);
         }
 
-        .estream-icon {
+        .wplus-live-stream-icon {
             width: 20px;
             height: 20px;
         }
@@ -2769,20 +2824,20 @@
 }
 
 // The message a moderator pinned over the chat.
-.estream-chat__pinned {
+.wplus-live-stream-chat__pinned {
     display: flex;
     align-items: flex-start;
     gap: 8px;
     padding: 8px 6px 8px 12px;
-    border-bottom: 1px solid var(--estream-border);
-    background: color-mix(in srgb, var(--estream-accent) 8%, var(--estream-surface));
+    border-bottom: 1px solid var(--wplus-live-stream-border);
+    background: color-mix(in srgb, var(--wplus-live-stream-accent) 8%, var(--wplus-live-stream-surface));
     font-size: 0.9em;
 
-    > .estream-icon {
+    > .wplus-live-stream-icon {
         width: 16px;
         height: 16px;
         margin-top: 2px;
-        color: var(--estream-accent);
+        color: var(--wplus-live-stream-accent);
     }
 
     &-body {
@@ -2791,25 +2846,25 @@
         overflow-wrap: anywhere;
 
         a {
-            color: var(--estream-accent);
+            color: var(--wplus-live-stream-accent);
             text-decoration: underline;
         }
     }
 
-    .estream-icon-button {
+    .wplus-live-stream-icon-button {
         width: 26px;
         height: 26px;
         flex: none;
     }
 }
 
-.estream-reconnecting .estream-icon {
+.wplus-live-stream-reconnecting .wplus-live-stream-icon {
     width: 16px;
     height: 16px;
 }
 
-.estream-emoji {
-    .estream-menu__list {
+.wplus-live-stream-emoji {
+    .wplus-live-stream-menu__list {
         min-width: 0;
         width: 292px;
         padding: 8px;
@@ -2835,36 +2890,36 @@
 
         &:hover,
         &:focus-visible {
-            background: var(--estream-surface-2);
+            background: var(--wplus-live-stream-surface-2);
             outline: none;
         }
     }
 }
 
-.estream-input {
+.wplus-live-stream-input {
     flex: 1;
     min-width: 0;
     padding: 7px 10px;
-    border: 1px solid var(--estream-border);
+    border: 1px solid var(--wplus-live-stream-border);
     border-radius: 6px;
-    background: var(--estream-surface);
-    color: var(--estream-text);
+    background: var(--wplus-live-stream-surface);
+    color: var(--wplus-live-stream-text);
     font: inherit;
     font-size: 0.95em;
 
     &:focus {
-        outline: 2px solid var(--estream-accent);
+        outline: 2px solid var(--wplus-live-stream-accent);
         outline-offset: -1px;
     }
 }
 
-select.estream-input {
+select.wplus-live-stream-input {
     flex: none;
 }
 
 // The chat's field where the site draws emoji in a set (emoji-field.tsx): one line like the input it stands for,
 // scrolling sideways when long, its placeholder shown while empty.
-.estream-chat__editable {
+.wplus-live-stream-chat__editable {
     // The input's height: its line, and the emoji drawn a little larger than the text.
     min-height: calc(1.45em + 16px);
     line-height: 1.45;
@@ -2880,17 +2935,17 @@ select.estream-input {
 
     &:empty::before {
         content: attr(data-placeholder);
-        color: var(--estream-muted);
+        color: var(--wplus-live-stream-muted);
         pointer-events: none;
     }
 
-    .estream-emoji-image {
+    .wplus-live-stream-emoji-image {
         vertical-align: -0.25em;
     }
 }
 
 // An emoji in the site's set, a little larger than the text around it, as Better Messages draws them.
-.estream-emoji-image {
+.wplus-live-stream-emoji-image {
     display: inline-block;
     width: 1.3em;
     height: 1.3em;
@@ -2899,7 +2954,7 @@ select.estream-input {
     border: 0;
 }
 
-.estream-message {
+.wplus-live-stream-message {
     position: relative;
     display: flex;
     gap: 8px;
@@ -2908,16 +2963,16 @@ select.estream-input {
 
     &:hover,
     &:focus-within {
-        background: var(--estream-surface-2);
+        background: var(--wplus-live-stream-surface-2);
     }
 
     // A message naming you, marked as YouTube and Twitch do.
     &--mention {
-        background: color-mix(in srgb, var(--estream-accent) 12%, transparent);
-        box-shadow: inset 3px 0 0 var(--estream-accent);
+        background: color-mix(in srgb, var(--wplus-live-stream-accent) 12%, transparent);
+        box-shadow: inset 3px 0 0 var(--wplus-live-stream-accent);
 
         &:hover {
-            background: color-mix(in srgb, var(--estream-accent) 18%, transparent);
+            background: color-mix(in srgb, var(--wplus-live-stream-accent) 18%, transparent);
         }
     }
 
@@ -2944,7 +2999,7 @@ select.estream-input {
         overflow-wrap: anywhere;
 
         a {
-            color: var(--estream-accent);
+            color: var(--wplus-live-stream-accent);
             text-decoration: underline;
             text-underline-offset: 2px;
         }
@@ -2953,23 +3008,23 @@ select.estream-input {
     &__name {
         font-weight: 650;
         margin-right: 6px;
-        color: var(--estream-muted);
+        color: var(--wplus-live-stream-muted);
     }
 
     &--host &__name {
-        color: var(--estream-accent);
+        color: var(--wplus-live-stream-accent);
     }
 
     // Its time is in its tooltip, and beside the name where the site shows times.
     &__time {
         display: none;
         margin-right: 6px;
-        color: var(--estream-muted);
+        color: var(--wplus-live-stream-muted);
         font-size: 0.8em;
         font-variant-numeric: tabular-nums;
     }
 
-    .estream-theme--times &__time {
+    .wplus-live-stream-theme--times &__time {
         display: inline;
     }
 
@@ -2979,11 +3034,11 @@ select.estream-input {
         top: 2px;
         opacity: 0;
 
-        .estream-icon-button {
+        .wplus-live-stream-icon-button {
             width: 28px;
             height: 28px;
-            background: var(--estream-surface);
-            box-shadow: 0 0 0 1px var(--estream-border);
+            background: var(--wplus-live-stream-surface);
+            box-shadow: 0 0 0 1px var(--wplus-live-stream-border);
         }
     }
 
@@ -2994,13 +3049,13 @@ select.estream-input {
 }
 
 // The chat's "Who's here" button, lit while the list shows.
-.estream-chat__people[aria-pressed="true"] {
-    color: var(--estream-accent);
-    background: color-mix(in srgb, var(--estream-accent) 12%, transparent);
+.wplus-live-stream-chat__people[aria-pressed="true"] {
+    color: var(--wplus-live-stream-accent);
+    background: color-mix(in srgb, var(--wplus-live-stream-accent) 12%, transparent);
 }
 
 // Who is here, in place of the messages: the signed-in, then how many visitors, and for moderators the banned.
-.estream-people {
+.wplus-live-stream-people {
     height: 100%;
     overflow-y: auto;
     padding: 6px 0 10px;
@@ -3013,13 +3068,13 @@ select.estream-input {
 
     &__more {
         margin: 6px 12px 0;
-        color: var(--estream-muted);
+        color: var(--wplus-live-stream-muted);
         font-size: 0.86em;
     }
 
     &__heading {
         margin: 14px 12px 4px;
-        color: var(--estream-muted);
+        color: var(--wplus-live-stream-muted);
         font-size: 0.75em;
         font-weight: 650;
         letter-spacing: 0.04em;
@@ -3031,7 +3086,7 @@ select.estream-input {
     }
 }
 
-.estream-person {
+.wplus-live-stream-person {
     display: flex;
     align-items: center;
     gap: 8px;
@@ -3041,10 +3096,10 @@ select.estream-input {
 
     &:hover,
     &:focus-within {
-        background: var(--estream-surface-2);
+        background: var(--wplus-live-stream-surface-2);
     }
 
-    .estream-message__avatar {
+    .wplus-live-stream-message__avatar {
         margin-top: 0;
     }
 
@@ -3056,33 +3111,33 @@ select.estream-input {
         font-weight: 600;
     }
 
-    .estream-role {
+    .wplus-live-stream-role {
         margin-right: 0;
     }
 
     &__muted {
         display: inline-flex;
-        color: var(--estream-muted);
+        color: var(--wplus-live-stream-muted);
 
-        .estream-icon {
+        .wplus-live-stream-icon {
             width: 14px;
             height: 14px;
         }
     }
 
     &__actions,
-    .estream-button {
+    .wplus-live-stream-button {
         margin-left: auto;
     }
 
     &--banned &__name {
-        color: var(--estream-muted);
+        color: var(--wplus-live-stream-muted);
         font-weight: 500;
     }
 }
 
 // Who wrote it, beside the name.
-.estream-role {
+.wplus-live-stream-role {
     display: inline-block;
     margin-right: 6px;
     padding: 0 5px;
@@ -3095,20 +3150,20 @@ select.estream-input {
     vertical-align: 1px;
 
     &--host {
-        background: var(--estream-accent);
-        color: var(--estream-accent-text);
+        background: var(--wplus-live-stream-accent);
+        color: var(--wplus-live-stream-accent-text);
     }
 
     &--guest {
-        background: var(--estream-surface-2);
-        color: var(--estream-text);
-        box-shadow: inset 0 0 0 1px var(--estream-border);
+        background: var(--wplus-live-stream-surface-2);
+        color: var(--wplus-live-stream-text);
+        box-shadow: inset 0 0 0 1px var(--wplus-live-stream-border);
     }
 }
 
 // The invitation
 
-.estream-dialog {
+.wplus-live-stream-dialog {
     position: fixed;
     inset: 0;
     z-index: 100000;
@@ -3118,7 +3173,7 @@ select.estream-input {
     padding: 16px;
     background: rgba(0, 0, 0, 0.45);
     // Outside the app, so its type is set again here, not taken from the page.
-    font-family: var(--estream-font);
+    font-family: var(--wplus-live-stream-font);
     font-size: 15px;
     line-height: 1.45;
     text-align: left;
@@ -3131,9 +3186,9 @@ select.estream-input {
         max-width: 400px;
         width: 100%;
         padding: 20px;
-        border-radius: var(--estream-radius);
-        background: var(--estream-surface);
-        color: var(--estream-text);
+        border-radius: var(--wplus-live-stream-radius);
+        background: var(--wplus-live-stream-surface);
+        color: var(--wplus-live-stream-text);
         box-shadow: 0 12px 40px rgba(0, 0, 0, 0.25);
 
         h2 {
@@ -3148,7 +3203,7 @@ select.estream-input {
 
         p {
             margin: 0 0 18px;
-            color: var(--estream-muted);
+            color: var(--wplus-live-stream-muted);
             font-size: 0.95em;
         }
     }
@@ -3161,7 +3216,7 @@ select.estream-input {
 }
 
 // The player's keys (shortcuts.tsx), in its dialog: each key beside what it does.
-.estream-keys {
+.wplus-live-stream-keys {
     margin: 4px 0 18px;
 
     &__row {
@@ -3169,7 +3224,7 @@ select.estream-input {
         align-items: baseline;
         gap: 12px;
         padding: 5px 0;
-        border-bottom: 1px solid var(--estream-border);
+        border-bottom: 1px solid var(--wplus-live-stream-border);
 
         dt {
             flex: 0 0 56px;
@@ -3177,7 +3232,7 @@ select.estream-input {
 
         dd {
             margin: 0;
-            color: var(--estream-muted);
+            color: var(--wplus-live-stream-muted);
         }
     }
 
@@ -3185,11 +3240,11 @@ select.estream-input {
         display: inline-block;
         min-width: 24px;
         padding: 1px 6px;
-        border: 1px solid var(--estream-border);
+        border: 1px solid var(--wplus-live-stream-border);
         border-bottom-width: 2px;
         border-radius: 5px;
-        background: var(--estream-surface);
-        color: var(--estream-text);
+        background: var(--wplus-live-stream-surface);
+        color: var(--wplus-live-stream-text);
         font-family: inherit;
         font-size: 0.85em;
         font-weight: 600;
@@ -3199,9 +3254,9 @@ select.estream-input {
 
 // Parts placed apart on a page (parts.tsx): each is a theme root of its own, with the type the app sets.
 
-.estream-part {
-    color: var(--estream-text);
-    font-family: var(--estream-font);
+.wplus-live-stream-part {
+    color: var(--wplus-live-stream-text);
+    font-family: var(--wplus-live-stream-font);
     font-size: 15px;
     line-height: 1.45;
     text-align: left;
@@ -3212,37 +3267,37 @@ select.estream-input {
 }
 
 // The layer for dialogs that belong to no part adds nothing to the page.
-.estream-part--dialogs {
+.wplus-live-stream-part--dialogs {
     display: contents;
 }
 
-.estream-theme .estream-studio-page__title,
-.estream-theme .estream-studio-page__heading {
+.wplus-live-stream-theme .wplus-live-stream-studio-page__title,
+.wplus-live-stream-theme .wplus-live-stream-studio-page__heading {
     padding: 0;
     border: 0;
-    color: var(--estream-text);
-    font-family: var(--estream-font);
+    color: var(--wplus-live-stream-text);
+    font-family: var(--wplus-live-stream-font);
     letter-spacing: normal;
     text-transform: none;
     text-align: left;
 }
 
 // A host on a page without the studio: where they go live.
-.estream-hostnote {
+.wplus-live-stream-hostnote {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
     gap: 8px 12px;
     margin-bottom: 10px;
     padding: 8px 10px 8px 12px;
-    border: 1px solid var(--estream-border);
-    border-radius: var(--estream-radius);
-    background: var(--estream-surface);
-    color: var(--estream-text);
+    border: 1px solid var(--wplus-live-stream-border);
+    border-radius: var(--wplus-live-stream-radius);
+    background: var(--wplus-live-stream-surface);
+    color: var(--wplus-live-stream-text);
     font-size: 0.92em;
 
-    > .estream-icon {
-        color: var(--estream-live);
+    > .wplus-live-stream-icon {
+        color: var(--wplus-live-stream-live);
     }
 
     &__text {
@@ -3250,60 +3305,60 @@ select.estream-input {
         min-width: 0;
     }
 
-    a.estream-button {
+    a.wplus-live-stream-button {
         text-decoration: none;
     }
 }
 
-.estream-theme--full .estream-hostnote,
-.estream-part--floating .estream-hostnote {
+.wplus-live-stream-theme--full .wplus-live-stream-hostnote,
+.wplus-live-stream-part--floating .wplus-live-stream-hostnote {
     display: none;
 }
 
 // A phone that scrolled past the player while live keeps the picture at the top of the screen (`sticky`), its
 // place on the page kept meanwhile.
-.estream-part--floating {
+.wplus-live-stream-part--floating {
     position: fixed;
     top: var(--wp-admin--admin-bar--height, 0px);
     left: 0;
     right: 0;
     z-index: 99990;
-    background: var(--estream-stage);
+    background: var(--wplus-live-stream-stage);
     box-shadow: 0 6px 18px rgba(0, 0, 0, 0.3);
 
-    .estream-app {
+    .wplus-live-stream-app {
         padding: 0;
         gap: 0;
         border-radius: 0;
     }
 
-    .estream-stage {
+    .wplus-live-stream-stage {
         width: min(100%, calc(40vh * 16 / 9));
         margin: 0 auto;
         border-radius: 0;
     }
 
-    &.estream-theme--standard .estream-stage {
+    &.wplus-live-stream-theme--standard .wplus-live-stream-stage {
         width: min(100%, calc(40vh * 4 / 3));
     }
 
-    &.estream-theme--upright .estream-stage {
+    &.wplus-live-stream-theme--upright .wplus-live-stream-stage {
         width: min(100%, calc(40vh * 9 / 16));
     }
 }
 
 // The chat as a part: the site's chat height, or the height it was given (as tall as the player beside it, or
 // the block's own).
-.estream-part--chat {
+.wplus-live-stream-part--chat {
     display: flex;
     flex-direction: column;
 
-    > .estream-chat {
+    > .wplus-live-stream-chat {
         flex: 1;
     }
 }
 
-.estream-part--sized > .estream-chat {
+.wplus-live-stream-part--sized > .wplus-live-stream-chat {
     height: 100%;
     min-height: 0;
 }
@@ -3313,7 +3368,7 @@ select.estream-input {
 // here only what is the stream's.
 
 // The header's button, a live dot on it while the stream is on air.
-.estream-bm-button--live {
+.wplus-live-stream-bm-button--live {
     position: relative;
 
     &::after {
@@ -3330,7 +3385,7 @@ select.estream-input {
 }
 
 // The banner over the messages: Live, the stream's title, how many watch.
-.estream-bm-banner {
+.wplus-live-stream-bm-banner {
     .wplus-group-call-in-progress-info {
         flex-wrap: wrap;
         justify-content: center;
@@ -3362,9 +3417,9 @@ select.estream-input {
 }
 
 // The stream in the call area: its picture over the call's canvas, above the dock, as a call's grid is.
-.estream-theme.estream-bm-stage {
-    --estream-stage: transparent;
-    --estream-background: transparent;
+.wplus-live-stream-theme.wplus-live-stream-bm-stage {
+    --wplus-live-stream-stage: transparent;
+    --wplus-live-stream-background: transparent;
     position: absolute;
     inset: 0;
     background: transparent;
@@ -3374,7 +3429,7 @@ select.estream-input {
         inset: 0;
     }
 
-    .estream-bm-stage__picture {
+    .wplus-live-stream-bm-stage__picture {
         position: absolute;
         inset: 0 0 64px;
     }
@@ -3384,7 +3439,7 @@ select.estream-input {
         background: none;
     }
 
-    .estream-stage {
+    .wplus-live-stream-stage {
         position: absolute;
         inset: 0;
         aspect-ratio: auto;
@@ -3394,8 +3449,8 @@ select.estream-input {
 
     // Light on the dark stage: over a theme's colour for links in a post (`.entry-content a:not(…)`), which outranks
     // a class or two, as Better Messages outranks it.
-    a.estream-bm-stage__studio:not(#\9) {
-        color: var(--estream-over-text);
+    a.wplus-live-stream-bm-stage__studio:not(#\9) {
+        color: var(--wplus-live-stream-over-text);
         text-decoration: underline;
         text-decoration-color: rgba(255, 255, 255, 0.5);
         text-underline-offset: 3px;
@@ -3411,7 +3466,7 @@ select.estream-input {
     // picture. Better Messages strips every button in its wraps with !important (no background, no padding, square
     // corners, no shadow, the text's colour), so this takes an id's weight and !important back. So do the buttons said
     // over a picture too much for the connection.
-    button.estream-slow__button:not(#\9) {
+    button.wplus-live-stream-slow__button:not(#\9) {
         padding: 8px 16px !important;
         border-radius: var(--wplus-radius-button, 8px) !important;
         background: rgba(var(--wplus-color-accent, 37, 99, 235), 1) !important;
@@ -3425,7 +3480,7 @@ select.estream-input {
         }
     }
 
-    button.estream-unmute:not(#\9) {
+    button.wplus-live-stream-unmute:not(#\9) {
         padding: 10px 18px !important;
         border-radius: var(--wplus-radius-button, 8px) !important;
         background: rgba(var(--wplus-color-accent, 37, 99, 235), 1) !important;
@@ -3441,7 +3496,7 @@ select.estream-input {
     }
 
     // The time on air, beside the Live badge.
-    .estream-top__time .estream-bar__time {
+    .wplus-live-stream-top__time .wplus-live-stream-bar__time {
         opacity: 1;
     }
 
@@ -3502,13 +3557,13 @@ select.estream-input {
 
     // A sheet's button while its sheet is open, as a latched extra of the call's.
     .wplus-group-call-controls-buttons > .wplus-configure-call[data-active],
-    .wplus-group-call-controls-buttons > .estream-bm-react[data-active] {
+    .wplus-group-call-controls-buttons > .wplus-live-stream-bm-react[data-active] {
         background: rgba(var(--wplus-color-accent), 1);
         color: rgba(var(--wplus-color-text-on-accent), 1);
     }
 
     // The viewer's sheet: the volume over the quality, one column as wide as a device's picker.
-    .wplus-call-settings.estream-bm-watch {
+    .wplus-call-settings.wplus-live-stream-bm-watch {
         flex-direction: column;
         flex-wrap: nowrap;
         align-items: stretch;
@@ -3520,20 +3575,20 @@ select.estream-input {
         }
     }
 
-    .estream-bm-volume input[type="range"] {
-        @include estream-slider;
+    .wplus-live-stream-bm-volume input[type="range"] {
+        @include wplus-live-stream-slider;
         display: block;
         width: 100%;
         margin: 7px 0;
     }
 
     // The reactions, a row of emoji over the dock.
-    .wplus-call-settings.estream-bm-reactions {
+    .wplus-call-settings.wplus-live-stream-bm-reactions {
         gap: 2px;
         padding: 6px;
     }
 
-    .estream-bm-reaction {
+    .wplus-live-stream-bm-reaction {
         display: inline-flex;
         align-items: center;
         justify-content: center;
@@ -3558,11 +3613,11 @@ select.estream-input {
     }
 
     // Where a call shows its connection: the host's, and how many watch.
-    .estream-bm-status {
+    .wplus-live-stream-bm-status {
         gap: 6px;
     }
 
-    .estream-bm-watching {
+    .wplus-live-stream-bm-watching {
         flex: none;
         display: inline-flex;
         align-items: center;
@@ -3578,7 +3633,7 @@ select.estream-input {
     }
 
     // A host's peak beside the count, set apart by a hairline and a shade softer.
-    .estream-bm-watching__peak {
+    .wplus-live-stream-bm-watching__peak {
         display: inline-flex;
         align-items: center;
         gap: 4px;
@@ -3587,7 +3642,7 @@ select.estream-input {
         border-left: 1px solid rgba(255, 255, 255, 0.2);
         color: rgba(255, 255, 255, 0.78);
 
-        .estream-icon {
+        .wplus-live-stream-icon {
             width: 14px;
             height: 14px;
         }
@@ -3599,12 +3654,12 @@ select.estream-input {
     }
 
     // The host's statistics across the settings sheet, over the devices: each figure's name, then the figure.
-    .wplus-call-settings > .estream-bm-statistics {
+    .wplus-call-settings > .wplus-live-stream-bm-statistics {
         flex: 1 1 100%;
         max-width: none;
     }
 
-    .estream-bm-figures {
+    .wplus-live-stream-bm-figures {
         display: grid;
         grid-template-columns: max-content 1fr;
         gap: 5px 16px;
@@ -3629,18 +3684,18 @@ select.estream-input {
     }
 
     // The host's last stream, under "Your stream has ended", which says what its own title would.
-    .estream-screen .estream-summary {
+    .wplus-live-stream-screen .wplus-live-stream-summary {
         align-items: stretch;
         width: min(100%, 440px);
         margin-top: 4px;
         text-align: left;
     }
 
-    .estream-screen .estream-summary__title {
+    .wplus-live-stream-screen .wplus-live-stream-summary__title {
         display: none;
     }
 
-    .estream-summary__figure {
+    .wplus-live-stream-summary__figure {
         background: rgba(255, 255, 255, 0.07);
     }
 
@@ -3652,23 +3707,23 @@ select.estream-input {
 }
 
 // In full screen, the frame is the screen's.
-.estream-theme.estream-bm-stage.estream-theme--full {
+.wplus-live-stream-theme.wplus-live-stream-bm-stage.wplus-live-stream-theme--full {
     background: #111318;
 }
 
-.estream-theme.estream-theme--full .estream-stage {
+.wplus-live-stream-theme.wplus-live-stream-theme--full .wplus-live-stream-stage {
     max-height: none;
 }
 
 // A Better Messages chat room in the chat's place: it takes the space the light chat would,
 // beside the stream, below it, as a part and in the studio, and Better Messages' room fills it, whatever height its
 // placeholder came with.
-.estream-bm-room {
+.wplus-live-stream-bm-room {
     flex: 1;
     display: flex;
     flex-direction: column;
     min-height: 320px;
-    height: var(--estream-chat-height, 480px);
+    height: var(--wplus-live-stream-chat-height, 480px);
 
     > .wplus-chat-wrap {
         flex: 1;
@@ -3680,16 +3735,16 @@ select.estream-input {
 // The room keeps to the stream: none of its header's ways out of it, the dash that docks it among the page's mini chats
 // or opens the messenger, and the arrows that take the room over the whole page; and in full screen not its More menu
 // either, which it opens on the page's body, outside the full screen, where nobody sees it.
-.estream-bm-room [data-action-key="minimize"],
-.estream-bm-room [data-action-key="maximize"],
-.estream-bm-room [data-action-key="unmaximize"],
-.estream-theme--full .estream-bm-room [data-action-key="more"] {
+.wplus-live-stream-bm-room [data-action-key="minimize"],
+.wplus-live-stream-bm-room [data-action-key="maximize"],
+.wplus-live-stream-bm-room [data-action-key="unmaximize"],
+.wplus-live-stream-theme--full .wplus-live-stream-bm-room [data-action-key="more"] {
     display: none !important;
 }
 
 // In full screen the room meets the screen's edges square, as the light chat does there: none of Better Messages'
 // card frame, which it raises with an id's weight (`:not(#\9)`), the column's own line parting it from the picture.
-.estream-theme--full .estream-bm-room .wplus-card--thread-embed:not(#\9) {
+.wplus-live-stream-theme--full .wplus-live-stream-bm-room .wplus-card--thread-embed:not(#\9) {
     border: 0;
     border-radius: 0;
     box-shadow: none;
@@ -3697,12 +3752,12 @@ select.estream-input {
 
 // That line in the dark the room takes in full screen, not the page's theme's, which shows as a white stripe between
 // the black of the picture and the room; over black, since the player's surface under it is the page's theme's too.
-.estream-theme--full .estream-app__side:has(> .estream-bm-room) {
+.wplus-live-stream-theme--full .wplus-live-stream-app__side:has(> .wplus-live-stream-bm-room) {
     border-left-color: rgba(255, 255, 255, 0.08);
     background: #000;
 }
 
-.estream-app__side > .estream-bm-room {
+.wplus-live-stream-app__side > .wplus-live-stream-bm-room {
     position: absolute;
     inset: 0;
     height: auto;
@@ -3710,24 +3765,24 @@ select.estream-input {
 }
 
 // Below the stream, the height the site chose; not in full screen, where the room is beside the picture as tall as it.
-.estream-theme--chat-below:not(.estream-theme--full) .estream-app__side > .estream-bm-room {
+.wplus-live-stream-theme--chat-below:not(.wplus-live-stream-theme--full) .wplus-live-stream-app__side > .wplus-live-stream-bm-room {
     position: static;
-    height: var(--estream-chat-height, 480px);
+    height: var(--wplus-live-stream-chat-height, 480px);
 }
 
 @container (max-width: 760px) {
-    .estream-theme:not(.estream-theme--full) .estream-app__side > .estream-bm-room {
+    .wplus-live-stream-theme:not(.wplus-live-stream-theme--full) .wplus-live-stream-app__side > .wplus-live-stream-bm-room {
         position: static;
-        height: var(--estream-chat-height, 480px);
+        height: var(--wplus-live-stream-chat-height, 480px);
     }
 }
 
-.estream-part--sized > .estream-bm-room {
+.wplus-live-stream-part--sized > .wplus-live-stream-bm-room {
     height: 100%;
     min-height: 0;
 }
 
-.estream-studio-page__panel--chat > .estream-bm-room {
+.wplus-live-stream-studio-page__panel--chat > .wplus-live-stream-bm-room {
     height: auto;
     min-height: 0;
 
@@ -3741,9 +3796,9 @@ select.estream-input {
 }
 
 // The studio card: the way to the studio with more room, and a host live from another window.
-.estream-studio__open {
+.wplus-live-stream-studio__open {
     margin-left: auto;
-    color: var(--estream-accent);
+    color: var(--wplus-live-stream-accent);
     font-size: 0.88em;
     font-weight: 600;
     text-decoration: none;
@@ -3753,39 +3808,39 @@ select.estream-input {
     }
 }
 
-.estream-studio__elsewhere {
+.wplus-live-stream-studio__elsewhere {
     display: flex;
     align-items: flex-start;
     gap: 10px;
     margin: 0;
     padding: 12px 14px;
-    border-radius: var(--estream-radius);
-    background: var(--estream-surface-2);
-    color: var(--estream-text);
+    border-radius: var(--wplus-live-stream-radius);
+    background: var(--wplus-live-stream-surface-2);
+    color: var(--wplus-live-stream-text);
 
-    .estream-icon {
+    .wplus-live-stream-icon {
         margin-top: 2px;
-        color: var(--estream-live);
+        color: var(--wplus-live-stream-live);
     }
 }
 
 // The admin's studio page (studio-page.tsx), in the height its place gives it (the admin's content area): the
 // picture as large as fits with the controls under it, and the chat, the guests and the stream's details beside it.
 
-.estream-part--studio-page {
-    container: estream-studio-page / inline-size;
+.wplus-live-stream-part--studio-page {
+    container: wplus-live-stream-studio-page / inline-size;
     height: 100%;
 }
 
 // What the controls of a live stream take under the picture: the statistics and the bar, in their card.
 $studio-controls: 150px;
 
-.estream-studio-page {
+.wplus-live-stream-studio-page {
     display: flex;
     flex-direction: column;
     height: 100%;
-    background: var(--estream-surface-2);
-    color: var(--estream-text);
+    background: var(--wplus-live-stream-surface-2);
+    color: var(--wplus-live-stream-text);
 
     &__head {
         display: flex;
@@ -3794,8 +3849,8 @@ $studio-controls: 150px;
         gap: 8px 14px;
         min-height: 60px;
         padding: 10px 16px;
-        border-bottom: 1px solid var(--estream-border);
-        background: var(--estream-surface);
+        border-bottom: 1px solid var(--wplus-live-stream-border);
+        background: var(--wplus-live-stream-surface);
     }
 
     &__back {
@@ -3805,15 +3860,15 @@ $studio-controls: 150px;
         width: 36px;
         height: 36px;
         border-radius: 8px;
-        color: var(--estream-text);
+        color: var(--wplus-live-stream-text);
         text-decoration: none;
 
         &:hover {
-            background: var(--estream-surface-2);
+            background: var(--wplus-live-stream-surface-2);
         }
 
         &:focus-visible {
-            outline: 2px solid var(--estream-accent);
+            outline: 2px solid var(--wplus-live-stream-accent);
         }
     }
 
@@ -3831,7 +3886,7 @@ $studio-controls: 150px;
 
     &__when {
         margin: 0;
-        color: var(--estream-muted);
+        color: var(--wplus-live-stream-muted);
         font-size: 0.85em;
     }
 
@@ -3839,7 +3894,7 @@ $studio-controls: 150px;
         flex: 1;
     }
 
-    &__head a.estream-button {
+    &__head a.wplus-live-stream-button {
         text-decoration: none;
     }
 
@@ -3851,7 +3906,7 @@ $studio-controls: 150px;
     }
 
     &__main {
-        container: estream-studio-main / size;
+        container: wplus-live-stream-studio-main / size;
         min-width: 0;
         min-height: 0;
         display: flex;
@@ -3874,7 +3929,7 @@ $studio-controls: 150px;
         align-items: flex-start;
         justify-content: center;
 
-        .estream-stage {
+        .wplus-live-stream-stage {
             width: min(100cqw, calc(100cqh * 16 / 9));
         }
 
@@ -3882,7 +3937,7 @@ $studio-controls: 150px;
             align-items: center;
             background: #000;
 
-            .estream-stage {
+            .wplus-live-stream-stage {
                 border-radius: 0;
             }
         }
@@ -3890,29 +3945,29 @@ $studio-controls: 150px;
 
     &__controls {
         flex: none;
-        container: estream-studio / inline-size;
+        container: wplus-live-stream-studio / inline-size;
         display: flex;
         flex-direction: column;
         gap: 12px;
         padding: 14px;
-        border: 1px solid var(--estream-border);
-        border-radius: var(--estream-radius);
-        background: var(--estream-surface);
+        border: 1px solid var(--wplus-live-stream-border);
+        border-radius: var(--wplus-live-stream-radius);
+        background: var(--wplus-live-stream-surface);
 
         // The bar first, under the statistics while live, and what the moment needs under it, set apart.
-        > .estream-studio__bar:first-child {
+        > .wplus-live-stream-studio__bar:first-child {
             padding-top: 0;
             border-top: 0;
         }
 
-        > .estream-studio__bar ~ :not(.estream-controls__error) {
+        > .wplus-live-stream-studio__bar ~ :not(.wplus-live-stream-controls__error) {
             padding-top: 12px;
-            border-top: 1px solid var(--estream-border);
+            border-top: 1px solid var(--wplus-live-stream-border);
         }
     }
 
     // While live: time on air, viewers and their peak, messages, reactions, the connection, the picture's numbers.
-    &__stats .estream-studio__status {
+    &__stats .wplus-live-stream-studio__status {
         gap: 8px;
     }
 
@@ -3921,15 +3976,15 @@ $studio-controls: 150px;
         min-height: 0;
         display: flex;
         flex-direction: column;
-        border-left: 1px solid var(--estream-border);
-        background: var(--estream-surface);
+        border-left: 1px solid var(--wplus-live-stream-border);
+        background: var(--wplus-live-stream-surface);
     }
 
     &__tabs {
         display: flex;
         gap: 4px;
         padding: 6px 10px 0;
-        border-bottom: 1px solid var(--estream-border);
+        border-bottom: 1px solid var(--wplus-live-stream-border);
     }
 
     &__tab {
@@ -3944,20 +3999,20 @@ $studio-controls: 150px;
         font: inherit;
         font-weight: 600;
         cursor: pointer;
-        @include button-colours( var(--estream-muted), none );
+        @include button-colours( var(--wplus-live-stream-muted), none );
 
         &:hover {
-            color: var(--estream-text);
+            color: var(--wplus-live-stream-text);
         }
 
         &:focus-visible {
-            outline: 2px solid var(--estream-accent);
+            outline: 2px solid var(--wplus-live-stream-accent);
             outline-offset: -2px;
         }
 
         &--on {
-            border-bottom-color: var(--estream-accent);
-            @include button-colours( var(--estream-text) );
+            border-bottom-color: var(--wplus-live-stream-accent);
+            @include button-colours( var(--wplus-live-stream-text) );
         }
     }
 
@@ -3965,8 +4020,8 @@ $studio-controls: 150px;
         min-width: 20px;
         padding: 0 6px;
         border-radius: 999px;
-        background: var(--estream-accent);
-        color: var(--estream-accent-text);
+        background: var(--wplus-live-stream-accent);
+        color: var(--wplus-live-stream-accent-text);
         font-size: 0.78em;
         line-height: 20px;
         text-align: center;
@@ -3984,7 +4039,7 @@ $studio-controls: 150px;
             padding: 0;
             overflow: hidden;
 
-            > .estream-chat {
+            > .wplus-live-stream-chat {
                 flex: 1;
                 height: auto;
                 min-height: 0;
@@ -3993,7 +4048,7 @@ $studio-controls: 150px;
             }
 
             // The tab names it already; its header keeps slow mode and the moderators' settings.
-            .estream-chat__title {
+            .wplus-live-stream-chat__title {
                 position: absolute;
                 width: 1px;
                 height: 1px;
@@ -4003,7 +4058,7 @@ $studio-controls: 150px;
             }
         }
 
-        .estream-queue {
+        .wplus-live-stream-queue {
             padding: 0;
             border: 0;
         }
@@ -4022,18 +4077,18 @@ $studio-controls: 150px;
             width: 100%;
         }
 
-        .estream-encoder__field {
+        .wplus-live-stream-encoder__field {
             width: 100%;
         }
 
-        a.estream-button {
+        a.wplus-live-stream-button {
             text-decoration: none;
         }
     }
 
     &__heading {
         margin: 0;
-        color: var(--estream-muted);
+        color: var(--wplus-live-stream-muted);
         font-size: 0.78em;
         font-weight: 650;
         letter-spacing: 0.04em;
@@ -4042,7 +4097,7 @@ $studio-controls: 150px;
 
     &__note {
         margin: 0;
-        color: var(--estream-muted);
+        color: var(--wplus-live-stream-muted);
         font-size: 0.92em;
     }
 
@@ -4052,26 +4107,26 @@ $studio-controls: 150px;
     }
 }
 
-.estream-theme--standard .estream-studio-page__picture {
+.wplus-live-stream-theme--standard .wplus-live-stream-studio-page__picture {
     height: min(calc(100cqw * 3 / 4), calc(100cqh - #{$studio-controls}));
 
-    .estream-stage {
+    .wplus-live-stream-stage {
         width: min(100cqw, calc(100cqh * 4 / 3));
     }
 }
 
-.estream-theme--upright .estream-studio-page__picture {
+.wplus-live-stream-theme--upright .wplus-live-stream-studio-page__picture {
     height: min(calc(100cqw * 16 / 9), calc(100cqh - #{$studio-controls}));
 
-    .estream-stage {
+    .wplus-live-stream-stage {
         width: min(100cqw, calc(100cqh * 9 / 16));
     }
 }
 
 // Narrow, by the room it is given (the admin's content area, beside WordPress's menu and the plugin's tabs, or a
 // phone): everything in one column that scrolls under the head, the picture as wide as it is, the tabs under it.
-@container estream-studio-page (max-width: 820px) {
-    .estream-studio-page {
+@container wplus-live-stream-studio-page (max-width: 820px) {
+    .wplus-live-stream-studio-page {
         &__body {
             display: flex;
             flex-direction: column;
@@ -4086,13 +4141,13 @@ $studio-controls: 150px;
 
         // As wide as the column, and at the top of it.
         &__picture,
-        .estream-theme--standard &__picture,
-        .estream-theme--upright &__picture {
+        .wplus-live-stream-theme--standard &__picture,
+        .wplus-live-stream-theme--upright &__picture {
             height: auto;
             min-height: 0;
             container-type: inline-size;
 
-            .estream-stage {
+            .wplus-live-stream-stage {
                 width: 100%;
             }
         }
@@ -4101,11 +4156,11 @@ $studio-controls: 150px;
             flex: none;
             height: max(420px, 70%);
             border-left: 0;
-            border-top: 1px solid var(--estream-border);
+            border-top: 1px solid var(--wplus-live-stream-border);
         }
     }
 
-    .estream-theme--upright .estream-studio-page__picture .estream-stage {
+    .wplus-live-stream-theme--upright .wplus-live-stream-studio-page__picture .wplus-live-stream-stage {
         width: min(100%, calc(70vh * 9 / 16));
     }
 }
@@ -4113,7 +4168,7 @@ $studio-controls: 150px;
 // The Live stream block's ready layouts (the WordPress plugin's Easy_Stream_Render::LAYOUTS): the stream's parts
 // in a column or two, the chat beside the player down to a phone's width, under it below that.
 
-.estream-layout {
+.wplus-live-stream-layout {
     container-type: inline-size;
     width: 100%;
 
@@ -4134,38 +4189,38 @@ $studio-controls: 150px;
 }
 
 @container (min-width: 600px) {
-    .estream-layout--side .estream-layout__grid {
+    .wplus-live-stream-layout--side .wplus-live-stream-layout__grid {
         grid-template-columns: minmax(0, 1fr) clamp(260px, 32%, 360px);
     }
 
     // Upright: the player as wide as its shape at the window's height, the chat beside it.
-    .estream-layout--vertical .estream-layout__grid {
+    .wplus-live-stream-layout--vertical .wplus-live-stream-layout__grid {
         grid-template-columns: minmax(0, calc(min(80vh, 780px) * 9 / 16)) minmax(260px, 360px);
         justify-content: center;
     }
 }
 
 // The chat hidden from the player (parts.tsx): the player takes the layout's width, the chat kept on the page unseen.
-.estream-layout--no-chat {
-    .estream-layout__side,
-    .estream-part--chat {
+.wplus-live-stream-layout--no-chat {
+    .wplus-live-stream-layout__side,
+    .wplus-live-stream-part--chat {
         display: none;
     }
 }
 
 // So is a chat that is a block of its own, wherever it is on the page, its block with it: a player beside it in a Row
 // takes the row's width.
-[data-estream-chat-hidden],
-.wp-block-wordplus-stream-chat:has(> [data-estream-chat-hidden]) {
+[data-wplus-live-stream-chat-hidden],
+.wp-block-wordplus-stream-chat:has(> [data-wplus-live-stream-chat-hidden]) {
     display: none;
 }
 
 @container (min-width: 600px) {
-    .estream-layout--side.estream-layout--no-chat .estream-layout__grid {
+    .wplus-live-stream-layout--side.wplus-live-stream-layout--no-chat .wplus-live-stream-layout__grid {
         grid-template-columns: minmax(0, 1fr);
     }
 
-    .estream-layout--vertical.estream-layout--no-chat .estream-layout__grid {
+    .wplus-live-stream-layout--vertical.wplus-live-stream-layout--no-chat .wplus-live-stream-layout__grid {
         grid-template-columns: minmax(0, calc(min(80vh, 780px) * 9 / 16));
     }
 }
@@ -4201,3 +4256,86 @@ $studio-controls: 150px;
         flex: 1 1 100%;
     }
 }
+
+// Recording (recording.tsx): REC among the studio's figures and over the picture for its hosts, and the recording of a
+// stream that ended, in a dialog as wide as the screen allows.
+
+.wplus-live-stream-rec__dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: currentColor;
+    animation: wplus-live-stream-pulse 2s ease-in-out infinite;
+
+    @media (prefers-reduced-motion: reduce) {
+        animation: none;
+    }
+}
+
+.wplus-live-stream-chip--rec {
+    background: #c62828;
+    color: #fff;
+    letter-spacing: 0.03em;
+
+    &[data-state="starting"],
+    &[data-state="stopping"] {
+        @include button-colours( var(--wplus-live-stream-text), var(--wplus-live-stream-surface-2) );
+        letter-spacing: normal;
+
+        .wplus-live-stream-rec__dot {
+            background: #c62828;
+        }
+    }
+
+    &.wplus-live-stream-chip--button,
+    &.wplus-live-stream-chip--button:hover {
+        background: #c62828;
+        color: #fff;
+    }
+}
+
+.wplus-live-stream-badge--rec {
+    background: #c62828;
+
+    &::before {
+        content: "";
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: currentColor;
+        animation: wplus-live-stream-pulse 2s ease-in-out infinite;
+
+        @media (prefers-reduced-motion: reduce) {
+            animation: none;
+        }
+    }
+}
+
+.wplus-live-stream-studio__record.wplus-live-stream-button--on .wplus-live-stream-icon {
+    color: #e53935;
+}
+
+.wplus-live-stream-studio__record-error {
+    flex-basis: 100%;
+}
+
+.wplus-live-stream-dialog__box--wide {
+    max-width: 1240px;
+    max-height: calc(100vh - 32px);
+    overflow: auto;
+}
+
+.wplus-live-stream-replay {
+    margin: 4px 0 16px;
+
+    > * {
+        display: block;
+        width: 100%;
+    }
+}
+
+// The host's effects in the studio (effects.tsx), after the setup's rows they refine.
+@import "effects";
+
+// The test stream (test-stream.tsx): its card in the studio and its badge on the stream's page.
+@import "test";

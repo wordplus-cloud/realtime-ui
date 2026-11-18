@@ -1,0 +1,154 @@
+// ─── A group call on a phone or a tablet ──────────────────────────────────
+//
+// group-video-grid.tsx lays the tiles out for a touch screen (its `touch`): a camera fills its tile only when the two
+// are all but one shape (FILL_CUTS_MOST), the user's own tile is among the others, and the pages of tiles swipe, a dot
+// for each under them (PageArrows). On a phone held upright the sheets over the call are bottom sheets, the width of
+// the stage. A call filling the window keeps clear of the notch, the rounded corners and the home bar (the host's
+// --wplus-safe-area-*).
+
+// The pages swipe, each stopping where it starts.
+.wplus-call-wrap .wplus-group-call-videos-grid .wplus-group-call-videos-grid-secondary[data-swipe] {
+    scroll-snap-type: x mandatory;
+    overscroll-behavior-x: contain;
+    scrollbar-width: none;
+
+    &::-webkit-scrollbar {
+        display: none;
+    }
+}
+
+.wplus-call-wrap .wplus-call-page-stop {
+    position: absolute;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    scroll-snap-align: start;
+    scroll-snap-stop: always;
+    pointer-events: none;
+}
+
+// A dot for each page, the one in view filled, in the gutter between the tiles and the dock.
+.wplus-call-wrap .wplus-call-pages.wplus-call-page-dots {
+    gap: 0;
+    padding: 0 2px;
+    border: 0;
+    background: none;
+    box-shadow: none;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    transform: translate(-50%, -12px);
+
+    .wplus-call-page-dot {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 16px;
+        height: 16px;
+        cursor: pointer;
+        -webkit-tap-highlight-color: transparent;
+
+        &::before {
+            content: "";
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.45);
+            box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.25);
+            transition: background var(--wplus-duration-fast) ease, transform var(--wplus-duration-fast) ease;
+        }
+
+        &[aria-current="true"]::before {
+            background: rgba(255, 255, 255, 1);
+            transform: scale(1.3);
+        }
+    }
+
+    .wplus-call-page-count {
+        padding: 2px 8px;
+        @include wplus-call-glass(0.6);
+        &:not(#\9) { border-radius: var(--wplus-radius-pill); }
+    }
+}
+
+
+// A phone or a tablet: a tile's pin and ⋯ show once the tile is tapped (group-video-grid-item.tsx), while their menu is
+// open, or while what they asked waits, rather than over every tile at once. Not on the hover a tap leaves behind.
+.wplus-call-wrap.wplus-call-wrap-group .wplus-group-call-videos-grid[data-touch] .wplus-group-call-input-video-inner {
+    &:not([data-tapped]) .wplus-admin-controls:not([data-open]):not(:has([data-busy])):not(:focus-within) {
+        opacity: 0;
+        visibility: hidden;
+    }
+
+    &[data-tapped] .wplus-admin-controls {
+        opacity: 1;
+        visibility: visible;
+        transition-delay: 0s;
+    }
+}
+
+// Any other screen with a touch pointer and no hover (a Windows laptop in tablet mode) has no tap to show them: they
+// stay on show, as every hover-only affordance does in 3.0.
+@media (pointer: coarse) {
+    .wplus-call-wrap.wplus-call-wrap-group .wplus-group-call-videos-grid:not([data-touch]) .wplus-group-call-input-video-inner .wplus-admin-controls {
+        opacity: 1;
+        visibility: visible;
+    }
+}
+
+// A phone held upright: a sheet over the call spans the stage and stands on the dock, its corners rounded on top.
+@media (pointer: coarse) {
+    @container (max-width: 599px) {
+        .wplus-call-people[data-mode="sheet"],
+        .wplus-group-call-controls-v2 .wplus-call-dock-sheet,
+        .wplus-call-popover.wplus-call-more-menu {
+            inset-inline: 6px !important;
+            width: auto !important;
+            max-width: none !important;
+            &:not(#\9) { border-radius: 16px; }
+        }
+
+        // Participants rises into place as it always came in. The dock's More has no entrance and gets none: it opens
+        // where it stays (call-more-sheet.spec.ts).
+        .wplus-call-people[data-mode="sheet"] {
+            transform-origin: bottom center;
+            animation-name: wplus-call-sheet-up;
+        }
+
+        // A dock's sheet of its own (the live streams' stage) stands on the whole bar, not on the dock's pill of
+        // buttons, so it can span the stage.
+        .wplus-group-call-controls-v2 .wplus-group-call-controls-buttons {
+            position: static;
+        }
+
+        .wplus-group-call-controls-v2 .wplus-call-dock-sheet,
+        .wplus-call-popover.wplus-call-more-menu {
+            min-width: 0;
+            padding: 8px;
+
+            .wplus-call-dock-sheet__row {
+                min-height: 44px;
+                font-size: 15px;
+            }
+        }
+
+        .wplus-call-people[data-mode="sheet"] .wplus-call-people-row {
+            min-height: 48px;
+        }
+    }
+}
+
+@keyframes wplus-call-sheet-up {
+    from { opacity: 0; transform: translateY(14px); }
+    to   { opacity: 1; transform: none; }
+}
+
+// The call filling the window: clear of what the screen keeps for itself. The grid takes the padding off what it lays
+// out (group-video-grid.tsx).
+.wplus-call-wrap.wplus-call-wrap--window {
+    box-sizing: border-box;
+    padding:
+        var(--wplus-safe-area-top, 0px)
+        var(--wplus-safe-area-right, 0px)
+        var(--wplus-safe-area-bottom, 0px)
+        var(--wplus-safe-area-left, 0px);
+}

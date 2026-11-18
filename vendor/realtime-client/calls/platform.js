@@ -6,6 +6,9 @@
  * The defaults read the user agent themselves. A product that already parses
  * it (Better Messages, with ua-parser-js) hands its own answers to
  * `setCallPlatform()`, so its records read the same as before.
+ *
+ * `appLabel` is the product and its version ("better-messages 3.2.0"), which only
+ * the product knows, as a group call's client names it with `meshApp`.
  */
 function agent() {
     return typeof navigator !== 'undefined' && typeof navigator.userAgent === 'string' ? navigator.userAgent : '';
@@ -62,6 +65,9 @@ export const defaultPlatform = {
     isFirefox() {
         return /Firefox\/|FxiOS\//.test(agent());
     },
+    appLabel() {
+        return '';
+    },
 };
 let platform = defaultPlatform;
 export function setCallPlatform(answers) {
@@ -71,3 +77,34 @@ export const browserLabel = () => platform.browserLabel();
 export const platformLabel = () => platform.platformLabel();
 export const isSafari = () => platform.isSafari();
 export const isFirefox = () => platform.isFirefox();
+export const appLabel = () => platform.appLabel();
+// What else a group call's client tells its node of the device and the network
+// on a join (rtc-client's room/utils.ts), for a direct call's report: nothing
+// where the browser won't say.
+/** The kind of device: an iPad's Safari says it is a Mac, and only touch tells. */
+export function deviceKind() {
+    const ua = agent();
+    if (!ua)
+        return undefined;
+    const nav = navigator;
+    if (/iPad/.test(ua) || (/Macintosh/.test(ua) && (nav.maxTouchPoints ?? 0) > 1))
+        return 'tablet';
+    if (/iPhone|iPod|Mobi/.test(ua) || nav.userAgentData?.mobile)
+        return 'phone';
+    if (/Android/.test(ua))
+        return 'tablet';
+    return 'desktop';
+}
+/** The network's type ("wifi", "cellular"), Chromium on Android's alone. */
+export function networkType() {
+    const type = typeof navigator !== 'undefined' ? navigator.connection?.type : undefined;
+    return type ? String(type).replace(/[^a-z0-9-]/gi, '').slice(0, 16) || undefined : undefined;
+}
+/** Chromium's estimate of the network from the page's own downloads: class, Mbit/s down (10 at most), round trip ms. */
+export function networkEstimate() {
+    const c = typeof navigator !== 'undefined' ? navigator.connection : undefined;
+    if (!c?.effectiveType)
+        return undefined;
+    const figure = (v) => typeof v === 'number' && Number.isFinite(v) ? String(v) : '';
+    return [String(c.effectiveType).replace(/[^a-z0-9-]/gi, '').slice(0, 10), figure(c.downlink), figure(c.rtt)].join(',');
+}

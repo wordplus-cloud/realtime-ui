@@ -8,48 +8,7 @@ import { translator } from '../src/inc/translations.ts';
 import type { SdkCall, SdkCalls, SdkGroupCall, SdkIncoming, SdkPerson, SdkRemoteTrack } from '../src/sdk/types.ts';
 import { fakeRoom, fakeRooms } from './fake-rooms.ts';
 import { remoteTrack } from '../src/sdk/tracks.ts';
-
-// The SDK's calls as the screens read them, by shape: events fired by hand.
-class Emitter {
-    private handlers = new Map<string, Array<( ...args: any[] ) => void>>();
-    on( event: string, fn: ( ...args: any[] ) => void ) {
-        this.handlers.set( event, [ ...( this.handlers.get( event ) ?? [] ), fn ] );
-        return this;
-    }
-    off( event: string, fn?: ( ...args: any[] ) => void ) {
-        this.handlers.set( event, ( this.handlers.get( event ) ?? [] ).filter( ( f ) => fn && f !== fn ) );
-        return this;
-    }
-    fire( event: string, ...args: any[] ) {
-        for ( const fn of this.handlers.get( event ) ?? [] ) fn( ...args );
-    }
-}
-
-const remote = (): SdkRemoteTrack & { on: HTMLMediaElement[] } => {
-    const on: HTMLMediaElement[] = [];
-    return {
-        on,
-        mediaStreamTrack: {} as MediaStreamTrack,
-        attach: ( el ) => ( on.push( el ), el ),
-        detach: () => [],
-    };
-};
-
-function fakeCall( over: Partial<SdkCall> = {} ) {
-    const e = new Emitter();
-    const call = Object.assign( e, {
-        id: 'call-1', name: 'support:34:42', type: 'video' as const, role: 'caller' as const, peer: { user: 34, info: { name: 'Ann' } },
-        state: 'ringing' as SdkCall[ 'state' ], endReason: null,
-        remote: { camera: null, microphone: null, screen: null, screenAudio: null, media: { camera: false, microphone: false, screen_share: false, screen_share_audio: false }, quality: 'unknown' as const },
-        sent: [] as Array<[ string, unknown ]>,
-        add: vi.fn( async () => ( {} as any ) ),
-        setTrack( source: string, track: unknown ) { this.sent.push( [ source, track ] ); },
-        ended: false,
-        end() { this.ended = true; },
-        ...over,
-    } );
-    return call;
-}
+import { Emitter, devices, fakeCall, remote } from './fake-sdk-call.ts';
 
 function fakeCalls() {
     const e = new Emitter();
@@ -60,25 +19,6 @@ function fakeCalls() {
         people: vi.fn( async () => [ { id: 43, name: 'Cara', avatar: '' } ] ),
     } ) as unknown as SdkCalls & Emitter & { start: ReturnType<typeof vi.fn>; group: ReturnType<typeof vi.fn>; people: ReturnType<typeof vi.fn> };
 }
-
-const devices = () => {
-    const track = { stop: vi.fn(), getSettings: () => ( { deviceId: 'cam-1' } ), addEventListener: () => {} };
-    // A stream of what was asked for, as the browser gives it: the microphone, the camera, or both.
-    const stream = ( asked: MediaStreamConstraints ) => {
-        const audio = asked.audio ? [ track ] : [];
-        const video = asked.video ? [ track ] : [];
-        return { getTracks: () => [ ...audio, ...video ], getAudioTracks: () => audio, getVideoTracks: () => video };
-    };
-    Object.defineProperty( navigator, 'mediaDevices', {
-        configurable: true,
-        value: {
-            getUserMedia: vi.fn( async ( asked: MediaStreamConstraints ) => stream( asked ) ),
-            getDisplayMedia: vi.fn(),
-            enumerateDevices: vi.fn( async () => [] ),
-        },
-    } );
-    return track;
-};
 
 beforeEach( () => {
     configureUi( { translate: ( text ) => text, currentUserId: () => 42 } );
@@ -115,6 +55,46 @@ describe( 'the SDK\'s calls on Better Messages\' screens', () => {
         const video = container.querySelector( '.wplus-private-call video.video1' );
         expect( video ).not.toBeNull();
         expect( camera.on ).toContain( video );
+    } );
+
+    it( 'places a call with a token from the app\'s own route, once however many clicks', async () => {
+        const calls = fakeCalls();
+        const started = fakeCall( { role: 'caller', state: 'ringing', peer: { user: 34, info: null } } );
+        const tokenFrom = vi.fn( async () => 'a-token' );
+        const startCall = vi.fn( async () => started );
+        Object.assign( calls, { tokenFrom, startCall } );
+        const controller = new CallsController( calls );
+        render( <CallsApp controller={ controller } /> );
+
+        await act( async () => {
+            await Promise.all( [
+                controller.placeWithToken( '/api/call-token', 34, 'audio', { name: 'Ann' } ),
+                controller.placeWithToken( '/api/call-token', 34, 'audio', { name: 'Ann' } ),
+            ] );
+        } );
+
+        expect( tokenFrom ).toHaveBeenCalledTimes( 1 );
+        expect( tokenFrom ).toHaveBeenCalledWith( '/api/call-token', { to: 34, type: 'audio' } );
+        expect( startCall ).toHaveBeenCalledWith( 'a-token' );
+        expect( controller.snapshot().showing?.kind ).toBe( 'call' );
+    } );
+
+    it( 'starts nothing when the app\'s route says no, and the next click asks again', async () => {
+        const calls = fakeCalls();
+        const started = fakeCall( { role: 'caller', state: 'ringing', peer: { user: 34, info: null } } );
+        const tokenFrom = vi.fn( async () => 'a-token' );
+        tokenFrom.mockRejectedValueOnce( Object.assign( new Error( 'forbidden' ), { code: 'forbidden' } ) );
+        const startCall = vi.fn( async () => started );
+        Object.assign( calls, { tokenFrom, startCall } );
+        const controller = new CallsController( calls );
+        render( <CallsApp controller={ controller } /> );
+
+        await act( async () => controller.placeWithToken( '/api/call-token', 34, 'video', { name: 'Ann' } ) );
+        expect( startCall ).not.toHaveBeenCalled();
+        expect( controller.snapshot().showing ).toBeNull();
+
+        await act( async () => controller.placeWithToken( '/api/call-token', 34, 'video', { name: 'Ann' } ) );
+        expect( startCall ).toHaveBeenCalledWith( 'a-token' );
     } );
 
     it( 'answers and ends a call from the keyboard: the ring and every control are named buttons in the Tab order', async () => {
@@ -224,9 +204,11 @@ describe( 'the SDK\'s calls on Better Messages\' screens', () => {
         const { container } = render( <CallsApp controller={ controller } /> );
         await act( async () => controller.place( 'support:34:42', 34, 'video', { name: 'Ann' } ) );
 
-        // Add Person: the app's people for the call, and the one picked rung in.
+        // Add Person, all the dock's More would hold, so its own button in More's place: the app's people for the call,
+        // and the one picked rung in.
         await act( async () => { fireEvent.click( container.querySelector( '.wplus-private-call' )! ); } );
-        await act( async () => { fireEvent.click( container.querySelector( '.wplus-add-person' )! ); } );
+        expect( container.querySelector( '.wplus-call-more' ), 'More for Add Person alone' ).toBeNull();
+        await act( async () => { fireEvent.click( container.querySelector( '.wplus-call-buttons > .wplus-add-person' )! ); } );
         expect( calls.people ).toHaveBeenCalledWith( 'support:34:42' );
         await act( async () => { fireEvent.click( container.querySelector( '.wplus-call-add-person-list button' )! ); } );
         expect( placed.add ).toHaveBeenCalledWith( 43 );
@@ -414,6 +396,65 @@ describe( 'a call in the page, in a spot of its own', () => {
         expect( container.querySelector( '.realtime-call-spot' ) ).toBeNull();
         expect( container.querySelector( '.realtime-call-home .realtime-call-window' ) ).toBe( window );
         expect( placed.ended ).toBe( false );
+    } );
+
+    // A spot off the screen shows the person nothing, and the other side, told nothing shows its camera, stops sending it.
+    it( 'CallSpot: a call answered into it comes into view, and the ring alone moves nothing', async () => {
+        const { CallScreen, CallSpot } = await import( '../src/react.tsx' );
+        const into = vi.spyOn( Element.prototype, 'scrollIntoView' ).mockImplementation( () => {} );
+        const calls = fakeCalls();
+        const rt = { calls: async () => calls };
+        const { container } = render( <>
+            <CallScreen rt={ rt } />
+            <CallSpot rt={ rt } call="match:{a}:{b}"><p>The chat</p></CallSpot>
+        </> );
+        await act( async () => {} );
+
+        const answered = fakeCall( { name: 'match:34:42', role: 'callee', state: 'connecting', peer: { user: 42, info: { name: 'Ben' } } } );
+        const incoming = Object.assign( new Emitter(), { id: 'ring-1', call: 'match:34:42', from: 42, info: { name: 'Ben' }, type: 'video' as const, group: null, state: 'ringing', accept: vi.fn( async () => answered ), decline: vi.fn( async () => {} ) } ) as unknown as SdkIncoming;
+        await act( async () => calls.fire( 'incoming', incoming ) );
+        expect( into ).not.toHaveBeenCalled();
+
+        await act( async () => { fireEvent.click( container.querySelector( '.wplus-toast-site-call-action-answer' )! ); } );
+        const spot = container.querySelector( '.realtime-call-spot' )!;
+        expect( spot.querySelector( '.realtime-call-window .wplus-private-call' ) ).not.toBeNull();
+        expect( into.mock.contexts ).toEqual( [ spot ] );
+        expect( into ).toHaveBeenCalledWith( { block: 'nearest' } );
+
+        // It stays where the person scrolled it from then on: the call going on brings it back to nothing.
+        await act( async () => {
+            answered.state = 'connected';
+            answered.fire( 'state', 'connected' );
+        } );
+        expect( into ).toHaveBeenCalledTimes( 1 );
+        into.mockRestore();
+    } );
+
+    it( 'CallSpot: a group call the person joins comes into view, and one the spot joins by itself leaves the page where it is', async () => {
+        const { CallScreen, CallSpot } = await import( '../src/react.tsx' );
+        const { controllerFor } = await import( '../src/sdk/controller.ts' );
+        const into = vi.spyOn( Element.prototype, 'scrollIntoView' ).mockImplementation( () => {} );
+        const calls = fakeCalls();
+        const group = Object.assign( new Emitter(), { state: 'connected', people: () => [], setTrack: vi.fn( async () => {} ), leave: vi.fn(), decline: vi.fn() } );
+        calls.group.mockResolvedValue( group );
+        const rt = { calls: async () => calls };
+        const Page = ( { join }: { join?: 'video' } ) => <>
+            <CallScreen rt={ rt } />
+            <CallSpot rt={ rt } call="meeting:daily" join={ join } />
+        </>;
+        const { container, unmount } = render( <Page join="video" /> );
+        await act( async () => {} );
+        expect( container.querySelector( '.realtime-call-spot' )!.getAttribute( 'data-call' ) ).toBe( 'meeting:daily' );
+        expect( into ).not.toHaveBeenCalled();
+        await act( async () => fireEvent.click( container.querySelector( '.wplus-exit-room' )! ) );
+        unmount();
+
+        // Its button, which joins with no `media`.
+        const again = render( <Page /> );
+        await act( async () => {} );
+        await act( async () => controllerFor( calls ).join( 'meeting:daily', 'video', 'The daily meeting' ) );
+        expect( into.mock.contexts ).toEqual( [ again.container.querySelector( '.realtime-call-spot' ) ] );
+        into.mockRestore();
     } );
 
     it( 'CallSpot join: its group call joined as the spot comes onto the page, and not again once left', async () => {
@@ -713,6 +754,149 @@ describe( 'a host in a group call', () => {
         await open( container, key );
         return [ ...container.querySelectorAll( '.wplus-call-moderation-person .wplus-call-moderation-row' ) ].map( ( e ) => e.getAttribute( 'aria-label' ) );
     };
+
+    // A group call the way the client makes one, recording or not.
+    const recorded = ( can: Record<string, boolean>, more: Record<string, unknown> = {} ) => Object.assign( meeting( can ), {
+        isRecording: false,
+        canRecord: true,
+        startRecording: vi.fn( async () => ( { id: 'rec_abcdefgh12', state: 'recording' } ) ),
+        stopRecording: vi.fn( async ( id: string ) => ( { id, state: 'stopping' } ) ),
+    }, more );
+    const probe = async ( group: unknown ) => {
+        const { useGroupCall } = await import( '../src/sdk/use-group-call.ts' );
+        const seen: { context: any } = { context: null };
+        const Probe = () => {
+            seen.context = useGroupCall( group as SdkGroupCall, 'video', () => {} );
+            return null;
+        };
+        render( <Probe /> );
+        await act( async () => {} );
+        return seen;
+    };
+
+    it( 'starts and stops a recording from the call screen, as the app\'s calls route answers', async () => {
+        const group = recorded( { publish: true, subscribe: true, admin: true } );
+        const seen = await probe( group );
+        expect( seen.context.recording ).toMatchObject( { state: 'off', can: true } );
+
+        await act( async () => seen.context.recording.start() );
+        expect( group.startRecording ).toHaveBeenCalled();
+        expect( seen.context.recording ).toMatchObject( { state: 'on', id: 'rec_abcdefgh12', can: true, mine: true } );
+        expect( seen.context.recording.since ).toBeGreaterThan( 0 );
+
+        // The room's flag agrees, and the flag going off after the stop ends it.
+        await act( async () => group.fire( 'recording', true ) );
+        expect( seen.context.recording ).toMatchObject( { state: 'on', id: 'rec_abcdefgh12', mine: true } );
+        await act( async () => seen.context.recording.stop() );
+        expect( group.stopRecording ).toHaveBeenCalledWith( 'rec_abcdefgh12' );
+        expect( seen.context.recording ).toMatchObject( { state: 'stopping', id: 'rec_abcdefgh12', mine: true } );
+        await act( async () => group.fire( 'recording', false ) );
+        expect( seen.context.recording ).toMatchObject( { state: 'off', can: true } );
+    } );
+
+    it( 'goes on a server that has no flag of the room: stopped is stopped', async () => {
+        const group = recorded( { publish: true, subscribe: true, admin: true } );
+        const seen = await probe( group );
+        await act( async () => seen.context.recording.start() );
+        await act( async () => seen.context.recording.stop() );
+        expect( seen.context.recording ).toMatchObject( { state: 'off', can: true } );
+    } );
+
+    it( 'says a refusal in the screen\'s words, keeps its code, and leaves what was as it was', async () => {
+        const group = recorded( { publish: true, subscribe: true, admin: true }, {
+            startRecording: vi.fn( async () => { throw Object.assign( new Error( 'no_credits' ), { code: 'no_credits' } ); } ),
+        } );
+        const seen = await probe( group );
+        let error: any = null;
+        await act( async () => { await seen.context.recording.start().catch( ( e: unknown ) => { error = e; } ); } );
+        expect( error ).toMatchObject( { message: 'Could not start recording', code: 'no_credits' } );
+        expect( seen.context.recording ).toMatchObject( { state: 'off', can: true } );
+
+        // A stop refused: it still records.
+        const stopped = recorded( { publish: true, subscribe: true, admin: true }, {
+            stopRecording: vi.fn( async () => { throw Object.assign( new Error( 'not_found' ), { code: 'not_found' } ); } ),
+        } );
+        const again = await probe( stopped );
+        await act( async () => again.context.recording.start() );
+        let refused: any = null;
+        await act( async () => { await again.context.recording.stop().catch( ( e: unknown ) => { refused = e; } ); } );
+        expect( refused ).toMatchObject( { message: 'Could not stop recording', code: 'not_found' } );
+        expect( again.context.recording ).toMatchObject( { state: 'on', id: 'rec_abcdefgh12', mine: true } );
+    } );
+
+    it( 'shows someone else\'s recording from the room\'s flag, with no Stop, whoever is looking', async () => {
+        // A host who didn't start it: the flag names no id to stop it by.
+        const host = recorded( { publish: true, subscribe: true, admin: true }, { isRecording: true } );
+        const seen = await probe( host );
+        expect( seen.context.recording ).toMatchObject( { state: 'on', can: false } );
+        expect( seen.context.recording.mine ).toBeUndefined();
+        expect( seen.context.recording.id ).toMatch( /^room-\d+$/ );
+        await act( async () => seen.context.recording.stop() );
+        expect( host.stopRecording ).not.toHaveBeenCalled();
+
+        // Anyone else hears of it as it starts, and has nothing about it before or after.
+        const guest = recorded( { publish: true, subscribe: true }, { canRecord: false } );
+        const other = await probe( guest );
+        expect( other.context.recording ).toBeUndefined();
+        await act( async () => guest.fire( 'recording', true ) );
+        expect( other.context.recording ).toMatchObject( { state: 'on', can: false } );
+        await act( async () => guest.fire( 'recording', false ) );
+        expect( other.context.recording ).toBeUndefined();
+    } );
+
+    it( 'has nothing about recording with a client from before it', async () => {
+        const seen = await probe( meeting( { publish: true, subscribe: true, admin: true } ) );
+        expect( seen.context.recording ).toBeUndefined();
+    } );
+
+    it( 'keeps the notice\'s Do Not Show Again in the browser', async () => {
+        window.localStorage.removeItem( 'wplus-recording-notice-off' );
+        const seen = await probe( recorded( { publish: true, subscribe: true }, { canRecord: false, isRecording: true } ) );
+        expect( seen.context.recording.notice.shown ).toBe( true );
+        await act( async () => seen.context.recording.notice.dontShowAgain() );
+        expect( seen.context.recording.notice.shown ).toBe( false );
+        const later = await probe( recorded( { publish: true, subscribe: true }, { canRecord: false, isRecording: true } ) );
+        expect( later.context.recording.notice.shown ).toBe( false );
+        window.localStorage.removeItem( 'wplus-recording-notice-off' );
+    } );
+
+    it( 'draws it on the call screen: Start in Host Controls, which asks first, then REC with Stop', async () => {
+        const calls = fakeCalls();
+        const group = recorded( { publish: true, subscribe: true, admin: true } );
+        calls.group.mockResolvedValue( group );
+        const controller = new CallsController( calls );
+        const { container } = render( <CallsApp controller={ controller } /> );
+        await act( async () => controller.join( 'meeting:daily', 'video', 'Daily' ) );
+
+        await act( async () => fireEvent.click( container.querySelector( '.wplus-host-controls' )! ) );
+        await act( async () => fireEvent.click( container.querySelector( '.wplus-room-record' )! ) );
+        expect( group.startRecording ).not.toHaveBeenCalled();
+        await act( async () => fireEvent.click( container.querySelector( '.wplus-call-dialog-yes' )! ) );
+        expect( group.startRecording ).toHaveBeenCalled();
+
+        const pill = container.querySelector( '.wplus-call-rec-pill[data-state="on"]' )!;
+        expect( pill.querySelector( '.wplus-call-rec-stop' ) ).not.toBeNull();
+        await act( async () => fireEvent.click( pill ) );
+        await act( async () => fireEvent.click( container.querySelector( '.wplus-call-dialog-yes' )! ) );
+        expect( group.stopRecording ).toHaveBeenCalledWith( 'rec_abcdefgh12' );
+    } );
+
+    it( 'tells someone else in the call with REC and the notice, and offers them nothing', async () => {
+        window.localStorage.removeItem( 'wplus-recording-notice-off' );
+        const calls = fakeCalls();
+        const group = recorded( { publish: true, subscribe: true }, { canRecord: false } );
+        calls.group.mockResolvedValue( group );
+        const controller = new CallsController( calls );
+        const { container } = render( <CallsApp controller={ controller } /> );
+        await act( async () => controller.join( 'meeting:daily', 'video', 'Daily' ) );
+        expect( container.querySelector( '.wplus-call-rec-pill' ) ).toBeNull();
+
+        await act( async () => group.fire( 'recording', true ) );
+        const pill = container.querySelector( '.wplus-call-rec-pill[data-state="on"]' )!;
+        expect( pill.querySelector( '.wplus-call-rec-stop' ) ).toBeNull();
+        expect( container.querySelector( '.wplus-call-recording-notice' ) ).not.toBeNull();
+        expect( container.querySelector( '.wplus-host-controls' ) ).toBeNull();
+    } );
 
     it( 'gets the moderator controls the cloud takes, each asked of the app through group.moderate()', async () => {
         // The rule's admin: Better Messages' controls for the others, but none the cloud has no act for: no pin, no

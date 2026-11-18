@@ -6,8 +6,8 @@ import { host } from "../../host.ts";
 import Tooltip from "../helpers/tooltip.tsx";
 import UserName from "../users/user-name.tsx";
 import UserAvatar from "../users/user-avatar.tsx";
-import Icon, { IconName } from "../../primitives/icon.tsx";
-import { cssRatio, useMediaRatio } from "../../inc/calls/ratio.ts";
+import Icon, { IconName } from "../../primitives/icons.tsx";
+import { cssRatio, publicationRatio, useMediaRatio } from "../../inc/calls/ratio.ts";
 import { ManageParticipant, MicLockedChip, ModerationPanelContext, heldMute, tileModerated } from "./moderation-panels.tsx";
 import usePendingActions from "../../inc/calls/pending.ts";
 import { Piece } from "../../pieces.tsx";
@@ -22,9 +22,11 @@ const TILE_ENTER_MS = 300;
  * they are briefly away or nothing of theirs arrives (stalled.tsx), and for a moderator the ⋯ that opens what they can
  * do about this person (moderation-panels.tsx), the row outlined while that panel is open.
  */
-export default memo(function GroupAudioGridItem({ unique_key, participant } : {
+export default memo(function GroupAudioGridItem({ unique_key, participant, entered = false } : {
     unique_key: string,
-    participant: CallParticipant
+    participant: CallParticipant,
+    // Drawn before: a roster too long to draw at once draws the row again as it scrolls to it, which is not a join.
+    entered?: boolean
 }){
     const itemRef = useRef<HTMLDivElement>(null);
 
@@ -46,9 +48,10 @@ export default memo(function GroupAudioGridItem({ unique_key, participant } : {
     // permanent animation-name meant every tile collapsed to scale(0) and grew
     // back on every re-sort. Carrying the keyframe on a class that is dropped
     // once it has played leaves later moves with no animation to restart.
-    const [ entering, setEntering ] = useState( true );
+    const [ entering, setEntering ] = useState( ! entered );
 
     useEffect(() => {
+        if ( entered ) return;
         const timer = window.setTimeout( () => setEntering( false ), TILE_ENTER_MS );
         return () => window.clearTimeout( timer );
     }, []);
@@ -82,11 +85,14 @@ export default memo(function GroupAudioGridItem({ unique_key, participant } : {
     }, [ screenElement, participant ]);
 
     // A roster row is a row until somebody shares, and then their row is the
-    // stage: it takes the height the roster is not using, and the picture
-    // inside it takes the shape the share actually has. A phone's share is
-    // taller than it is wide, so that shape cannot be assumed — it is read
-    // off the playing element and handed to the stylesheet.
-    const screenRatio = cssRatio( useMediaRatio( screenElement ) );
+    // stage: it takes the height the roster is not using, and its card takes
+    // the shape the share actually has, the picture as large as the stage
+    // allows with their row under it. A phone's share is taller than it is
+    // wide, so that shape cannot be assumed: it is read off the playing
+    // element, which follows a share resized or switched, and until the
+    // element has played, off the size the share was published at.
+    const playedRatio = useMediaRatio( screenElement );
+    const screenRatio = cssRatio( playedRatio ?? publicationRatio( participant.screen ? participant.screenPub : null ) );
 
     let className = "wplus-group-call-input-audio";
     let innerClass = "wplus-group-call-input-audio-inner";
@@ -158,7 +164,7 @@ export default memo(function GroupAudioGridItem({ unique_key, participant } : {
             <div className="wplus-group-call-input-audio-inner-info">
                         <span className="wplus-caller-info">
                             <span className="wplus-info-avatar">
-                                <UserAvatar user_id={user_id} size={45}/>
+                                <UserAvatar user_id={user_id} size={45} presence={false}/>
                             </span>
                             <span className="wplus-info-name"><span className="wplus-caller-name">
                                 <UserName user_id={user_id}/>

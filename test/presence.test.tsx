@@ -2,7 +2,7 @@ import React from 'react';
 import { cleanup, fireEvent, render } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
-    ActivityIndicator, Avatar, AvatarStack, GroupAvatar, OnlineCount, OnlineList, PersonRow, PresenceLabel, ReadBy, configureUi, host, plainName,
+    ActivityIndicator, Avatar, AvatarFace, AvatarStack, GroupAvatar, OnlineCount, OnlineList, PersonRow, PresenceLabel, ReadBy, configureUi, host, plainName,
 } from '../src/index.ts';
 import { translator } from '../src/inc/translations.ts';
 
@@ -73,6 +73,106 @@ describe( 'presence: the avatar', () => {
 
         const read = render( <ReadBy users={ [ people[ 0 ], null, people[ 1 ] ] } /> ).container;
         expect( [ ...read.querySelectorAll( 'img' ) ].map( ( i ) => i.getAttribute( 'alt' ) ) ).toEqual( [ 'P34', 'P42' ] );
+    } );
+} );
+
+describe( 'presence: letters, the offline dot and a face beside its name, for an app whose people have no picture', () => {
+    const ann = { user_id: 34, name: 'Ann Lee' };
+    const letters = { text: 'A', background: '#FDE68A', color: '#78350F' };
+
+    it( 'draws the letters on their colour in place of the host\'s default picture, named for the reader', () => {
+        configureUi( { defaultAvatar: () => '/avatars/default.svg' } );
+        const { container, rerender } = render( <Avatar user={ ann } size={ 40 } letters={ letters } /> );
+
+        const drawn = container.querySelector( '.wplus-avatar-letters' ) as HTMLElement;
+        expect( drawn.textContent ).toBe( 'A' );
+        expect( drawn.getAttribute( 'role' ) ).toBe( 'img' );
+        expect( drawn.getAttribute( 'aria-label' ) ).toBe( 'Ann Lee' );
+        expect( drawn.style.width ).toBe( '40px' );
+        expect( drawn.style.getPropertyValue( '--wplus-avatar-size' ) ).toBe( '40px' );
+        expect( drawn.style.background ).toMatch( /#fde68a|rgb\(253, 230, 138\)/i );
+        expect( container.querySelector( 'img' ) ).toBeNull();
+
+        // Without letters the host's default picture, as before.
+        rerender( <Avatar user={ ann } size={ 40 } /> );
+        expect( container.querySelector( 'img' )!.getAttribute( 'src' ) ).toBe( '/avatars/default.svg' );
+    } );
+
+    it( 'lays the person\'s own picture over the letters, which show through it and stay where it fails to load', () => {
+        const { container, rerender } = render( <Avatar user={ { ...ann, avatar: '/ann.jpg' } } letters={ letters } /> );
+        // Over the letters, which name the face: a picture see-through where the person chose none shows them.
+        const drawn = container.querySelector( '.wplus-avatar-letters' )!;
+        const picture = drawn.querySelector( 'img.wplus-avatar-letters__picture' )!;
+        expect( [ picture.getAttribute( 'src' ), picture.getAttribute( 'alt' ) ] ).toEqual( [ '/ann.jpg', '' ] );
+        expect( drawn.textContent ).toBe( 'A' );
+        expect( drawn.getAttribute( 'aria-label' ) ).toBe( 'Ann Lee' );
+        fireEvent.error( picture );
+        expect( container.querySelector( 'img' ) ).toBeNull();
+        expect( container.querySelector( '.wplus-avatar-letters' )?.textContent ).toBe( 'A' );
+
+        rerender( <Avatar user={ { ...ann, avatar: '/ann-new.jpg' } } letters={ letters } /> );
+        expect( container.querySelector( 'img' )!.getAttribute( 'src' ) ).toBe( '/ann-new.jpg' );
+
+        // Without letters a picture that fails stays, as Better Messages has it.
+        const plain = render( <Avatar user={ { ...ann, avatar: '/gone.jpg' } } /> ).container;
+        fireEvent.error( plain.querySelector( 'img' )! );
+        expect( plain.querySelector( 'img' )!.getAttribute( 'src' ) ).toBe( '/gone.jpg' );
+    } );
+
+    it( 'draws the dot for an offline person only where asked', () => {
+        const { container, rerender } = render( <Avatar user={ ann } letters={ letters } presence="offline" showOffline /> );
+        expect( container.querySelector( '.wplus-presence-dot' )?.getAttribute( 'data-presence' ) ).toBe( 'offline' );
+
+        rerender( <Avatar user={ ann } letters={ letters } presence="offline" /> );
+        expect( container.querySelector( '.wplus-presence-dot' ) ).toBeNull();
+    } );
+
+    it( 'leaves a face beside its name to the name: no tooltip, nothing read twice', () => {
+        const named = render( <Avatar user={ { ...ann, avatar: '/ann.jpg' } } /> ).container;
+        expect( named.querySelector( '.wplus-avatar-wrap' )!.getAttribute( 'aria-label' ) ).toBe( 'Ann Lee' );
+
+        const { container } = render( <Avatar user={ { ...ann, avatar: '/ann.jpg' } } presence="online" decorative /> );
+        const wrap = container.querySelector( '.wplus-avatar-wrap' )!;
+        expect( wrap.getAttribute( 'aria-hidden' ) ).toBe( 'true' );
+        expect( wrap.getAttribute( 'aria-label' ) ).toBeNull();
+        expect( container.querySelector( 'img' )!.getAttribute( 'alt' ) ).toBe( '' );
+
+        const blank = render( <Avatar user={ ann } letters={ letters } decorative /> ).container;
+        expect( blank.querySelector( '.wplus-avatar-letters' )!.getAttribute( 'role' ) ).toBeNull();
+    } );
+
+    it( 'stacks the faces as the app draws each, overlapped from the side the line starts', () => {
+        const team = [ ann, { user_id: 42, name: 'Tom' } ];
+        const { container } = render(
+            <AvatarStack users={ team } size={ 36 } avatar={ ( person, i ) => ( {
+                letters: { ...letters, text: person.name!.charAt( 0 ) },
+                presence: i === 0 ? 'online' : null,
+                decorative: true,
+            } ) } />,
+        );
+
+        expect( [ ...container.querySelectorAll( '.wplus-avatar-letters' ) ].map( ( l ) => l.textContent ) ).toEqual( [ 'A', 'T' ] );
+        expect( container.querySelectorAll( '.wplus-presence-dot' ) ).toHaveLength( 1 );
+        const items = container.querySelectorAll<HTMLElement>( '.wplus-avatar-stack__item' );
+        expect( items[ 1 ]!.style.marginInlineStart ).toBe( '-12.6px' );
+        expect( items[ 1 ]!.style.marginLeft ).toBe( '' );
+    } );
+
+    it( 'draws a face with no tooltip, and a stack\'s faces with their names as text, never as markup', () => {
+        configureUi( { nameHtml: ( name: string ) => `${ name } <img class="badge" src="/vip.svg">` } );
+        const face = render( <AvatarFace user={ { ...ann, avatar: '/ann.jpg' } } presence="online" /> ).container;
+        expect( face.querySelector( '.wplus-avatar-wrap' )!.getAttribute( 'aria-label' ) ).toBeNull();
+        expect( face.querySelector( 'img' )!.getAttribute( 'alt' ) ).toBe( 'Ann Lee' );
+        expect( face.querySelector( '.wplus-presence-dot' ) ).not.toBeNull();
+
+        const stack = render( <AvatarStack users={ [ ann, { user_id: 42, name: 'Tom' } ] } /> ).container;
+        expect( [ ...stack.querySelectorAll( '.wplus-avatar-wrap' ) ].map( ( w ) => w.getAttribute( 'aria-label' ) ) ).toEqual( [ 'Ann Lee', 'Tom' ] );
+        expect( stack.querySelector( '.badge' ) ).toBeNull();
+
+        // The avatar of a name gives the name to its tooltip on the face's own wrap, as before the face was a part.
+        const avatar = render( <Avatar user={ { ...ann, avatar: '/ann.jpg' } } /> ).container;
+        expect( avatar.firstElementChild!.className ).toBe( 'wplus-avatar-wrap' );
+        expect( avatar.firstElementChild!.getAttribute( 'aria-label' ) ).toBe( 'Ann Lee' );
     } );
 } );
 

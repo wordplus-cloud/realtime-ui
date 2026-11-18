@@ -1,7 +1,7 @@
 import React, { useContext, useEffect, useState } from "react";
 import { CallContext, type CallContextInterface, type CallPerson } from "./context.ts";
 import Tooltip from "../helpers/tooltip.tsx";
-import Icon from "../../primitives/icon.tsx";
+import Icon from "../../primitives/icons.tsx";
 import { _x } from "../../inc/globals.ts";
 import { host } from "../../host.ts";
 

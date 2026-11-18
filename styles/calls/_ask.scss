@@ -1,0 +1,76 @@
+// A moderator's ask to turn on a camera or a microphone (ask-prompt.tsx), in
+// the join prompt's card and place: the device on its badge, the ask, and
+// under it Turn On, Preview and Not Now. Where the device is stuck, the steps
+// to free it take the ask's place, one line each, and Turn On is Try Again.
+
+.wplus-call-wrap .wplus-call-join-prompt.wplus-call-ask-prompt {
+    grid-template-columns: auto minmax(0, 1fr);
+    grid-template-areas:
+        "icon text"
+        ".    actions";
+    max-width: min(520px, 100%);
+    padding: 12px 14px 12px 12px;
+}
+
+.wplus-call-wrap .wplus-call-ask-prompt .wplus-call-join-prompt-icon {
+    align-self: start;
+    background: rgba(var(--wplus-color-accent), 0.18);
+    color: rgba(var(--wplus-color-accent), 1);
+}
+
+.wplus-call-wrap .wplus-call-ask-prompt[data-stuck] .wplus-call-join-prompt-icon {
+    background: rgba(var(--wplus-color-recording), 0.18);
+    color: rgba(var(--wplus-color-recording), 1);
+}
+
+.wplus-call-wrap .wplus-call-ask-steps {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-top: 3px;
+}
+
+.wplus-call-wrap .wplus-call-ask-actions {
+    grid-area: actions;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+}
+
+.wplus-call-wrap .wplus-call-ask-on[data-busy] {
+    opacity: 0.6;
+    pointer-events: none;
+}
+
+.wplus-call-wrap .wplus-call-ask-preview,
+.wplus-call-wrap .wplus-call-ask-not-now {
+    display: inline-flex;
+    align-items: center;
+    height: 32px;
+    padding: 0 12px;
+    &:not(#\9) { border-radius: var(--wplus-radius-pill); }
+    font-size: 13px;
+    font-weight: 600;
+    white-space: nowrap;
+    cursor: pointer;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+    transition: background 0.12s ease, color 0.12s ease;
+}
+
+.wplus-call-wrap .wplus-call-ask-preview {
+    background: rgba(255, 255, 255, 0.1);
+    color: rgba(255, 255, 255, 0.94);
+
+    &:hover { background: rgba(255, 255, 255, 0.16); }
+}
+
+.wplus-call-wrap .wplus-call-ask-not-now {
+    color: rgba(255, 255, 255, 0.62);
+
+    &:hover {
+        background: rgba(255, 255, 255, 0.08);
+        color: rgba(255, 255, 255, 1);
+    }
+}

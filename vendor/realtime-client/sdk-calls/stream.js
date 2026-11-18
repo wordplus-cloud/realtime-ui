@@ -8,8 +8,9 @@
  * place in the room `u:<id>.<8 hex>`) stay inside.
  */
 import { Listeners } from '../channel.js';
+import { RealtimeError } from '../errors.js';
 import { choosableLayers } from '../streams/playback.js';
-const refused = (code) => Object.assign(new Error(code), { code });
+const refused = (code) => new RealtimeError(code);
 const userOf = (user) => 'u:' + String(user);
 /** The cloud's answer to an action: done, or a refusal with its code. */
 async function done(answer) {
@@ -73,7 +74,7 @@ export class Stream {
     get messages() {
         return this.last.chat;
     }
-    /** Whether this page waits for a place: the stream is full, and the join goes on by itself. */
+    /** Whether this page waits to take the picture: the join goes on by itself once it may. */
     get waiting() {
         return this.last.media === 'waiting';
     }
@@ -85,11 +86,6 @@ export class Stream {
     get onStage() {
         return this.last.onStage;
     }
-    /**
-     * `state` (StreamState), `viewers` (n), `tiles` (StreamTile[]), `message` (ChatMessage, each one new), `hands`
-     * (StreamHand[], for its hosts), `invited` (a host asks this user on stage: `joinStage()`), `stage` (whether this page
-     * is on stage now), `waiting` ({ until }: full), `error` ({ code }), `change` (any of it).
-     */
     on(event, fn) {
         this.listeners.on(event, fn);
         return this;
@@ -191,11 +187,24 @@ export class Stream {
     async preview(devices = { camera: true, microphone: true }) {
         await this.engine.startPreview(devices);
     }
-    async setCamera(on) {
+    /**
+     * The browser's camera on the stage, or off with false: the device named, the one last named, or the browser's own
+     * choice, and named while on, it moves there.
+     */
+    async setCamera(on, options = {}) {
+        if (options.deviceId && !(await this.engine.useDevice('camera', options.deviceId)))
+            throw refused('device_busy');
         await this.engine.setCamera(on);
     }
-    async setMicrophone(on) {
+    /** The browser's microphone, as `setCamera()` has its camera. */
+    async setMicrophone(on, options = {}) {
+        if (options.deviceId && !(await this.engine.useDevice('microphone', options.deviceId)))
+            throw refused('device_busy');
         await this.engine.setMicrophone(on);
+    }
+    /** The cameras, microphones and speakers this browser has. Their names are empty until the browser gave the site one. */
+    devices() {
+        return this.engine.listDevices();
     }
     /** Shares a screen in place of the camera, or stops; whether it is shared now. */
     setScreenShare(on) {
@@ -228,8 +237,13 @@ export class Stream {
         return { url: encoder.url, key: encoder.key };
     }
     // A moderator's.
-    kick(user) {
+    /** Out of the stream now, free to come back, as `remove()` is on a room and a group call. */
+    remove(user) {
         return done(this.engine.kick(userOf(user)));
+    }
+    /** The same as `remove()`. */
+    kick(user) {
+        return this.remove(user);
     }
     ban(user) {
         return done(this.engine.ban(userOf(user)));

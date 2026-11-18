@@ -37,7 +37,7 @@ export function fieldText( root : Node ) : string {
 
 function emojiImage( emoji : string, src : string ) : HTMLImageElement {
     const img = document.createElement( 'img' );
-    img.className = 'estream-emoji-image';
+    img.className = 'wplus-live-stream-emoji-image';
     img.src = src;
     img.alt = emoji;
     img.draggable = false;
@@ -254,7 +254,7 @@ export const EmojiField = forwardRef<EmojiFieldHandle, EmojiFieldProps>( functio
     return (
         <div
             ref={ box }
-            className="estream-input estream-chat__editable"
+            className="wplus-live-stream-input wplus-live-stream-chat__editable"
             contentEditable
             suppressContentEditableWarning
             role="textbox"

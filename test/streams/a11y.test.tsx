@@ -48,7 +48,7 @@ describe( 'the player for a keyboard and a screen reader', () => {
         const button = screen.getByLabelText( 'Settings' );
         fireEvent.click( button );
         const menu = screen.getByRole( 'menu' );
-        const names = () => ( document.activeElement as HTMLElement ).querySelector( '.estream-menu__label' )?.firstChild?.textContent;
+        const names = () => ( document.activeElement as HTMLElement ).querySelector( '.wplus-live-stream-menu__label' )?.firstChild?.textContent;
         expect( names() ).toBe( 'Auto' );
 
         fireEvent.keyDown( menu, { key: 'End' } );
@@ -68,7 +68,7 @@ describe( 'the player for a keyboard and a screen reader', () => {
     it( 'lists its keys on ?, only those it answers here, and closes the list on Escape, giving the focus back', () => {
         const { asClient } = fakeClient( live() );
         render( <EasyStreamApp client={ asClient } /> );
-        const stage = document.querySelector( '.estream-stage' ) as HTMLElement;
+        const stage = document.querySelector( '.wplus-live-stream-stage' ) as HTMLElement;
         stage.focus();
 
         fireEvent.keyDown( stage, { key: '?' } );

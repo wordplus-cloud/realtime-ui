@@ -31,6 +31,13 @@
  * answers pauses direct connections for an hour. A failed
  * connect is the manager's (`error`), heard once, whatever namespaces it
  * carries; a namespace's refusal is no node's failure.
+ *
+ * Without direct connections (`direct: false`, a page on another website:
+ * rooms()' `embedded`), the connection only ever goes through the realtime
+ * server's own name, so that website's CSP names that one address: no node is
+ * kept or read, a `direct` offer is never taken, and a drain moves the whole
+ * connection make before break to the realtime server, whose load balancer
+ * sends it to a node that stays.
  */
 import { type ManagerOptions, type Socket } from 'socket.io-client';
 import { type Link, type Listener, type MemberSpec, type PendingSocket, type Sink, type TimedEmitter } from './channel.js';
@@ -57,6 +64,8 @@ export interface HubOptions {
     options?: Partial<ManagerOptions>;
     /** The page, whose CSP violations say a node is blocked. A SharedWorker has none. */
     doc?: Pick<Document, 'addEventListener' | 'removeEventListener'> | null;
+    /** False: never a node directly, only the realtime server's own name, and no node cache (above). True by default. */
+    direct?: boolean;
     /** Stand-ins for tests. */
     manager?: ManagerFactory;
     random?: () => number;
@@ -69,6 +78,8 @@ export declare class Hub {
     readonly random: () => number;
     /** A store read at once (localStorage, memory): a direct offer needs no wait for a read. */
     readonly storeReadsAtOnce: boolean;
+    /** Whether the connection may go to a node directly, or only through the realtime server's own name. */
+    readonly direct: boolean;
     private readonly timers;
     private readonly makeManager;
     private stopWatchingCsp;

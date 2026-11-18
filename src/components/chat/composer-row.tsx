@@ -41,9 +41,17 @@ export interface ComposerRowProps {
     onStartVoice?  : () => void;
     onStartVideo?  : () => void;
     onAttachClick? : ( e: React.MouseEvent ) => void;
+    /** The attachment button's name and tooltip in an app's words, however many are added: the package's by default. */
+    attachLabel?   : string;
+    /** Send's name and tooltip in an app's words, while the message is within its length: the package's by default. */
+    sendLabel?     : string;
     // Absent when no picker is available at all: the button is then not drawn.
     onEmojiClick?  : ( e: React.MouseEvent ) => void;
     pickerLabel?   : string;
+    // What the picker opens with, so the button says so: the smile while it has emoji, the sticker or the GIF badge
+    // where it has none (a phone, whose keyboard carries the emoji, or a site with the emoji picker off). The smile
+    // over a GIF search read as an emoji button that opened the wrong thing.
+    pickerIcon?    : "smile" | "sticker" | "gif";
     /** A points balance beside the buttons (Better Messages' myCRED and GamiPress), the host's. */
     points?        : ReactNode;
     afterButtonHtml? : string;
@@ -75,8 +83,11 @@ export function ComposerRow( {
     onStartVoice,
     onStartVideo,
     onAttachClick,
+    attachLabel: givenAttachLabel,
+    sendLabel,
     onEmojiClick,
     pickerLabel,
+    pickerIcon = "smile",
     points,
     afterButtonHtml,
     formatToggle,
@@ -100,7 +111,7 @@ export function ComposerRow( {
     // focus at its press, and the browser hit-tests the release at the same point in the same task: dropped there and
     // then, the class brought FluentCommunity's nav back and gave an installed app's composer back its bottom band, so
     // the button had moved off the finger and the click went to whatever was under it. The first tap on Send only
-    // folded the keyboard (ticket 10500). The class stays while the focus is in any composer's editor, the next one
+    // folded the keyboard (from a support report). The class stays while the focus is in any composer's editor, the next one
     // included.
     const unfocusTimer = useRef<ReturnType<typeof setTimeout> | undefined>( undefined );
     useEffect( () => () => {
@@ -136,7 +147,7 @@ export function ComposerRow( {
     const showCounter = limited && charCount / maxLength >= COUNTER_THRESHOLD;
     const counterWarn = limited && charCount > maxLength * 0.9;
     const overLimit = limited && charCount > maxLength;
-    const attachLabel = attachCount > 0
+    const attachLabel = givenAttachLabel ? givenAttachLabel : attachCount > 0
         ? sprintf(
             _nx(
                 "%s attachment added, click to add more attachments",
@@ -165,10 +176,16 @@ export function ComposerRow( {
 
             { /* 2.0's wplus-editor DOM shape: wrapper + div.wplus-editor-content. */ }
             <div ref={ hostRef } className="wplus-editor wplus-composer__editor">
+                { /* A text field to a screen reader, named by its placeholder: a bare contenteditable is read as a
+                     group with no name, or not at all. */ }
                 <div
                     ref={ editableRef }
                     className="wplus-editor-content wplus-composer__editable notranslate wp-exclude-emoji"
                     { ...( { placeholder } as Record<string, string> ) }
+                    role="textbox"
+                    aria-multiline="true"
+                    aria-label={ placeholder || undefined }
+                    aria-disabled={ disabled ? "true" : undefined }
                     contentEditable={ ! disabled }
                     suppressContentEditableWarning
                     data-no-translation={ true }
@@ -204,7 +221,7 @@ export function ComposerRow( {
 
             { /* keepFocus on a computer, as 2.0's smile button had it: a picked emoji goes in at the caret. */ }
             { onEmojiClick && (
-                <IconButton icon="smile" className="wplus-composer__picker" label={ pickerLabel ?? "" }
+                <IconButton icon={ pickerIcon } className="wplus-composer__picker" label={ pickerLabel ?? "" }
                             size={ 18 } keepFocus={ ! isMobile() } onClick={ onEmojiClick } />
             ) }
 
@@ -230,7 +247,7 @@ export function ComposerRow( {
                                     : sprintf( _x( "Message is too long. Maximum allowed length is %d characters", "Send button tooltip when over limit", "bp-better-messages" ), maxLength ) )
                                 : ( isEdit
                                     ? _x( "Save Message", "\"Edit message\" button tooltip", "bp-better-messages" )
-                                    : __( "Send Message", "bp-better-messages" ) ) }
+                                    : sendLabel || __( "Send Message", "bp-better-messages" ) ) }
                             emphasis="accent" size={ 18 }
                             className={ overLimit ? "wplus-composer__send--over" : undefined }
                             disabled={ ! canSend && ! isEdit && ! overLimit }

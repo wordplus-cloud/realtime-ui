@@ -1,0 +1,237 @@
+// ─── The host's effects in the studio (effects.tsx) ───────────────────────
+// What is behind the host, as a row of tiles: None, Blur, each picture, the
+// host's own with a way to remove it, and a tile to add one, the chosen one
+// ringed in the accent, a spinner over it while its files load. Under them a
+// quiet line, and the effect's settings, closed. AI noise removal is the
+// setup's switch with its line under it. In the studio's colours, light or
+// dark, in the setup's rows and in a Better Messages room's sheet alike.
+
+.wplus-live-stream-setup__row--top {
+    align-items: start;
+
+    > .wplus-live-stream-setup__label {
+        padding-top: 4px;
+    }
+}
+
+.wplus-live-stream-effects {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 6px;
+    width: 100%;
+    max-width: 420px;
+    min-width: 0;
+
+    &__tiles {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(64px, 1fr));
+        gap: 6px;
+    }
+
+    &__tile {
+        position: relative;
+        min-width: 0;
+    }
+
+    &__pick {
+        position: relative;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 100%;
+        aspect-ratio: 16 / 9;
+        margin: 0;
+        padding: 0;
+        overflow: hidden;
+        border: 1px solid var(--wplus-live-stream-border);
+        border-radius: 8px;
+        // Its own colours in a theme's hovered and focused buttons too, as every button of the streams keeps them.
+        @include button-colours( var(--wplus-live-stream-muted), var(--wplus-live-stream-surface-2) );
+        font: inherit;
+        cursor: pointer;
+        -webkit-tap-highlight-color: transparent;
+        transition: border-color 0.12s ease, color 0.12s ease;
+
+        &:hover {
+            color: var(--wplus-live-stream-text);
+        }
+
+        &[aria-checked="true"] {
+            border-color: var(--wplus-live-stream-accent);
+            box-shadow: 0 0 0 1px var(--wplus-live-stream-accent);
+            color: var(--wplus-live-stream-accent);
+        }
+
+        &:focus-visible {
+            outline: 2px solid var(--wplus-live-stream-accent);
+            outline-offset: 2px;
+        }
+
+        &[aria-disabled="true"],
+        &:disabled {
+            cursor: default;
+        }
+
+        > img {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .wplus-live-stream-icon {
+            width: 18px;
+            height: 18px;
+        }
+    }
+
+    &__tile[data-unusable] &__pick > img {
+        opacity: 0.35;
+    }
+
+    // Over a tile: its spinner while its files load, or that it cannot be used.
+    &__mark {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: rgba(0, 0, 0, 0.4);
+        color: #fff;
+    }
+
+    // A picture of the host's own: removed from this browser by the cross on its corner.
+    &__remove {
+        position: absolute;
+        top: 3px;
+        right: 3px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 18px;
+        height: 18px;
+        margin: 0;
+        padding: 0;
+        border: 0;
+        border-radius: 50%;
+        @include button-colours( #fff, rgba(0, 0, 0, 0.6) );
+        cursor: pointer;
+        opacity: 0;
+        transition: opacity 0.12s ease;
+
+        .wplus-live-stream-icon {
+            width: 12px;
+            height: 12px;
+        }
+
+        &:focus-visible {
+            opacity: 1;
+            outline: 2px solid var(--wplus-live-stream-accent);
+            outline-offset: 1px;
+        }
+    }
+
+    &__tile:hover &__remove {
+        opacity: 1;
+    }
+
+    // Touch has no hover: the cross stays.
+    @media (hover: none) {
+        &__remove {
+            opacity: 1;
+        }
+    }
+
+    &__warn {
+        color: var(--wplus-live-stream-danger);
+    }
+
+    &__loading {
+        margin-left: 2px;
+        border-color: var(--wplus-live-stream-border);
+        border-top-color: var(--wplus-live-stream-accent);
+    }
+
+    // The effect's settings: one line, closed at first, then its sliders.
+    &__tune-head {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        margin: 0;
+        padding: 2px 0;
+        border: 0;
+        @include button-colours( var(--wplus-live-stream-text), none );
+        font: inherit;
+        font-size: 0.9em;
+        cursor: pointer;
+
+        .wplus-live-stream-icon {
+            width: 15px;
+            height: 15px;
+        }
+
+        &:focus-visible {
+            outline: 2px solid var(--wplus-live-stream-accent);
+            outline-offset: 2px;
+            border-radius: 4px;
+        }
+    }
+
+    &__sliders {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        padding-top: 4px;
+    }
+
+    &__slider {
+        display: grid;
+        grid-template-columns: 96px minmax(0, 1fr);
+        align-items: center;
+        gap: 2px 10px;
+        font-size: 0.88em;
+
+        input[type="range"] {
+            width: 100%;
+            margin: 0;
+            accent-color: var(--wplus-live-stream-accent);
+        }
+    }
+
+    &__slider-name {
+        color: var(--wplus-live-stream-text);
+    }
+
+    &__ends {
+        grid-column: 2;
+        display: flex;
+        justify-content: space-between;
+        color: var(--wplus-live-stream-muted);
+        font-size: 0.85em;
+    }
+
+    &__reset {
+        align-self: flex-start;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        &__pick,
+        &__remove {
+            transition: none;
+        }
+    }
+}
+
+// A Better Messages room's sheet: the rows one under the other, as its fields are.
+.wplus-live-stream-bm-effects {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 4px 0;
+
+    .wplus-live-stream-setup__row {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}

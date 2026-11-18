@@ -39,14 +39,14 @@ describe( 'the WordPlus SDK\'s shared parts', () => {
         const watch = vi.fn( () => stop );
         page.wordplusTooltips = { watch };
 
-        const first = tree( <button type="button" data-estream-tip="Mute (m)">a</button> );
+        const first = tree( <button type="button" data-wplus-live-stream-tip="Mute (m)">a</button> );
         const second = tree();
         expect( watch ).toHaveBeenCalledTimes( 1 );
-        expect( watch ).toHaveBeenCalledWith( document, { attribute: 'data-estream-tip', focus: true, className: 'estream-tip' } );
+        expect( watch ).toHaveBeenCalledWith( document, { attribute: 'data-wplus-live-stream-tip', focus: true, className: 'wplus-live-stream-tip' } );
 
         // Ours draws nothing meanwhile.
         fireEvent.pointerOver( screen.getByText( 'a' ), { pointerType: 'mouse' } );
-        expect( document.getElementById( 'estream-tooltip' ) ).toBeNull();
+        expect( document.getElementById( 'wplus-live-stream-tooltip' ) ).toBeNull();
 
         first.unmount();
         expect( stop ).not.toHaveBeenCalled();
@@ -188,12 +188,12 @@ describe( 'the WordPlus SDK\'s shared parts', () => {
         await act( async () => {} );
 
         const fire = screen.getByRole( 'button', { name: 'Fire' } );
-        expect( fire.querySelector( 'img.estream-emoji-image' )?.getAttribute( 'alt' ) ).toBe( '🔥' );
+        expect( fire.querySelector( 'img.wplus-live-stream-emoji-image' )?.getAttribute( 'alt' ) ).toBe( '🔥' );
         // One the set's renderer doesn't know stays the device's own.
         expect( screen.getByRole( 'button', { name: '🎉' } ).textContent ).toBe( '🎉' );
 
         await act( async () => { update( { reactions: [ { id: 1, kind: '🔥', at: Date.now() } ] } ); } );
-        expect( document.querySelector( '.estream-floating img.estream-emoji-image' )?.getAttribute( 'alt' ) ).toBe( '🔥' );
+        expect( document.querySelector( '.wplus-live-stream-floating img.wplus-live-stream-emoji-image' )?.getAttribute( 'alt' ) ).toBe( '🔥' );
     } );
 
     it( 'draws the chat\'s emoji in the site\'s set, as Better Messages does, once a message has one', async () => {
@@ -208,8 +208,8 @@ describe( 'the WordPlus SDK\'s shared parts', () => {
 
         await act( async () => { update( { chat: [ said( '1-0', 'Hello there' ), said( '2-0', 'So 🔥 hot, https://site.example/🔥' ) ] } ); } );
         expect( ready ).toHaveBeenCalledTimes( 1 );
-        const text = document.querySelectorAll( '.estream-message__text' )[1]!;
-        const images = [ ...text.querySelectorAll( 'img.estream-emoji-image' ) ] as HTMLImageElement[];
+        const text = document.querySelectorAll( '.wplus-live-stream-message__text' )[1]!;
+        const images = [ ...text.querySelectorAll( 'img.wplus-live-stream-emoji-image' ) ] as HTMLImageElement[];
         // The emoji in the text, not the one inside the link's address.
         expect( images.map( ( img ) => [ img.alt, img.src ] ) ).toEqual( [ [ '🔥', 'https://site.example/wp-content/uploads/wordplus/emoji/apple/1f525.png' ] ] );
         expect( text.textContent ).toBe( 'So  hot, https://site.example/🔥' );
@@ -224,7 +224,7 @@ describe( 'the WordPlus SDK\'s shared parts', () => {
         await act( async () => {} );
 
         expect( ready ).not.toHaveBeenCalled();
-        expect( document.querySelector( '.estream-message__text' )?.textContent ).toBe( 'So 🔥 hot' );
-        expect( document.querySelector( 'img.estream-emoji-image' ) ).toBeNull();
+        expect( document.querySelector( '.wplus-live-stream-message__text' )?.textContent ).toBe( 'So 🔥 hot' );
+        expect( document.querySelector( 'img.wplus-live-stream-emoji-image' ) ).toBeNull();
     } );
 } );

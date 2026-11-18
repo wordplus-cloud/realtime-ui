@@ -31,6 +31,13 @@
  * answers pauses direct connections for an hour. A failed
  * connect is the manager's (`error`), heard once, whatever namespaces it
  * carries; a namespace's refusal is no node's failure.
+ *
+ * Without direct connections (`direct: false`, a page on another website:
+ * rooms()' `embedded`), the connection only ever goes through the realtime
+ * server's own name, so that website's CSP names that one address: no node is
+ * kept or read, a `direct` offer is never taken, and a drain moves the whole
+ * connection make before break to the realtime server, whose load balancer
+ * sends it to a node that stays.
  */
 import { Manager } from 'socket.io-client';
 import { Listeners, timedReply } from './channel.js';
@@ -57,7 +64,9 @@ export class Hub {
         this.server = options.server;
         this.random = options.random ?? Math.random;
         this.makeManager = options.manager ?? defaultManager;
-        const store = options.store ?? null;
+        this.direct = options.direct !== false;
+        // Without direct connections no node is kept, nor read from what other products of the page kept.
+        const store = this.direct ? options.store ?? null : null;
         this.storeReadsAtOnce = !store || !!store.readNow;
         if (store)
             this.nodes.setStore(store);
@@ -566,7 +575,7 @@ export class Connection {
             return;
         }
         if (event === 'nodes') {
-            if (manager === this.manager || manager === this.move?.manager)
+            if (this.hub.direct && (manager === this.manager || manager === this.move?.manager))
                 this.hub.nodes.update(this.hub.server, args[0]?.nodes);
             return;
         }
@@ -586,6 +595,9 @@ export class Connection {
             return;
         }
         if (manager !== this.manager)
+            return;
+        // Without direct connections, an offer of a node is no business of this connection.
+        if (request?.reason === 'direct' && !this.hub.direct)
             return;
         // A direct offer is decided on the stored cache: a pause another tab stored holds, however slow its first read.
         if (request?.reason === 'direct' && !this.hub.storeReadsAtOnce) {
@@ -608,15 +620,17 @@ export class Connection {
         }
         if (direct && this.hub.nodes.paused(server))
             return;
-        // A direct offer it can't use leaves the connection where it is (migrateTarget).
-        const target = migrateTarget(request, server, managerUrl(manager));
+        // A direct offer it can't use leaves the connection where it is (migrateTarget). Without direct connections a
+        // drain goes to the realtime server, whichever node it names, and nothing is kept.
+        const named = migrateTarget(request, server, managerUrl(manager));
+        const target = named && !this.hub.direct ? server : named;
         if (!target)
             return;
         // Should the connection drop before its move, it reconnects there too, rather than to a node going away.
         aim(manager, target, server);
-        if (direct)
+        if (this.hub.direct && direct)
             this.hub.nodes.offered(target, server, request?.nodes);
-        else
+        else if (this.hub.direct)
             this.hub.nodes.remember(target, server, request?.nodes);
         const timer = this.hub.later(() => {
             this.scheduled = null;
@@ -737,7 +751,8 @@ export class Connection {
         move.manager.reconnection(true);
         // Its reconnects wait for its node no longer than any connect to a node.
         aim(move.manager, move.target, server);
-        this.hub.nodes.remember(move.target, server, move.request?.nodes);
+        if (this.hub.direct)
+            this.hub.nodes.remember(move.target, server, move.request?.nodes);
         // Its connect came before it took over, so the handlers skipped it.
         this.hub.nodes.reached(move.target, server);
         for (const [member, entry] of move.entries) {

@@ -1,6 +1,24 @@
+import { selectedPair } from "./pair.js";
 const num = (v) => typeof v === 'number' && Number.isFinite(v) ? v : undefined;
 const add = (a, b) => a === undefined ? b : b === undefined ? a : a + b;
 const round1 = (v) => Math.round(v * 10) / 10;
+const word = (v) => typeof v === 'string' && v.trim() ? v.trim() : undefined;
+// How long after this side shows a source again its first frame may still come,
+// ending the gap this side made: the other side starts sending it again and its
+// picture needs a key frame. A frame landing after a reading is the next one's.
+const RESUME_MS = 3000;
+// Encoders that run on the CPU, by the name the browser gives; any other a
+// browser names is a device's. The name decides where there is one and
+// powerEfficientEncoder where there isn't, as a group call's client reads them
+// (rtc-client's meshEncoders.ts).
+const SOFTWARE_ENCODER = /^(libvpx|openh264|libaom|svt|ffmpeg|libx26|dav1d|rav1e|fake)/i;
+function encoderHardware(name, powerEfficient) {
+    if (name)
+        return !SOFTWARE_ENCODER.test(name);
+    return typeof powerEfficient === 'boolean' ? powerEfficient : undefined;
+}
+// A stats entry's codec by its short name: `video/H264` as "h264".
+const codecWord = (entry) => word(entry?.mimeType)?.replace(/^(video|audio)\//i, '').toLowerCase();
 /**
  * One stats pass's running totals, by source: each stream this side sends and
  * receives (the mids are the same at both ends, so this side's own map names
@@ -13,7 +31,6 @@ export function qualityTotals(report, scope, at = Date.now()) {
         byId.set(s.id, s); });
     const totals = { at, out: new Map(), in: new Map(), path: {} };
     let transport = null;
-    let pair = null;
     report.forEach((s) => {
         if (!s)
             return;
@@ -25,6 +42,7 @@ export function qualityTotals(report, scope, at = Date.now()) {
             const capture = s.mediaSourceId ? byId.get(s.mediaSourceId) : undefined;
             const remote = s.remoteId ? byId.get(s.remoteId) : undefined;
             const durations = s.qualityLimitationDurations;
+            const encoder = word(s.encoderImplementation);
             totals.out.set(source, {
                 kind: s.kind,
                 bytes: (prev?.bytes ?? 0) + (num(s.bytesSent) ?? 0),
@@ -36,11 +54,20 @@ export function qualityTotals(report, scope, at = Date.now()) {
                 limit: typeof s.qualityLimitationReason === 'string' ? s.qualityLimitationReason : prev?.limit,
                 cpuS: add(prev?.cpuS, num(durations?.cpu)),
                 bwS: add(prev?.bwS, num(durations?.bandwidth)),
-                hw: typeof s.powerEfficientEncoder === 'boolean' ? s.powerEfficientEncoder : prev?.hw,
+                hw: encoderHardware(encoder, s.powerEfficientEncoder) ?? prev?.hw,
                 sendDelayS: add(prev?.sendDelayS, num(s.totalPacketSendDelay)),
                 nack: add(prev?.nack, num(s.nackCount)),
-                pli: add(prev?.pli, num(s.pliCount)),
-                remoteLost: add(prev?.remoteLost, remote ? Math.max(0, num(remote.packetsLost) ?? 0) : undefined)
+                pli: add(add(prev?.pli, num(s.pliCount)), num(s.firCount)),
+                remoteLost: add(prev?.remoteLost, remote ? Math.max(0, num(remote.packetsLost) ?? 0) : undefined),
+                codec: codecWord(s.codecId ? byId.get(s.codecId) : undefined) ?? prev?.codec,
+                encoder: encoder ?? prev?.encoder,
+                encodeS: add(prev?.encodeS, num(s.totalEncodeTime)),
+                encoded: add(prev?.encoded, num(s.framesEncoded)),
+                framesSent: add(prev?.framesSent, num(s.framesSent)),
+                keyFrames: add(prev?.keyFrames, num(s.keyFramesEncoded)),
+                target: add(prev?.target, num(s.targetBitrate)),
+                resent: add(prev?.resent, num(s.retransmittedPacketsSent)),
+                huge: add(prev?.huge, num(s.hugeFramesSent))
             });
         }
         else if (s.type === 'inbound-rtp') {
@@ -64,19 +91,26 @@ export function qualityTotals(report, scope, at = Date.now()) {
                 samples: add(prev?.samples, num(s.totalSamplesReceived)),
                 // made up while the other side was silent costs nothing anyone hears
                 concealed: add(prev?.concealed, concealed === undefined ? undefined : concealed - (num(s.silentConcealedSamples) ?? 0)),
-                hw: typeof s.powerEfficientDecoder === 'boolean' ? s.powerEfficientDecoder : prev?.hw
+                hw: typeof s.powerEfficientDecoder === 'boolean' ? s.powerEfficientDecoder : prev?.hw,
+                codec: codecWord(s.codecId ? byId.get(s.codecId) : undefined) ?? prev?.codec,
+                decoder: word(s.decoderImplementation) ?? prev?.decoder,
+                decodeS: add(prev?.decodeS, num(s.totalDecodeTime)),
+                gaps: add(prev?.gaps, num(s.totalInterFrameDelay)),
+                gapsSquared: add(prev?.gapsSquared, num(s.totalSquaredInterFrameDelay)),
+                pauses: add(prev?.pauses, num(s.pauseCount)),
+                pauseS: add(prev?.pauseS, num(s.totalPausesDuration)),
+                plis: add(prev?.plis, num(s.pliCount)),
+                nacks: add(prev?.nacks, num(s.nackCount)),
+                stretched: add(prev?.stretched, add(num(s.insertedSamplesForDeceleration), num(s.removedSamplesForAcceleration))),
+                jitter: num(s.jitter) ?? prev?.jitter
             });
         }
         else if (s.type === 'transport' && s.selectedCandidatePairId && !transport) {
             transport = s;
         }
-        else if (s.type === 'candidate-pair' && s.state === 'succeeded' && (s.selected || s.nominated) && !pair) {
-            pair = s;
-        }
     });
-    // The transport's own word on the selected pair first; Firefox has no
-    // transport entry and marks the pair instead.
-    const selected = (transport ? byId.get(transport.selectedCandidatePairId) : null) ?? pair;
+    // The pair in use, not any pair once nominated (pair.ts).
+    const selected = selectedPair(report);
     if (selected) {
         const rtt = num(selected.currentRoundTripTime);
         const out = num(selected.availableOutgoingBitrate);
@@ -100,8 +134,10 @@ const delta = (a, b) => a !== undefined && b !== undefined && b >= a ? b - a : u
  * What changed between two totals, as a reading's tracks and connection:
  * only the sources in `sending` and `playing` at the end, and only what the
  * browser keeps. `stalls`: how long each sent source's capture gave nothing.
+ * `shownAgain`: when this side last started showing each source again after not
+ * showing it, whose gap is this side's own and not the call's.
  */
-export function qualityBetween(prev, now, scope, stalls = new Map()) {
+export function qualityBetween(prev, now, scope, stalls = new Map(), shownAgain = new Map()) {
     const ms = Math.max(0, Math.round(now.at - prev.at));
     const seconds = ms / 1000;
     const reading = { ms, sent: [], played: [] };
@@ -129,9 +165,36 @@ export function qualityBetween(prev, now, scope, stalls = new Map()) {
         const bytes = delta(p.bytes, n.bytes);
         if (bytes !== undefined)
             t.kbps = Math.round(bytes * 8 / seconds / 1000);
+        if (n.codec)
+            t.codec = n.codec;
+        const resent = delta(p.resent, n.resent);
+        if (resent && packets)
+            t.resent = round1(Math.min(100, resent * 100 / packets));
         if (n.kind === 'video') {
             const frames = delta(p.frames, n.frames);
             const produced = delta(p.produced, n.produced);
+            const encoded = delta(p.encoded, n.encoded);
+            const encodeS = delta(p.encodeS, n.encodeS);
+            const framesSent = delta(p.framesSent, n.framesSent);
+            const keyFrames = delta(p.keyFrames, n.keyFrames);
+            const huge = delta(p.huge, n.huge);
+            const mode = scope.modeOf?.(source);
+            if (n.encoder)
+                t.encoder = n.encoder;
+            if (encoded && encodeS !== undefined)
+                t.encodeMs = round1(encodeS * 1000 / encoded);
+            if (encoded !== undefined)
+                t.encoded = encoded;
+            if (framesSent !== undefined)
+                t.framesSent = framesSent;
+            if (keyFrames !== undefined)
+                t.keyFrames = keyFrames;
+            if (n.target)
+                t.target = Math.round(n.target / 1000);
+            if (huge)
+                t.huge = huge;
+            if (mode)
+                t.mode = mode;
             if (frames !== undefined)
                 t.fps = round1(frames / seconds);
             if (produced !== undefined)
@@ -181,6 +244,8 @@ export function qualityBetween(prev, now, scope, stalls = new Map()) {
             t.kbps = Math.round(bytes * 8 / seconds / 1000);
         if (received !== undefined && lost !== undefined && received + lost > 0)
             t.lost = round1(lost * 100 / (received + lost));
+        if (n.codec)
+            t.codec = n.codec;
         const jbDelay = delta(p.jbDelayS, n.jbDelayS);
         const jbEmitted = delta(p.jbEmitted, n.jbEmitted);
         if (jbDelay !== undefined && jbEmitted)
@@ -191,10 +256,33 @@ export function qualityBetween(prev, now, scope, stalls = new Map()) {
                 t.fps = round1(frames / seconds);
             if (n.height)
                 t.height = n.height;
-            const freezes = delta(p.freezes, n.freezes);
+            let freezes = delta(p.freezes, n.freezes);
+            let frozen = delta(p.freezeS, n.freezeS);
+            const pauses = delta(p.pauses, n.pauses);
+            const paused = delta(p.pauseS, n.pauseS);
+            // A gap this side made itself, not showing the source (its tile
+            // hidden, the page in the background, the other side's camera off
+            // until now), isn't the call's: a source shown again since just
+            // before the last reading owns the pauses ending in this one, or
+            // the one freeze its gap came out as when too short for a pause.
+            const again = shownAgain.get(source);
+            const resumed = again !== undefined && again > prev.at - RESUME_MS;
+            let hidden;
+            if (resumed && pauses) {
+                hidden = { gaps: pauses, seconds: paused };
+            }
+            else if (resumed && freezes === 1) {
+                hidden = { gaps: 1, seconds: frozen };
+                freezes = 0;
+                frozen = 0;
+            }
+            if (hidden) {
+                t.hiddenGaps = hidden.gaps;
+                if (hidden.seconds !== undefined)
+                    t.hiddenGapMs = Math.round(hidden.seconds * 1000);
+            }
             if (freezes !== undefined) {
                 t.freezes = freezes;
-                const frozen = delta(p.freezeS, n.freezeS);
                 if (frozen !== undefined)
                     t.freezeMs = Math.round(frozen * 1000);
             }
@@ -203,13 +291,54 @@ export function qualityBetween(prev, now, scope, stalls = new Map()) {
                 t.dropped = dropped;
             if (n.hw !== undefined)
                 t.hw = n.hw;
+            if (n.decoder)
+                t.decoder = n.decoder;
+            const decodeS = delta(p.decodeS, n.decodeS);
+            if (frames && decodeS !== undefined)
+                t.decodeMs = round1(decodeS * 1000 / frames);
+            // Chrome adds every gap to both sums, a pause's and a freeze's too,
+            // as its very length, so one hidden gap comes out exactly; several,
+            // or one no total tells, leave the spread unsaid this reading.
+            let gaps = delta(p.gaps, n.gaps);
+            let squared = delta(p.gapsSquared, n.gapsSquared);
+            let shown = frames;
+            if (resumed) {
+                if (hidden?.gaps === 1 && hidden.seconds !== undefined && frames && gaps !== undefined && squared !== undefined) {
+                    gaps -= hidden.seconds;
+                    squared -= hidden.seconds * hidden.seconds;
+                    shown = frames - 1;
+                }
+                else {
+                    gaps = undefined;
+                }
+            }
+            if (shown && shown > 1 && gaps !== undefined && squared !== undefined) {
+                const mean = gaps / shown;
+                t.unevenMs = Math.round(Math.sqrt(Math.max(0, squared / shown - mean * mean)) * 1000);
+            }
+            if (pauses && !hidden) {
+                t.pauses = pauses;
+                if (paused !== undefined)
+                    t.pauseMs = Math.round(paused * 1000);
+            }
+            const plis = delta(p.plis, n.plis);
+            const nacks = delta(p.nacks, n.nacks);
+            if (plis)
+                t.plis = plis;
+            if (nacks)
+                t.nacks = nacks;
         }
         else {
             const samples = delta(p.samples, n.samples);
             const concealed = delta(p.concealed, n.concealed);
+            const stretched = delta(p.stretched, n.stretched);
             if (samples && concealed !== undefined)
                 t.concealed = round1(Math.min(100, concealed * 100 / samples));
+            if (samples && stretched)
+                t.stretched = round1(Math.min(100, stretched * 100 / samples));
         }
+        if (n.jitter !== undefined && n.jitter >= 0.001)
+            t.jitterMs = Math.round(n.jitter * 1000);
         reading.played.push(t);
     }
     return reading;
@@ -244,9 +373,15 @@ export class QualityWatch {
         // in the window it gave no frame while on
         this.produced = new Map();
         this.stalls = new Map();
+        // when this side last started showing each source again after not showing it
+        this.shownAgain = new Map();
     }
     tick(report, scope, at = Date.now()) {
         const totals = qualityTotals(report, scope, at);
+        for (const source of scope.playing) {
+            if (this.scope && !this.scope.playing.has(source))
+                this.shownAgain.set(source, at);
+        }
         this.latest = totals;
         this.scope = scope;
         if (!this.base)
@@ -273,7 +408,7 @@ export class QualityWatch {
         const latest = this.latest;
         if (!base || !latest || !this.scope || latest.at <= base.at)
             return undefined;
-        const reading = qualityBetween(base, latest, this.scope, this.stalls);
+        const reading = qualityBetween(base, latest, this.scope, this.stalls, this.shownAgain);
         const path = pathBetween(base, latest);
         const h = { ...health };
         if (path)

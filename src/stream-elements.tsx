@@ -14,7 +14,7 @@
 // The elements of one stream share one join, one chat and the player's state, however many there are. The script
 // (dist/realtime-ui-streams.min.js, window.wordplusRealtimeStreams) is apart from the call screen's realtime-ui.min.js,
 // so a page with calls alone never carries the live streams' views: @wordplus/realtime's rt.streamScreen() loads it. The
-// views draw in the page itself, as Easy Stream's do on any site: their classes are all `estream-`, and their
+// views draw in the page itself, as Easy Stream's do on any site: their classes are all `wplus-live-stream-`, and their
 // stylesheet goes into the page's head once. A page's prefix for the elements' names goes before these too
 // (element-names.ts): `shop` makes `<shop-live-stream>`.
 import { createRoot, type Root } from "react-dom/client";
@@ -133,7 +133,12 @@ function draw( group: Group ): void {
         const calls = pageCalls();
         if ( ! calls?.stream ) return;
         group.joining = true;
-        calls.stream( group.name, { video } ).then( ( stream ) => {
+        // With `token-url`, the route of the app's own that decides who is what, asked again as each token runs out.
+        const tokenUrl = attribute( group, "token-url" );
+        const joining = tokenUrl && calls.joinStream
+            ? calls.joinStream( () => calls.tokenFrom( tokenUrl, { stream: group.name } ), { video } )
+            : calls.stream( group.name, { video } );
+        joining.then( ( stream ) => {
             group.joining = false;
             if ( groups.get( group.name ) !== group ) return stream.leave();
             group.stream = stream;
@@ -200,7 +205,7 @@ let keys = 0;
 /** `<live-stream name="show:42" view="player">`: a stream, or one of its parts. */
 class StreamElement extends HTMLElement {
     static readonly tag: string = "live-stream";
-    static readonly observedAttributes = [ "name", "view", "title", "cover", "url", "login-url", "studio-url", "back-url", "chat", "height", "sticky" ];
+    static readonly observedAttributes = [ "name", "token-url", "view", "title", "cover", "url", "login-url", "studio-url", "back-url", "chat", "height", "sticky" ];
     readonly key = "s" + ++keys;
     /** Where its part draws: React's, so only React empties it. */
     mount = document.createElement( "div" );
@@ -242,7 +247,7 @@ class StreamElement extends HTMLElement {
     /** What kept the stream away, in place of its views. */
     refused( text: string ): void {
         const note = document.createElement( "p" );
-        note.className = "estream-theme estream-part estream-part--refused";
+        note.className = "wplus-live-stream-theme wplus-live-stream-part wplus-live-stream-part--refused";
         note.textContent = text;
         this.mount.replaceChildren( note );
     }

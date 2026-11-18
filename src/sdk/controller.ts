@@ -1,4 +1,4 @@
-import { _x } from "../inc/globals.ts";
+import { _x, sprintf } from "../inc/globals.ts";
 import { setUiUsers } from "../host.ts";
 import type { CallPerson } from "../components/calls/context.ts";
 import { infoOf, type CallUser, type SdkCall, type SdkCalls, type SdkGroupCall, type SdkIncoming } from "./types.ts";
@@ -12,7 +12,28 @@ const REFUSED: Record<string, string> = {
     auth_failed: 'your calls route did not answer with a token: is it added on your server?',
     no_auth: 'the page has no calls route in its settings',
     bad_request: 'the call name or the person called is not one calls take',
+    locked: 'a host locked the call (Lock Room), and this user was not in it, or was removed from it',
+    banned: 'a host banned this user from the call (Remove and Ban from Calls), until the time in the error\'s until',
 };
+
+/**
+ * Why a join was refused, in the user's words: a locked call, a ban with until when (as Better Messages' banner says
+ * it), a rule that said no, or anything else.
+ */
+export function refusalNotice( error: unknown ): string {
+    const code = ( error as { code?: string } | null )?.code;
+    if ( code === 'locked' ) return _x( 'This call is locked', 'Call Screen', 'bp-better-messages' );
+    if ( code === 'banned' ) {
+        const until = Number( ( error as { until?: unknown } ).until );
+        if ( ! Number.isFinite( until ) || until <= 0 ) return _x( 'A moderator removed you from this call until it ends', 'Call Moderation', 'bp-better-messages' );
+        const lang = ( typeof document !== 'undefined' && document.documentElement.lang ) || undefined;
+        const when = new Intl.DateTimeFormat( lang, { dateStyle: 'medium', timeStyle: 'short' } ).format( new Date( until ) );
+        return sprintf( _x( 'A moderator removed you from the calls of this conversation until %s', 'Message when user was banned from group calls', 'bp-better-messages' ), when );
+    }
+    return code === 'forbidden'
+        ? _x( 'You cannot make this call', 'Call Screen', 'bp-better-messages' )
+        : _x( 'This call could not be connected', 'Call Screen', 'bp-better-messages' );
+}
 
 /**
  * The page's one controller for its calls: the elements and a React CallScreen on the same page share it, so a call
@@ -160,6 +181,9 @@ export class CallsController {
         return this.owners.find( ( owner ) => owner.pattern.test( name ) );
     }
 
+    /** Whether a call button is asking the app's route for a token. */
+    private asking = false;
+
     constructor( readonly calls: SdkCalls, private options: { add?: boolean } = {} ) {
         calls.on( 'incoming', ( incoming: SdkIncoming ) => this.ring( incoming ) );
     }
@@ -195,16 +219,40 @@ export class CallsController {
     }
 
     /**
+     * Calls `to` with a token from the app's own route, which decides whether they may be called: what `<call-button
+     * token-url>` does. Once while it asks: a second click asks for no second call. `name`: the call's name for a chat that
+     * shows it, which the route may put on the token (`callToken`'s `name`).
+     */
+    async placeWithToken( url: string, to: CallUser, type: 'audio' | 'video', peer: { name: string; avatar?: string }, name?: string ): Promise<void> {
+        if ( this.busy || this.asking ) return;
+        this.asking = true;
+        setUiUsers( [ [ to, peer ] ] );
+        try {
+            const call = await this.calls.startCall( await this.calls.tokenFrom( url, { to, type, ...( name ? { name } : {} ) } ) );
+            const owner = this.ownerOf( call.name );
+            if ( owner ) return owner.take( { kind: 'call', call } );
+            this.showCall( call, peer );
+        } catch ( error ) {
+            this.refused( error );
+        } finally {
+            this.asking = false;
+        }
+    }
+
+    /**
      * Joins the group call `name`: what `<room-button>` does, and a spot with `join`. Once while it is being joined: a
      * second click, or a second spot that joins it, asks nothing more. `media`: what it turns on as it joins, the
-     * microphone and on a video call the camera when not given (JoinMedia).
+     * microphone and on a video call the camera when not given (JoinMedia). `tokenUrl`: the app's own route, which decides
+     * who joins and gets `?call=meeting:7&type=video`.
      */
-    async join( name: string, type: 'audio' | 'video', title: string, media?: JoinMedia ): Promise<void> {
+    async join( name: string, type: 'audio' | 'video', title: string, media?: JoinMedia, tokenUrl?: string | null ): Promise<void> {
         const owner = this.ownerOf( name );
         if ( ( this.busy && ! owner ) || this.joining.has( name ) ) return;
         this.joining.add( name );
         try {
-            const group = await this.calls.group( name, { type } );
+            const group = tokenUrl
+                ? await this.calls.joinGroupCall( await this.calls.tokenFrom( tokenUrl, { call: name, type } ) )
+                : await this.calls.group( name, { type } );
             if ( owner ) return owner.take( { kind: 'group', group } );
             this.set( { showing: { kind: 'group', group, name, type, title, ...( media ? { media } : {} ), ...this.adding( name, group ) } } );
         } catch ( error ) {
@@ -287,9 +335,7 @@ export class CallsController {
         const code = ( error as { code?: string } | null )?.code;
         // For the developer, who otherwise sees a notice for the user alone and no reason (an SDK review, 2026-10-14).
         console.warn( 'wordplus-realtime: a call did not start (' + ( code ?? 'error' ) + ')' + ( REFUSED[ code ?? '' ] ? ': ' + REFUSED[ code ?? '' ] : '' ), error );
-        this.say( code === 'forbidden'
-            ? _x( 'You cannot make this call', 'Call Screen', 'bp-better-messages' )
-            : _x( 'This call could not be connected', 'Call Screen', 'bp-better-messages' ) );
+        this.say( refusalNotice( error ) );
     }
 
     private say( notice: string ): void {

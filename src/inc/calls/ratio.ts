@@ -28,6 +28,22 @@ export const DEFAULT_TILE_RATIO = 16 / 9;
  */
 export const TALL_TILE_RATIO = 1;
 
+/**
+ * The most of a camera's picture that filling a box may cut, along the side it cuts, a hair at each edge: a camera fills
+ * its tile only when the two are the same shape or all but, and is drawn whole otherwise, the tile's colour around it.
+ * A shared screen is never cut. The recording and its preview cut no more, so the call and what is recorded agree.
+ */
+export const FILL_CUTS_MOST = 0.02;
+
+/** How much of a picture of `ratio` a box of `boxRatio` keeps along the side it cuts when the picture fills it. */
+export const keptOf = ( boxRatio: number, ratio: number ) => Math.min( boxRatio, ratio ) / Math.max( boxRatio, ratio );
+
+/** Whether a picture of `ratio` may fill a box `width` by `height`: it cuts at most FILL_CUTS_MOST of it. */
+export function fillsBox( width: number, height: number, ratio: number | null ): boolean {
+    if ( ! ratio || width <= 0 || height <= 0 ) return false;
+    return keptOf( width / height, ratio ) >= 1 - FILL_CUTS_MOST - 1e-9;
+}
+
 interface Dimensions {
     width: number;
     height: number;

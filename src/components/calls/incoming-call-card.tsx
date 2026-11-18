@@ -2,7 +2,7 @@ import React, { useEffect } from "react";
 import UserAvatar from "../users/user-avatar.tsx";
 import UserName from "../users/user-name.tsx";
 import Tooltip from "../helpers/tooltip.tsx";
-import Icon from "../../primitives/icon.tsx";
+import Icon from "../../primitives/icons.tsx";
 import { _x } from "../../inc/globals.ts";
 import { rememberBeforeRing } from "./focus-return.ts";
 

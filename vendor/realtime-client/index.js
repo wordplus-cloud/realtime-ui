@@ -9,7 +9,10 @@
  * keeps a socket of its own.
  */
 export { realtime, register, compareVersions, sharedWorkerAvoided, REGISTRY, WORKER_NAME, HOLD_KEY } from './registry.js';
-export { rooms, Rooms, Room, Online, RealtimeError, ROOMS_NAMESPACE, patternMatches, packBinary, unpackBinary, } from './rooms.js';
+export { rooms, Rooms, Room, Online, RealtimeError, ROOMS_NAMESPACE, EMBEDDED_FINAL, EMBEDDED_RETRY_MS, patternMatches, packBinary, unpackBinary, } from './rooms.js';
+export { embeddedConnector } from './embedded.js';
+export { siteRequest, absoluteUrl } from './site.js';
+export { visitorHeaders, VISITOR_HEADER } from './visitor.js';
 export { Keyring, keyring, labelOf, isSealed, validLabel, KEYRING_GLOBAL } from './keys.js';
 export { Connector, clusterOf, SAME_CLUSTER, VERSION } from './connector.js';
 export { RemoteConnector, serve, PORT_PROTOCOL, HELLO_TIMEOUT_MS, PING_INTERVAL_MS, CHECK_TIMEOUT_MS } from './remote.js';

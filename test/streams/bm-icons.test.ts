@@ -1,5 +1,5 @@
 import {describe, expect, it} from "vitest";
-import {iconPathD, type IconName} from "../../src/primitives/icon.tsx";
+import {iconPathD, type IconName} from "../../src/primitives/icons.tsx";
 import {BM_ICONS} from "../../src/components/streams/better-messages.tsx";
 
 // The stream's stage in a Better Messages conversation draws a copy of the few call icons it needs, so a page with a
@@ -12,7 +12,7 @@ describe( 'the icons of the stream\'s Better Messages stage', () => {
     it( 'are the call\'s own, but for the stream\'s few', () => {
         const differ = Object.entries( BM_ICONS )
             .filter( ( [ name ] ) => ! STREAM_ONLY.includes( name ) )
-            .filter( ( [ name, d ] ) => iconPathD( name as IconName ) !== d.split( '|' ).join( ' ' ) )
+            .filter( ( [ name, d ] ) => iconPathD( name as IconName ) !== d.split( '|' ).map( ( part ) => part.replace( /^m/, 'M0 0m' ) ).join( ' ' ) )
             .map( ( [ name ] ) => name );
 
         expect( differ ).toEqual( [] );

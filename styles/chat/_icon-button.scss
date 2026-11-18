@@ -1,0 +1,57 @@
+// IconButton (src/primitives/icon-button.tsx): the single-action button of the chat's parts, the composer's paperclip
+// and Send among them. Its look as Better Messages gives it (assets/css/parts/main/_icon-button.scss there), which
+// styles the button in its own stylesheet and imports none of this: an app that draws the parts with the package's
+// stylesheet alone (Live Support's visitor panel and inbox) compiles it as the part chat/icon-button beside the others,
+// and its Send wears the accent as Better Messages' does. Quiet without emphasis, a hover's background under it.
+.wplus-icon-btn {
+    border: 0;
+    padding: 8px;
+    background: transparent;
+    color: rgba(var(--wplus-color-text-secondary), 1);
+    &:not(#\9) { border-radius: var(--wplus-radius-button); }
+    cursor: pointer;
+    display: inline-grid;
+    place-items: center;
+    line-height: 0;
+    position: relative;
+    transition: background 0.12s ease, filter 0.12s ease;
+
+    &[data-emphasis="none"]:not(:disabled):not([aria-disabled="true"]):hover {
+        background: rgba(var(--wplus-color-bg-hover), 1);
+        color: rgba(var(--wplus-color-text-primary), 1);
+    }
+
+    &[data-emphasis="accent"] {
+        background: rgba(var(--wplus-color-accent), 1);
+        color: rgba(var(--wplus-color-text-on-accent), 1);
+    }
+
+    // Recording is a fixed hue, so the glyph on it is a fixed white rather than text-on-accent.
+    &[data-emphasis="danger"] {
+        background: rgba(var(--wplus-color-recording), 1);
+        color: rgba(255, 255, 255, 1);
+    }
+
+    &:disabled, &[aria-disabled="true"] {
+        cursor: not-allowed;
+        opacity: 0.5;
+    }
+}
+
+// A link IconButton (`href`) keeps the button's colours over a page's own link colour.
+a.wplus-icon-btn:not(#\9) {
+    color: rgba(var(--wplus-color-text-secondary), 1);
+    text-decoration: none;
+
+    &[data-emphasis="none"]:not([aria-disabled="true"]):hover {
+        color: rgba(var(--wplus-color-text-primary), 1);
+    }
+
+    &[data-emphasis="accent"] {
+        color: rgba(var(--wplus-color-text-on-accent), 1);
+    }
+
+    &[data-emphasis="danger"] {
+        color: rgba(255, 255, 255, 1);
+    }
+}

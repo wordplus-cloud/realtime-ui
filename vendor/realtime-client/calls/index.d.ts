@@ -17,6 +17,11 @@ export type { CameraCodec, CameraCodecCaps, CameraChoice, CameraHardware, CodecP
 export { droppedHardwareCodecs, rememberDroppedHardware, HARDWARE_DROPS_KEY } from "./room-publish.js";
 export { watchCameraEncoder, dropsFrames, cpuHeld, readingsFor, hardwareReading, readEncoder, layerEncoders } from "./encoder-watch.js";
 export type { EncoderReading, EncoderLayer } from "./encoder-watch.js";
+export { watchRoomMic, type RoomSending, type RoomMicOptions, type RoomVideoCaps } from "./mic-ceiling.js";
+export { PictureSteps, stepCaps, stepFitting, lowerCaps, CAMERA_STEPS, SCREEN_STEPS, PICTURE_DOWN_MS, PICTURE_UP_MS, PICTURE_RELAPSE_MS, PICTURE_UP_MAX_MS, PICTURE_FIT } from "./picture-steps.js";
+export type { PictureCaps, SoundReading } from "./picture-steps.js";
+export { UploadJam, jamReading, JAM_RTT_MS, JAM_UNANSWERED_MS, JAM_FOR_MS, JAM_CLEAR_RTT_MS, JAM_CLEAR_MS } from "./upload-jam.js";
+export type { JamReading } from "./upload-jam.js";
 export { cameraCodecOrder, cameraCodecRecord, cameraCodecRecords, cameraFinding, rememberCameraCodec, droppedCameraCodecs, heavySoftwareCodecs, cameraCheckPassed, browserVersion, windowsDesktopChromium, legacyCamera, uncheckedBrowser, knownAdapter, CAMERA_CODECS_KEY, CAMERA_CODEC_KEEP_MS } from "./room-publish.js";
 export type { CameraCodecRecord, CameraCodecResult } from "./room-publish.js";
 export { choiceHeight, vp9Height, VP9_TOP_HEIGHT, CAMERA_STEP_DOWN_HEIGHT } from "./room-publish.js";
@@ -37,6 +42,8 @@ export { checkNumbers, type CheckNumbers } from "./camera-check.js";
 export { watchNumbers, type WatchNumbers } from "./encoder-watch.js";
 export { lipSyncNumbers } from "./lip-sync.js";
 export { roomSettings, roomPolicy, applyViewSettings, type SettingsRoom } from "./room-settings.js";
+export { StallWatch, type StallStream, type Stalled } from "./stall-watch.js";
+export { awayFor, AWAY_MS, AWAY_LEFT_MS, BYE_KEEP_MS, BYE_TOPIC } from "./away.js";
 export type { CallId, CallTransport, RelayMessage } from "./transport.js";
 export type { P2PSource, P2PQuality, P2PConnection, P2PStats, SfuHandoff, IceServer, MediaState } from "./types.js";
 /**

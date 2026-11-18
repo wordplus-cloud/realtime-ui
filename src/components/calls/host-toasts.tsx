@@ -1,9 +1,10 @@
 import React, { useContext, useEffect, useRef, useState } from "react";
 import { _nx, _x, sprintf } from "../../inc/globals.ts";
-import Icon from "../../primitives/icon.tsx";
+import Icon from "../../primitives/icons.tsx";
 import { host } from "../../host.ts";
-import { CallContext, type CallContextInterface } from "./context.ts";
+import { CallContext, type CallContextInterface, type TurnOnAnswer } from "./context.ts";
 import pressable from "./pressable.ts";
+import { turnOnAnswerText } from "./ask-prompt.tsx";
 
 /** Whether this browser plays a sound when someone raises a hand: on unless a moderator turned it off in Host Controls. */
 export const HAND_SOUND_KEY = 'wordplus-call-hand-sound';
@@ -43,6 +44,8 @@ export function keepJoinAlerts( on: boolean ) {
 // filling up says so once, and no more than three toasts stand at a time.
 export const HAND_TOAST_MS = 10000;
 export const JOIN_TOAST_MS = 5000;
+// What came of an ask to turn on a camera or a microphone (ask-prompt.tsx).
+export const ANSWER_TOAST_MS = 8000;
 const JOINS_TOGETHER_MS = 3000;
 const MOST_TOASTS = 3;
 
@@ -59,8 +62,11 @@ export interface HostToastPerson {
 
 export interface HostToast {
     id: number,
-    kind: 'hand' | 'join',
+    kind: 'hand' | 'join' | 'answer',
     people: HostToastPerson[],
+    // For `answer`: what the person asked did, and whether they did it with both devices, asked for both at once.
+    answer?: TurnOnAnswer,
+    both?: boolean,
 }
 
 // A name as text: a site's badges in it are markup the tiles draw, and a toast has no room for them.
@@ -70,6 +76,7 @@ function toastText( toast: HostToast ): string {
     const [ first, second ] = toast.people.map( ( person ) => person.name );
 
     if ( toast.kind === 'hand' ) return sprintf( _x( '%s raised a hand', 'Call Moderation', 'bp-better-messages' ), first );
+    if ( toast.kind === 'answer' && toast.answer ) return turnOnAnswerText( toast.answer, first, toast.both );
     if ( toast.people.length === 1 ) return sprintf( _x( '%s joined', 'Call Moderation', 'bp-better-messages' ), first );
     if ( toast.people.length === 2 ) return sprintf( _x( '%1$s and %2$s joined', 'Call Moderation', 'bp-better-messages' ), first, second );
 
@@ -105,7 +112,7 @@ function chime( context: AudioContext ) {
  * toast down.
  */
 export function useHostToasts(): [ HostToast[], ( id: number ) => void ] {
-    const { participants, connectionState, selectedSpeakerDevice } = useContext<CallContextInterface>( CallContext );
+    const { participants, connectionState, selectedSpeakerDevice, turnOnAsks } = useContext<CallContextInterface>( CallContext );
     const [ toasts, setToasts ] = useState<HostToast[]>( [] );
     const shown = useRef<HostToast[]>( [] );
     const seen = useRef<Map<string, boolean> | null>( null );
@@ -131,6 +138,22 @@ export function useHostToasts(): [ HostToast[], ( id: number ) => void ] {
     const expireIn = ( id: number, ms: number ) => {
         clearTimeout( timers.current.get( id ) );
         timers.current.set( id, setTimeout( () => dismiss( id ), ms ) );
+    };
+
+    // An answer that comes while the page is out of sight, the moderator in another tab or window, waits until it is
+    // seen before its time starts.
+    const unseen = useRef( new Set<() => void>() );
+    const expireOnceSeen = ( id: number, ms: number ) => {
+        if ( typeof document === 'undefined' || document.visibilityState !== 'hidden' ) return expireIn( id, ms );
+
+        const seenNow = () => {
+            if ( document.visibilityState === 'hidden' ) return;
+            document.removeEventListener( 'visibilitychange', seenNow );
+            unseen.current.delete( seenNow );
+            if ( shown.current.some( ( toast ) => toast.id === id ) ) expireIn( id, ms );
+        };
+        unseen.current.add( seenNow );
+        document.addEventListener( 'visibilitychange', seenNow );
     };
 
     const ring = () => {
@@ -233,8 +256,40 @@ export function useHostToasts(): [ HostToast[], ( id: number ) => void ] {
         if ( hands.length ) ring();
     }, [ participants, connectionState ] );
 
+    // The answers to this moderator's asks to turn on a camera or a microphone (ask-prompt.tsx), each once.
+    const answered = useRef<number | null>( null );
+    useEffect( () => {
+        const answers = turnOnAsks?.answers ?? [];
+        if ( answered.current === null || answered.current > answers.length ) {
+            answered.current = answers.length;
+            return;
+        }
+        const fresh = answers.slice( answered.current );
+        answered.current = answers.length;
+        if ( ! fresh.length ) return;
+
+        const next = [ ...shown.current ];
+        fresh.forEach( ( answer ) => {
+            const found = [ ...participants.entries() ].find( ( [ , participant ] ) => participant.identity === answer.from );
+            if ( ! found ) return;
+            // The other device's answer to the same ask for both, alike: one toast says it of both.
+            const pair = next.findIndex( ( toast ) => toast.kind === 'answer' && ! toast.both && toast.answer?.id === answer.id && toast.answer.from === answer.from
+                && toast.answer.answer === answer.answer && toast.answer.device !== answer.device );
+            if ( pair !== -1 ) {
+                next[ pair ] = { ...next[ pair ], both: true };
+                expireOnceSeen( next[ pair ].id, ANSWER_TOAST_MS );
+                return;
+            }
+            const toast: HostToast = { id: nextId.current++, kind: 'answer', people: [ { key: found[ 0 ], name: plain( found[ 1 ].name ), avatar: found[ 1 ].avatar } ], answer };
+            next.push( toast );
+            expireOnceSeen( toast.id, ANSWER_TOAST_MS );
+        } );
+        show( next.slice( -MOST_TOASTS ) );
+    }, [ turnOnAsks?.answers ] );
+
     useEffect( () => () => {
         timers.current.forEach( ( timer ) => clearTimeout( timer ) );
+        unseen.current.forEach( ( listener ) => document.removeEventListener( 'visibilitychange', listener ) );
         void audio.current?.close().catch( () => null );
     }, [] );
 

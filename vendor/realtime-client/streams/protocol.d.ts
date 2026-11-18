@@ -3,6 +3,7 @@ export declare const GRANT_KEY_LABEL = "live-stream grant v1";
 export declare const GRANT_MAX_LIFETIME_S: number;
 export declare const STREAM_ID: RegExp;
 export declare const USER_ID: RegExp;
+export declare const LANG: RegExp;
 export declare const JOIN_PATH = "/live-stream/v1/join";
 export declare const WHIP_PATH = "/live-stream/v1/whip";
 export declare const INGEST_IDENTITY = "ingest";
@@ -26,6 +27,7 @@ export interface GrantClaims {
     sub?: string;
     name?: string;
     avatar?: string;
+    lang?: string;
     chat?: ChatRight;
     mod?: boolean;
     src?: Source[];
@@ -43,7 +45,7 @@ export interface GrantClaims {
     iat?: number;
     exp: number;
 }
-export declare const CLAIM_ORDER: readonly ["iss", "aud", "str", "role", "sub", "name", "avatar", "chat", "mod", "src", "q", "stage", "offline", "links", "fresh", "people", "viewers", "reactions", "track", "autostart", "org", "iat", "exp"];
+export declare const CLAIM_ORDER: readonly ["iss", "aud", "str", "role", "sub", "name", "avatar", "lang", "chat", "mod", "src", "q", "stage", "offline", "links", "fresh", "people", "viewers", "reactions", "track", "autostart", "org", "iat", "exp"];
 export type StreamPhase = 'idle' | 'live' | 'ended';
 export interface StreamState {
     id: string;

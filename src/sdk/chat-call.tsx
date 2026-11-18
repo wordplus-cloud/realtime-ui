@@ -36,9 +36,11 @@ export interface ChatCall {
 }
 
 /** The chat's call, from Chat's `call`: true names it as the room, a template takes `{pair}` with `to`. */
-export function useChatCall( rt: SdkRooms | null | undefined, room: string, call: boolean | string | undefined, to: string | null ): ChatCall {
+export function useChatCall( rt: SdkRooms | null | undefined, room: string, call: boolean | string | undefined, to: string | null, tokenUrl?: string ): ChatCall {
     const me = rt?.user ?? null;
-    const name = call === true ? room : typeof call === "string" && call !== "" ? callName( call, me, to ?? "" ) : null;
+    // With only a route of the app's own to ask, the call is named as the room, which the route may put on its token.
+    const named = call ?? ( tokenUrl ? true : undefined );
+    const name = named === true ? room : typeof named === "string" && named !== "" ? callName( named, me, to ?? "" ) : null;
     const controller = usePageCalls( name === null ? null : rt );
     const spot = useRef<HTMLDivElement | null>( null );
     const body = useRef<HTMLDivElement | null>( null );
@@ -71,7 +73,7 @@ export function useChatCall( rt: SdkRooms | null | undefined, room: string, call
 
     const place = name === null || ! controller || to === null
         ? undefined
-        : ( type: "audio" | "video", peer: { name: string; avatar?: string } ) => void controller.place( name, to, type, peer );
+        : ( type: "audio" | "video", peer: { name: string; avatar?: string } ) => void ( tokenUrl ? controller.placeWithToken( tokenUrl, to, type, peer, name ) : controller.place( name, to, type, peer ) );
 
     return { name, place, spot, body, here, narrow, chatShown: ! here || view?.chat !== false, busy: !! view?.showing };
 }

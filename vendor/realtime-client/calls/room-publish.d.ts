@@ -687,11 +687,23 @@ export declare function roomPixelDensity(devicePixelRatio: number | undefined, s
 export declare function applyScreenSettings(track: ScreenShareTrack & {
     sender?: RTCRtpSender | null;
 }, settings: CallSettings | null | undefined, codec: CameraCodec, forVideo?: boolean): Promise<void>;
-/** 1.0.53: a call microphone's publish options from the settings (mic.kbps, mic.red, mic.dtx); 64 kbit/s, RED and DTX on without them. */
+/**
+ * 1.0.53: a call microphone's publish options from the settings (mic.kbps, mic.red, mic.dtx); 64 kbit/s, RED and DTX on without them.
+ *
+ * 1.0.86: and resend, the room client's word (@wordplus/rtc-client 1.0.27) that its node may ask the microphone again
+ * for what its upload lost, in RED too, where a node otherwise leaves a lost packet to RED's spare copy: that restores
+ * one lost alone and no run of them. What is sent again goes up the same upload, which on a narrow one was once the
+ * camera's room; a call's microphone says so because the call watches it (watchRoomMic, mic-ceiling.ts) and makes
+ * that room, bringing the microphone and the picture down on a line too narrow for both. Measured 10 Nov 2026 with
+ * that watch on: a line that fell to 150 kbps, 0.5-1.1% of the sound made up in the jam's first 23 s unasked and none
+ * to 0.8% asked; 600 kbps losing 8 packets in 100, 0.2-0.4% unasked and none to 0.2% asked once settled. So whoever
+ * publishes with these starts that watch, as the products do.
+ */
 export declare function micPublish(settings?: CallSettings | null): {
     maxBitrate: number;
     red: boolean;
     dtx: boolean;
+    resend: boolean;
 };
 /** 1.0.53: a shared screen's sound (screenAudio.kbps): stereo, without DTX or RED; 128 kbit/s without settings. */
 export declare function screenAudioPublish(settings?: CallSettings | null): {

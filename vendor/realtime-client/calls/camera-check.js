@@ -72,6 +72,17 @@ export const CHECK_MAX_FRAME_SHARE = CAMERA_TUNE_DEFAULTS.passEncode;
 export const CHECK_MIN_FRAMES = 6;
 /** The share of the time limited by bandwidth over which the loopback said too little (its estimate not risen yet). */
 const CHECK_MAX_BANDWIDTH_SHARE = 0.5;
+/**
+ * A layered encoding's (VP9 or AV1 SVC) time a picture against its layers' average: Chrome gives each spatial layer the
+ * time from its picture's start to that layer's end and counts each as a frame encoded and sent (libwebrtc's
+ * FrameEncodeMetadataWriter stamps one start a picture for every layer, SendStatisticsProxy adds each layer's), so
+ * totalEncodeTime over the pictures counts what comes before the last layer two or three times. Measured in a loopback
+ * (Chromium 153, a Mac, 10 fps, the layers' times seen leaving the encoder): a picture's time came to 1.2 to 1.5 times
+ * its layers' average, against 2 to 2.5 times for that sum (VP9 L3T3 at 1080: 26 ms summed, 9.8 to 11 a picture).
+ */
+export const SVC_PICTURE_SHARE = 1.5;
+/** The share of the camera's frames sent that is every one of them, for a verdict on its time alone (judgeEncoder()). */
+export const CHECK_KEPT_ALL_SHARE = 0.95;
 export function checkNumbers(settings) {
     return {
         connectMs: settingNumber(settings, 'check.connectMs', CAMERA_CHECK_CONNECT_MS),
@@ -86,6 +97,15 @@ export function checkNumbers(settings) {
     };
 }
 /**
+ * The frames a picture makes, each counted as encoded and as sent: its spatial layers where the browser names them,
+ * else the frames encoded over the camera's where clearly more than one (a browser that doesn't say), else one.
+ */
+export function pictureLayers(s) {
+    if ((s.layers ?? 0) >= 1)
+        return s.layers;
+    return s.captured > 0 && s.encoded > s.captured * 1.5 ? Math.max(1, Math.round(s.encoded / s.captured)) : 1;
+}
+/**
  * The verdict on one codec from its loopback's numbers. wantHardware: the codec was to go out in hardware (H.264,
  * H.265), whose failure is its frames taken off (`drops`); otherwise a software codec, whose failure is the CPU's (`cpu`).
  *
@@ -96,12 +116,16 @@ export function checkNumbers(settings) {
  *   CHECK_MIN_SENT_SHARE of the camera's frames;
  * - software: `cpu` where the CPU held it back over CHECK_MAX_CPU_SHARE of the window, a picture took over
  *   CHECK_MAX_FRAME_SHARE of its interval, or it sent under CHECK_MIN_SENT_SHARE;
- * - `pass` otherwise.
+ * - `pass` otherwise, and ("tight") where a picture took over CHECK_MAX_FRAME_SHARE of its interval but no more than
+ *   the interval, above CAMERA_STEP_DOWN_HEIGHT, while every frame was sent (CHECK_KEPT_ALL_SHARE) and the CPU never held it back: it keeps
+ *   up, and a call's CPU watch brings it down to CAMERA_STEP_DOWN_HEIGHT in place should it fall behind (camera-adapt.ts,
+ *   stepDownCamera()), where a verdict of too heavy would keep it there or move it to VP8 for good. A move's check
+ *   measures while the camera still goes out in its old codec, which slows it too.
  * Sending under CHECK_MIN_SENT_SHARE over the window while keeping up in its second half (`late`) is an encoder still
- * starting: too little to tell ("slow-start"), never drops nor cpu. The time a picture takes is the encoding time over
- * the pictures the camera gave, no more: an SVC encoding (VP9, AV1) counts each spatial layer's frame as encoded (Chrome's
- * VP9 L3T3 about 31 a second from a 15 fps camera), which spread a picture's time over two or three. The three shares
- * are the policy's tune's where given (passSent, passCpu, passEncode).
+ * starting: too little to tell ("slow-start"), never drops nor cpu. A layered encoding (VP9, AV1 SVC) counts each spatial
+ * layer's frame as encoded and as sent (pictureLayers()), so its frames sent are over its layers, and its time a picture
+ * is its layers' average time times SVC_PICTURE_SHARE, not their sum. The three shares are the policy's tune's where given
+ * (passSent, passCpu, passEncode).
  */
 export function judgeEncoder(codec, wantHardware, s, tune = CAMERA_TUNE_DEFAULTS, check = checkNumbers()) {
     const base = { codec, implementation: s.implementation, hardware: s.hardware };
@@ -112,8 +136,11 @@ export function judgeEncoder(codec, wantHardware, s, tune = CAMERA_TUNE_DEFAULTS
     if (s.bandwidthSeconds / seconds > check.bandwidthShare)
         return none('bandwidth');
     const sentShare = sentShareOf(s);
-    // the encoding time of a picture the camera gave: an SVC encoding's layer frames are no more pictures
-    const msPerFrame = s.encodeSeconds * 1000 / Math.max(1, Math.min(s.encoded, s.captured));
+    // the encoding time of a picture the camera gave; a layered one's from its layers' average (SVC_PICTURE_SHARE)
+    const layers = pictureLayers(s);
+    const msPerFrame = layers > 1
+        ? s.encodeSeconds * 1000 / Math.max(1, s.encoded) * SVC_PICTURE_SHARE
+        : s.encodeSeconds * 1000 / Math.max(1, Math.min(s.encoded, s.captured));
     const cpuShare = Math.min(1, s.cpuSeconds / seconds);
     const fps = Math.min(30, s.captureFps > 0 ? s.captureFps : s.captured / seconds);
     const numbers = { msPerFrame, sentShare, cpuShare, ...(fps > 0 ? { fps } : {}), ...(s.frameHeight ? { frameHeight: s.frameHeight } : {}) };
@@ -132,17 +159,23 @@ export function judgeEncoder(codec, wantHardware, s, tune = CAMERA_TUNE_DEFAULTS
     }
     if (cpuShare > tune.passCpu)
         return verdict('cpu', 'cpu');
-    if (fps > 0 && msPerFrame > tune.passEncode * 1000 / fps)
-        return verdict('cpu', 'slow');
+    if (fps > 0 && msPerFrame > tune.passEncode * 1000 / fps) {
+        // keeping up with every frame and nothing held back above the height a call steps it down to: its time alone
+        // fails nothing, while a picture fits its interval at all
+        const keptUp = sentShare >= CHECK_KEPT_ALL_SHARE && cpuShare === 0 && msPerFrame <= 1000 / fps && (s.frameHeight ?? 0) > CAMERA_STEP_DOWN_HEIGHT;
+        return keptUp ? verdict('pass', 'tight') : verdict('cpu', 'slow');
+    }
     if (sentShare < tune.passSent)
         return starting ? none('slow-start') : verdict('cpu', 'drops');
     return verdict('pass', 'ok');
 }
 // The share of the camera's frames a sample sent: an encoding sends 30 a second at most (the room's maxFramerate), so a
-// camera giving 60 isn't the encoder's to keep.
+// camera giving 60 isn't the encoder's to keep. A layered encoding's pictures are its frames sent over its layers: each
+// layer's counts as one, so VP9 L3T3 read 100% sent whatever it dropped.
 function sentShareOf(s) {
     const given = s.elapsedMs > 0 ? Math.min(s.captured, s.elapsedMs / 1000 * 30) : s.captured;
-    return given > 0 ? Math.min(1, s.sent / given) : 0;
+    const pictures = s.sent / pictureLayers({ captured: s.captured, encoded: s.encoded ?? 0, layers: s.layers });
+    return given > 0 ? Math.min(1, pictures / given) : 0;
 }
 /**
  * Whether an encoder keeps up with its camera over a stretch (the check's warm-up, CAMERA_CHECK_KEEPUP_MS): the camera
@@ -176,7 +209,7 @@ export function fitsLower(verdict, to, tune = CAMERA_TUNE_DEFAULTS, headroom = C
 /** The sender's counts from its stats (an RTCStatsReport): its outbound-rtp's, summed, and its media-source's frames. */
 export function encoderCounts(report) {
     const out = { at: 0, captured: 0, encoded: 0, sent: 0, encodeSeconds: 0, cpuSeconds: 0, bandwidthSeconds: 0, captureFps: 0, implementation: '', hardware: false, known: false, frameHeight: 0,
-        sourceHeight: 0, limit: '' };
+        sourceHeight: 0, limit: '', layers: 0 };
     report.forEach((s) => {
         if (s?.type === 'outbound-rtp' && (!s.kind || s.kind === 'video')) {
             out.at = Math.max(out.at, Number(s.timestamp) || 0);
@@ -195,6 +228,10 @@ export function encoderCounts(report) {
                 out.hardware = true;
             if (s.qualityLimitationReason)
                 out.limit = String(s.qualityLimitationReason);
+            // the layers it runs, which Chrome names as it runs them: L2T3_KEY for an L3T3_KEY asked at 480 lines or under
+            const spatial = /^L(\d)T\d/.exec(String(s.scalabilityMode ?? ''));
+            if (spatial)
+                out.layers = Math.max(out.layers, Number(spatial[1]));
         }
         else if (s?.type === 'media-source' && (!s.kind || s.kind === 'video')) {
             out.captured = Math.max(out.captured, Number(s.frames) || 0);
@@ -218,7 +255,8 @@ export function sampleBetween(a, b) {
         implementation: b.implementation,
         hardware: b.hardware,
         known: b.known,
-        ...(b.frameHeight ? { frameHeight: b.frameHeight } : {})
+        ...(b.frameHeight ? { frameHeight: b.frameHeight } : {}),
+        ...(b.layers ? { layers: b.layers } : {})
     };
 }
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));

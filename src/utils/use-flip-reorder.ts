@@ -24,11 +24,13 @@ import { useLayoutEffect, useRef, RefObject } from "react";
 // reason group-audio-grid-item drops .wplus-call-tile-entering once it has
 // played: this runs on every commit, and two animations driving transform at
 // once produce exactly the jitter it is here to avoid.
+type Place = { left: number, top: number, width: number, height: number };
+
 export default function useFlipReorder(
     containerRef: RefObject<HTMLElement | null>,
     duration = 300,
 ): void {
-    const previous = useRef<Map<string, DOMRect>>( new Map() );
+    const previous = useRef<Map<string, Place>>( new Map() );
     const lastOrder = useRef<string | null>( null );
     const running = useRef<WeakMap<HTMLElement, Animation>>( new WeakMap() );
 
@@ -65,12 +67,20 @@ export default function useFlipReorder(
         // with element.animate() makes the browser flush layout once per child,
         // and this effect runs on every commit — which in a call is every time
         // anyone's audio level changes.
-        const measured: Array<{ el: HTMLElement, key: string, rect: DOMRect }> = [];
+        //
+        // Places are read in the container's content, not the window: a list that scrolled since the last commit (a
+        // long roster draws the rows in view alone, and redraws as it scrolls) has its tiles where they were.
+        const box = container.getBoundingClientRect();
+        const measured: Array<{ el: HTMLElement, key: string, rect: Place }> = [];
 
         for ( const child of children ) {
             const key = child.dataset.key;
             if ( ! key ) continue;
-            measured.push( { el: child, key, rect: child.getBoundingClientRect() } );
+            const at = child.getBoundingClientRect();
+            measured.push( { el: child, key, rect: {
+                left: at.left - box.left + container.scrollLeft, top: at.top - box.top + container.scrollTop,
+                width: at.width, height: at.height,
+            } } );
         }
 
         if ( reordered && ! still ) {
@@ -115,7 +125,7 @@ export default function useFlipReorder(
             }
         }
 
-        const next = new Map<string, DOMRect>();
+        const next = new Map<string, Place>();
         for ( const { key, rect } of measured ) next.set( key, rect );
         previous.current = next;
     } );

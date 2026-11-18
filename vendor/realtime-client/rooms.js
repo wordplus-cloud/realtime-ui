@@ -27,11 +27,35 @@
  *   any key missing is fetched from the app's server. The realtime server reads none of it, and never hands out a key.
  * - **The app's users:** `users( ids )` reads the directory every plugin on a site shares, names, avatars and profile
  *   links sealed with the day's key, which this socket may read once the app vouched for its user (`identify`).
+ * - **On another website** (`embedded`, for a chat outside WordPress): a page whose origin the site lists in
+ *   WordPlus Cloud, which the realtime server takes by its Origin alone. Its connection is in the page and through the
+ *   realtime server's own name alone (embedded.ts), its requests go to the site's absolute routes without cookies
+ *   (site.ts), and a refusal of the page itself (`wrong_origin`, also met after the realtime server let it go) is
+ *   final: `unavailable` says so once, and the plugin goes on over its own REST routes.
  */
 import { Listeners } from './channel.js';
-import { labelOf, keyring as pageKeyring } from './keys.js';
+import { embeddedConnector } from './embedded.js';
+import { RealtimeError } from './errors.js';
+import { labelOf, keyring as pageKeyring, utf8Decode } from './keys.js';
 import { realtime } from './registry.js';
+import { siteRequest } from './site.js';
+export { RealtimeError };
 export const ROOMS_NAMESPACE = '/channels';
+/**
+ * The refusals of a page on another website that no retry mends: its origin isn't one the site lists live (removed,
+ * paused, or waiting for a site of the licence), or the site has no realtime at all. The page goes on without the
+ * realtime server (`unavailable`).
+ */
+export const EMBEDDED_FINAL = ['wrong_origin', 'not_licensed', 'not_included'];
+/**
+ * The refusals of a page on another website that a later try may pass: a node starting, or the site over its
+ * connections. Nobody else asks again for such a page, so it does, as after the realtime server let it go.
+ */
+const EMBEDDED_AGAIN = ['try_later', 'over_capacity'];
+/** How long a page on another website waits to connect again, by how many times it has in a row. */
+export const EMBEDDED_RETRY_MS = [1000, 2000, 4000, 8000, 15000, 30000];
+/** A connection up this long counts as one that worked: the next retry waits the first wait again. */
+const EMBEDDED_STEADY_MS = 60000;
 /** How long a request on the socket waits for its answer. A move waits 10 s for every namespace. */
 const ANSWER_MS = 8000;
 /** Rooms one `join` names, the server's limit (its LIMITS.roomsPerJoin). */
@@ -45,14 +69,6 @@ const FRESH_S = 60;
  * asks the app's server again: the realtime server refuses tokens signed in the second of the disconnect too.
  */
 const RENEW_AFTER_MS = 1100;
-/** An error the realtime server or the app's server answered, by its code (`forbidden`, `rate_limited`, `too_large` …). */
-export class RealtimeError extends Error {
-    constructor(code) {
-        super(code);
-        this.code = code;
-        this.name = 'RealtimeError';
-    }
-}
 const nowS = () => Math.floor(Date.now() / 1000);
 /** The page's rooms: open one per site or app with `rooms()`. */
 export function rooms(options) {
@@ -86,16 +102,24 @@ export class Rooms {
         /** Events waiting for a key, delivered in the order they came. */
         this.queue = Promise.resolve();
         this.waiting = 0;
+        /** On another website (`embedded`): why the realtime server will not take the page, once it said so for good. */
+        this.ended = null;
+        /** On another website: the next try to connect, how many came in a row, and since when the socket is up. */
+        this.retry = null;
+        this.retries = 0;
+        this.upSince = 0;
         this.site = options.site;
         this.keyring = options.keyring ?? pageKeyring();
         this.keyring.add(options.keys?.entries ?? [], 'page');
         this.identity = options.keys?.identity?.token ? options.keys.identity : null;
-        // A plugin that asks the site for keys its own way (the Better Messages worker) has set how already.
-        if (options.keys?.endpoint && !this.keyring.hasResolver())
-            this.keyring.setResolver((labels) => this.askKeys(labels));
+        // Asks for keys with this connection's own credentials while it is open. A plugin that asks the site its own way
+        // (the Better Messages worker) sets how itself, and is asked first.
+        this.releaseKeys = holdKeyring(this.keyring, options.keys?.endpoint ? (labels) => this.askKeys(labels) : null);
         this.scheduleIdentity();
         this.online = new Online(this);
-        const attach = options.attach ?? ((o) => realtime({ ...options, user: options.perUser ? this.user : options.user ?? null }).attach(o));
+        const attach = options.attach ?? (options.embedded
+            ? (o) => embeddedConnector().attach({ server: options.server, path: options.path }, o)
+            : (o) => realtime({ ...options, user: options.perUser ? this.user : options.user ?? null }).attach(o));
         this.socket = attach({
             namespace: ROOMS_NAMESPACE,
             auth: () => ({ site: this.site, rt: 3 }),
@@ -106,6 +130,7 @@ export class Rooms {
         // What the server drops when this tab goes while the browser's others stay.
         this.socket.farewell('bye', { tab: this.tab });
         this.socket.on('connect', () => {
+            this.upSince = Date.now();
             this.listeners.fire('connected', [], false);
             void this.joinAll();
         });
@@ -113,8 +138,19 @@ export class Rooms {
             for (const room of this.held.values())
                 room.lost();
             this.listeners.fire('disconnected', [reason], false);
+            // Let go by the realtime server (a website taken off the site's list): its next handshake says why.
+            if (this.options.embedded && reason === 'io server disconnect')
+                this.connectAgain();
         });
-        this.socket.on('connect_error', (error) => this.listeners.fire('error', [{ code: error.message }], false));
+        this.socket.on('connect_error', (error) => {
+            this.listeners.fire('error', [{ code: error.message }], false);
+            if (!this.options.embedded || this.socket.active)
+                return;
+            if (EMBEDDED_FINAL.includes(error.message))
+                this.end(error.message);
+            else if (EMBEDDED_AGAIN.includes(error.message))
+                this.connectAgain();
+        });
         this.socket.on('e', (e) => this.deliver(e, false));
         this.socket.on('join', (m) => {
             if (!m || m.x === this.tab)
@@ -167,17 +203,18 @@ export class Rooms {
     get connected() {
         return this.socket.connected;
     }
+    /**
+     * On another website (`embedded`): why the realtime server will not take this page (EMBEDDED_FINAL), once it said
+     * so, or null while it may. `unavailable` fired then.
+     */
+    get unavailable() {
+        return this.ended;
+    }
     /** The user the app vouched for on this page, or null. */
     get user() {
         const sub = this.identity ? payloadOf(this.identity.token)?.sub : undefined;
         return sub === undefined || sub === null ? null : String(sub);
     }
-    /**
-     * What the app's server sends this user (`toUser( id ).emit( event, data )`), `fn( data, { at } )`; and the
-     * connection's own: `connected`, `disconnected` (with the reason), `error` ({ code }: the handshake refused, such
-     * as `not_included`), `moved`: the connection moved to another node without a drop, and `signed_out`: the app's
-     * server disconnected the user, whose identity and rooms the page asks it for again.
-     */
     on(event, fn) {
         this.listeners.on(event, fn);
         return this;
@@ -246,12 +283,22 @@ export class Rooms {
         }
         return users;
     }
-    /** A room of the app, joined: the same one again for the same name. */
+    /**
+     * A room of the app, joined: the same one again for the same name. `Events` says what its events carry and `Info`
+     * what its members bring, for your own checking and nothing else: `rt.join<{ message: { text: string } }>( 'chat:1' )`.
+     */
     join(name) {
         let room = this.held.get(name);
         if (room)
             return room;
         room = new Room(this, name);
+        // A page the realtime server will not take: the room fails with why, once its listeners are on.
+        if (this.ended) {
+            const code = this.ended;
+            const failing = room;
+            queueMicrotask(() => failing.failed(code));
+            return room;
+        }
         this.held.set(name, room);
         if (this.socket.connected)
             this.joinSoon(room);
@@ -281,10 +328,54 @@ export class Rooms {
             clearTimeout(this.renewal);
         if (this.identityRenewal)
             clearTimeout(this.identityRenewal);
+        if (this.retry)
+            clearTimeout(this.retry);
+        this.retry = null;
         for (const room of this.held.values())
             room.ended();
         this.held.clear();
         this.socket.close();
+        this.releaseKeys();
+    }
+    /**
+     * On another website: connects again after a wait that grows with each try in a row (EMBEDDED_RETRY_MS), the first
+     * wait again once a connection stayed up a minute. Nobody else asks again for a page the server let go or put off.
+     */
+    connectAgain() {
+        if (this.closed || this.ended || this.retry)
+            return;
+        if (this.upSince && Date.now() - this.upSince >= EMBEDDED_STEADY_MS)
+            this.retries = 0;
+        this.upSince = 0;
+        const wait = EMBEDDED_RETRY_MS[Math.min(this.retries, EMBEDDED_RETRY_MS.length - 1)];
+        this.retries++;
+        this.retry = setTimeout(() => {
+            this.retry = null;
+            if (!this.closed && !this.ended && !this.socket.connected)
+                this.socket.connect();
+        }, wait);
+    }
+    /**
+     * On another website: the realtime server will not take the page (EMBEDDED_FINAL). Its rooms fail with the code, the
+     * connection is let go and nothing is tried again; `unavailable` tells the plugin, which goes on over its REST routes.
+     */
+    end(code) {
+        if (this.closed || this.ended)
+            return;
+        this.ended = code;
+        if (this.renewal)
+            clearTimeout(this.renewal);
+        if (this.retry)
+            clearTimeout(this.retry);
+        this.renewal = null;
+        this.retry = null;
+        const rooms = [...this.held.values()];
+        this.held.clear();
+        this.tokens.clear();
+        this.socket.close();
+        for (const room of rooms)
+            room.failed(code);
+        this.listeners.fire('unavailable', [{ code }], false);
     }
     /**
      * @internal Room.emit(): sealed with the room's newest key held, which those in it hold, binary parts carried in
@@ -299,11 +390,11 @@ export class Rooms {
         if (!mode.ack) {
             if (mode.volatile) {
                 if (room.state === 'joined' && this.socket.connected)
-                    this.socket.emit('emit', payload);
+                    this.sendPlain(room, event, payload);
                 return null;
             }
             await room.ready;
-            this.socket.emit('emit', payload);
+            this.sendPlain(room, event, payload);
             return null;
         }
         await room.ready;
@@ -313,6 +404,22 @@ export class Rooms {
         if (typeof reply.id === 'string')
             room.seen(reply.id);
         return { id: reply.id, at: reply.at };
+    }
+    /**
+     * An emit nothing waits for. The server answers only when asked, so with no answer a page never learns its rule left
+     * an event out: the first of each event in a room asks, and a refusal is said once (Room.refused()). The rest go
+     * without an answer, as they always went.
+     */
+    sendPlain(room, event, payload) {
+        if (!room.firstOf(event)) {
+            this.socket.emit('emit', payload);
+            return;
+        }
+        void this.ask(this.socket, 'emit', payload).then((reply) => {
+            // No answer in time says nothing of the rule: a connection that dropped is told by `disconnected`.
+            if (reply?.error && reply.error !== 'timeout')
+                room.refused(event, reply.error);
+        });
     }
     /** @internal Room.history(): a page of the room's history, opened, oldest first. */
     async history(room, ask) {
@@ -419,12 +526,7 @@ export class Rooms {
             return;
         let answer = null;
         try {
-            const res = await fetch(keys.endpoint, {
-                method: 'POST',
-                credentials: 'same-origin',
-                headers: { 'Content-Type': 'application/json', ...keys.headers },
-                body: JSON.stringify({ labels }),
-            });
+            const res = await siteRequest(this.options, { endpoint: keys.endpoint, headers: keys.headers }, { labels });
             if (res.ok)
                 answer = await res.json();
         }
@@ -669,12 +771,7 @@ export class Rooms {
         const auth = this.options.auth;
         if (!auth)
             return { denied: Object.fromEntries(names.map((n) => [n, 'no_auth'])) };
-        const res = await fetch(auth.endpoint, {
-            method: 'POST',
-            credentials: 'same-origin',
-            headers: { 'Content-Type': 'application/json', ...auth.headers },
-            body: JSON.stringify({ rooms: names }),
-        });
+        const res = await siteRequest(this.options, auth, { rooms: names });
         if (!res.ok)
             throw new Error('auth ' + res.status);
         return (await res.json());
@@ -723,6 +820,16 @@ export class Rooms {
         });
     }
 }
+/** The refusals of an event a room's rule or the server turns away, and what to change. */
+const EMIT_REFUSALS = {
+    not_allowed: 'the rule of this room on your server does not list it in `emit`, or answers `readOnly` for this user',
+    forbidden: 'this page is not in the room',
+    bad_event: 'the server takes no event by this name, or the name is a reserved one',
+    too_large: 'it is over 1 MB',
+    rate_limited: 'this connection sends more than 50 events a second',
+};
+/** The most events a room asks about (Rooms.sendPlain()): an app's names are few, and a page that makes them up asks no more. */
+const ASKED_MOST = 64;
 /** A room this tab joined: its events, what it may send, and for a presence room who is in it. */
 export class Room {
     constructor(owner, name) {
@@ -738,12 +845,9 @@ export class Room {
         /** @internal The last kept event this tab had, which a reconnect joins again from. */
         this.lastId = null;
         this.listeners = new Listeners();
+        this.asked = new Set();
         this.ready = this.pendingReady();
     }
-    /**
-     * An event of the room, `fn( data, meta )` with meta `{ from, id, at, replayed? }`; or the room's own: `joined`
-     * (the members), `join` ({ id, info }), `leave` ({ id }), `count` (n), `error` ({ code }) and `kicked`.
-     */
     on(event, fn) {
         this.listeners.on(event, fn);
         return this;
@@ -765,9 +869,12 @@ export class Room {
         this.listeners.offAny(fn);
         return this;
     }
-    /** Sends an event to the room's others, as its rule allows; nothing is waited for. */
+    /**
+     * Sends an event to the room's others, as its rule allows; nothing is waited for. An event the rule or the server
+     * turns away is said once, in the console and as the room's `error` ({ code, event }).
+     */
     emit(event, data) {
-        void this.owner.send(this, event, data ?? null, { ack: false }).catch(() => { });
+        void this.owner.send(this, event, data ?? null, { ack: false }).catch((error) => this.emitFailed(event, error));
     }
     /** Sends an event and waits for the cloud to take it (checked, kept, sent): `{ id, at }`, or a RealtimeError. */
     emitWithAck(event, data) {
@@ -776,7 +883,7 @@ export class Room {
     /** Sends without waiting and without keeping: dropped rather than queued while off line, as Socket.IO's `volatile`. */
     get volatile() {
         return {
-            emit: (event, data) => void this.owner.send(this, event, data ?? null, { ack: false, volatile: true }).catch(() => { }),
+            emit: (event, data) => void this.owner.send(this, event, data ?? null, { ack: false, volatile: true }).catch((error) => this.emitFailed(event, error)),
             emitWithAck: (event, data) => this.owner.send(this, event, data ?? null, { ack: true, volatile: true }),
         };
     }
@@ -797,6 +904,24 @@ export class Room {
     }
     leave() {
         this.owner.leave(this.name);
+    }
+    /** @internal Whether this is the first plain emit of the event in the room, which asks for an answer. */
+    firstOf(event) {
+        if (this.asked.has(event) || this.asked.size >= ASKED_MOST)
+            return false;
+        this.asked.add(event);
+        return true;
+    }
+    /** @internal A plain emit was turned away: said once for each event, as a page sends it again and again. */
+    refused(event, code) {
+        console.warn(`wordplus-realtime: room ${this.name} refused the event "${event}" (${code})${EMIT_REFUSALS[code] ? ': ' + EMIT_REFUSALS[code] : ''}.`);
+        this.listeners.fire('error', [{ code, event }], false);
+    }
+    /** A plain emit that could not leave. A room left on purpose says nothing: the page knows, and may well say goodbye. */
+    emitFailed(event, error) {
+        const code = error?.code ?? 'server';
+        if (code !== 'left' && this.firstOf(event))
+            this.refused(event, code);
     }
     /** @internal */
     joined(members, count) {
@@ -839,7 +964,7 @@ export class Room {
     memberJoined(id, info) {
         if (!this.members.has(id) && this.count !== null)
             this.count++;
-        this.members.set(id, info ?? null);
+        this.members.set(id, (info ?? null));
         this.listeners.fire('join', [{ id, info: info ?? null }], false);
     }
     /** @internal */
@@ -977,6 +1102,17 @@ export class Online {
     }
 }
 const KEPT = /^\d{1,16}-\d{1,20}$/;
+/**
+ * Holds the page's keyring while a connection is open, with its way to ask for keys (or none). A keyring an older copy
+ * of this package made has no lend(): that one is asked as before, by the first connection, and keeps its keys.
+ */
+function holdKeyring(keyring, ask) {
+    if (typeof keyring.lend === 'function')
+        return keyring.lend(ask);
+    if (ask && !keyring.hasResolver())
+        keyring.setResolver(ask);
+    return () => { };
+}
 function compareIds(a, b) {
     const [am, an] = a.split('-').map(Number);
     const [bm, bn] = b.split('-').map(Number);
@@ -1042,8 +1178,7 @@ function fromBase64(text) {
 function payloadOf(token) {
     try {
         const part = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
-        const text = new TextDecoder().decode(fromBase64(part));
-        return JSON.parse(text);
+        return JSON.parse(utf8Decode(fromBase64(part)));
     }
     catch {
         return null;

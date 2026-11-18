@@ -43,7 +43,9 @@ export const base : EasyStreamState = {
     elsewhere: false,
     sentHere: false,
     stalled: false,
-    offline: false
+    offline: false,
+    test: null,
+    testElsewhere: false
 };
 
 export function fakeClient( state : Partial<EasyStreamState> = {} ){
@@ -71,6 +73,15 @@ export function fakeClient( state : Partial<EasyStreamState> = {} ){
         setScreenShare: vi.fn( async ( on : boolean ) => { patch( { screenSharing: on } ); return on; } ),
         setOriginalSound: vi.fn( async ( on : boolean ) => { patch( { originalSound: on } ); return on; } ),
         end: vi.fn( async () => ( { ok: true } ) ),
+        // A test stream, as the client runs it in the studio: on with the devices, its chat writable, and over.
+        startTest: vi.fn( async () => {
+            patch( { test: { started_at: Date.now(), ended_at: null, watching: 0, watch: false }, devices: { camera: true, microphone: true }, chatConnected: true } );
+            return { ok: true };
+        } ),
+        endTest: vi.fn( () => {
+            const test = current.test;
+            if( test ) patch( { test: { ...test, ended_at: Date.now() }, devices: { camera: false, microphone: false }, chatConnected: false } );
+        } ),
         unstage: vi.fn( async () => ( { ok: true } ) ),
         leaveStage: vi.fn( async () => {} ),
         listDevices: vi.fn( async () => ( {
@@ -134,9 +145,9 @@ export function fakeClient( state : Partial<EasyStreamState> = {} ){
     return { client, update, asClient: client as unknown as EasyStreamClient };
 }
 
-// The element whose tooltip says this (data-estream-tip), as getByTitle found the browser's.
+// The element whose tooltip says this (data-wplus-live-stream-tip), as getByTitle found the browser's.
 export function byTip( text : string ) : HTMLElement {
-    const el = document.querySelector<HTMLElement>( '[data-estream-tip=' + JSON.stringify( text ) + ']' );
+    const el = document.querySelector<HTMLElement>( '[data-wplus-live-stream-tip=' + JSON.stringify( text ) + ']' );
     if( ! el ) throw new Error( 'nothing with the tooltip ' + JSON.stringify( text ) );
     return el;
 }

@@ -3,19 +3,19 @@ import {sharedTooltips} from "./shared.ts";
 import {WINDOW_ATTRIBUTE} from "./player.tsx";
 
 // Tooltips in place of the browser's (`title`), which shows late, plainly, and never in full screen: any element with
-// `data-estream-tip` shows that text over itself, under it where there is no room above, inside the window. A mouse or
+// `data-wplus-live-stream-tip` shows that text over itself, under it where there is no room above, inside the window. A mouse or
 // pen shows it at once, as does focus from the keyboard; a touch never. A click, Escape, a scroll or leaving hides it.
 // The words are the element's name (aria-label) or its description (aria-description) for screen readers too.
 //
 // The WordPlus SDK's floater, which every WordPlus plugin on the page shares, where the page has it (shared.ts), styled
-// as ours (`estream-tip`); our own otherwise. One for the page, whichever stream trees it has: each installs it
+// as ours (`wplus-live-stream-tip`); our own otherwise. One for the page, whichever stream trees it has: each installs it
 // (useTooltips) and the last one gone removes it. Ours goes into the element shown full screen, or filling the window
 // over the page, or the page's body.
 
-const ATTRIBUTE = 'data-estream-tip';
+const ATTRIBUTE = 'data-wplus-live-stream-tip';
 const GAP = 8;
 const MARGIN = 8;
-const ID = 'estream-tooltip';
+const ID = 'wplus-live-stream-tooltip';
 
 let users = 0;
 // The SDK's, while it watches the page: the way to stop it.
@@ -49,7 +49,7 @@ function show( el : HTMLElement ){
     if( ! tip ){
         tip = document.createElement( 'div' );
         tip.id = ID;
-        tip.className = 'estream-tooltip';
+        tip.className = 'wplus-live-stream-tooltip';
         tip.setAttribute( 'role', 'tooltip' );
     }
 
@@ -58,12 +58,12 @@ function show( el : HTMLElement ){
 
     tip.textContent = text;
     place( el, tip );
-    tip.classList.add( 'estream-tooltip--on' );
+    tip.classList.add( 'wplus-live-stream-tooltip--on' );
     target = el;
 }
 
 function hide(){
-    tip?.classList.remove( 'estream-tooltip--on' );
+    tip?.classList.remove( 'wplus-live-stream-tooltip--on' );
     target = null;
 }
 
@@ -118,7 +118,7 @@ function install(){
 
     const shared = sharedTooltips();
     if( shared ){
-        stopShared = shared.watch( document, { attribute: ATTRIBUTE, focus: true, className: 'estream-tip' } );
+        stopShared = shared.watch( document, { attribute: ATTRIBUTE, focus: true, className: 'wplus-live-stream-tip' } );
         return;
     }
 

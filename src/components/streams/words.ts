@@ -44,6 +44,8 @@ export function errorText( code : string | null, otherwise? : string ) : string 
             return __( 'The invitation is no longer open', 'wordplus-live-stream' );
         case 'no_encoder':
             return __( 'Nothing has come from OBS yet. Start streaming there first', 'wordplus-live-stream' );
+        case 'background':
+            return __( 'Your background could not start on this device. Choose None to go live without it', 'wordplus-live-stream' );
         default:
             return otherwise ?? __( 'The stream could not be loaded', 'wordplus-live-stream' );
     }

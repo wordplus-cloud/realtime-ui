@@ -1,6 +1,6 @@
 import React, { type ReactNode } from "react";
 import { _x } from "../../inc/globals.ts";
-import Icon from "../../primitives/icon.tsx";
+import Icon from "../../primitives/icons.tsx";
 import Tooltip from "../helpers/tooltip.tsx";
 import type { CallParticipant } from "./context.ts";
 

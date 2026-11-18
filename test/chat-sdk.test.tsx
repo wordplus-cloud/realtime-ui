@@ -24,6 +24,24 @@ const stacks = ( container: HTMLElement ) => [ ...container.querySelectorAll( '.
     texts: [ ...s.querySelectorAll( '.wplus-chat-text' ) ].map( ( t ) => t.textContent ),
 } ) );
 
+describe( 'the room of a chat of two', () => {
+    it( 'is named from the page\'s user and `to`, as both of them name it', async () => {
+        const { rt } = chatWith();
+        render( <Chat rt={ rt } room="chat:{pair}" to="42" /> );
+        await settle();
+
+        expect( rt.join ).toHaveBeenCalledWith( 'chat:34:42' );
+    } );
+
+    it( 'takes any other name as it is', async () => {
+        const { rt } = chatWith();
+        render( <Chat rt={ rt } room="chat:34:42" to="42" /> );
+        await settle();
+
+        expect( rt.join ).toHaveBeenCalledWith( 'chat:34:42' );
+    } );
+} );
+
 describe( 'the chat on a room', () => {
     it( 'shows the room\'s history in Better Messages\' stacks, its reactions, and the start of the conversation', async () => {
         const at = Date.now() - 60_000;

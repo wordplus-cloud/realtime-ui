@@ -12,6 +12,7 @@ import {ConfirmProvider} from "./dialog.tsx";
 import {ShortcutList} from "./shortcuts.tsx";
 import {themeClass, themeStyle, type Appearance} from "./appearance.ts";
 import type {StreamSession} from "./sessions.ts";
+import type {StreamRecording, StreamReplay} from "./recording.tsx";
 
 export interface EasyStreamAppProps {
     client : EasyStreamClient;
@@ -28,7 +29,7 @@ export interface EasyStreamAppProps {
     // A still stream for a settings page (the embed's preview): nothing reaches beyond the player.
     preview? : boolean;
     // The site's logo may be dragged into place and sized over the host's own picture before going live, and the page
-    // saves where (the logo's `estream-logo-move` and `estream-logo-size`): the WordPress plugin's studio, for those
+    // saves where (the logo's `wplus-live-stream-logo-move` and `wplus-live-stream-logo-size`): the WordPress plugin's studio, for those
     // who may change how streams look.
     placeLogo? : boolean;
     // Whether viewers may ask to come on stage (default false: guests on stage aren't in the first release).
@@ -44,6 +45,9 @@ export interface EasyStreamAppProps {
     room? : string;
     // The stream's own words in place of the player's.
     texts? : StreamTexts;
+    // Its recording, where the page records streams, and a recording of it to play once it has ended (recording.tsx).
+    recording? : StreamRecording;
+    replay? : StreamReplay;
     // Start the client on mount and stop it on unmount (default true).
     manage? : boolean;
 }
@@ -73,20 +77,20 @@ function Frame( props : FrameProps ){
     return (
         <div
             ref={ props.root }
-            className={ themeClass( props.appearance, player.videoShape ) + ( player.fullscreen ? ' estream-theme--full' : '' ) }
+            className={ themeClass( props.appearance, player.videoShape ) + ( player.fullscreen ? ' wplus-live-stream-theme--full' : '' ) }
             style={ themeStyle( props.appearance ) }
             onKeyDown={ shortcuts }
         >
             <ConfirmProvider>
                 <HostNote hidden={ props.studioHere } />
-                <div className="estream-shell">
-                    <div className={ 'estream-app' + ( host ? ' estream-app--host' : '' ) + ( chat ? '' : ' estream-app--no-chat' ) }>
-                        <div className="estream-app__main">
+                <div className="wplus-live-stream-shell">
+                    <div className={ 'wplus-live-stream-app' + ( host ? ' wplus-live-stream-app--host' : '' ) + ( chat ? '' : ' wplus-live-stream-app--no-chat' ) }>
+                        <div className="wplus-live-stream-app__main">
                             <Stage studio={ hostScreens } />
                             <Info guests={ props.guests } />
                             { host && <Studio /> }
                         </div>
-                        { chat && <aside className="estream-app__side"><Chat /></aside> }
+                        { chat && <aside className="wplus-live-stream-app__side"><Chat /></aside> }
                     </div>
                 </div>
                 <InviteDialog />
@@ -119,6 +123,8 @@ export function AllInOne( props : Omit<EasyStreamAppProps, 'client' | 'manage'> 
             connectUrl={ props.connectUrl }
             room={ props.room }
             texts={ props.texts }
+            recording={ props.recording }
+            replay={ props.replay }
             chat={ props.chat && chatReached( state ) }
         >
             <Frame root={ root } guests={ props.guests } appearance={ props.appearance } studioHere={ props.studioHere } />
@@ -154,6 +160,8 @@ export function EasyStreamApp( props : EasyStreamAppProps ){
                 connectUrl={ props.connectUrl }
                 room={ props.room }
                 texts={ props.texts }
+                recording={ props.recording }
+                replay={ props.replay }
             />
         </EasyStreamProvider>
     );

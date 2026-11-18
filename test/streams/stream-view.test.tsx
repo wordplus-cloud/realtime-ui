@@ -13,7 +13,7 @@ it( 'draws the stream on its engine, in the language given, and leaves the strea
 
     const { container, unmount } = render( <StreamView stream={ stream } title="New mugs" lang="he" /> );
 
-    expect( container.querySelector( '.estream-app' ) ).toBeTruthy();
+    expect( container.querySelector( '.wplus-live-stream-app' ) ).toBeTruthy();
     expect( ( container.firstElementChild as HTMLElement ).dir ).toBe( 'rtl' );
     expect( streamEngine( stream ) ).toBe( client );
 

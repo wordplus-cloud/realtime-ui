@@ -78,7 +78,11 @@ export default function Tooltip( { label, ariaLabel, side = "auto", delay = 0, c
     const shown = useRef<Element | null>( null );
     // Passing the prop at all, even as null, puts this instance in anchored mode.
     const anchored = anchorEl !== undefined;
-    const active = !! label && ! disabled && ! isMobile();
+    // A control whose popup is open says so (aria-expanded) and shows no tooltip while it is: it would stand over or
+    // under what it opened, and a popup drawn inside its control (the dock's More) enters the control again as the
+    // pointer moves into it. Closing it under a pointer that never moved brings none back, as no hover starts.
+    const expanded = ( ( children?.props ?? {} ) as { "aria-expanded"?: unknown } )[ "aria-expanded" ];
+    const active = !! label && ! disabled && expanded !== true && expanded !== "true" && ! isMobile();
 
     const show = ( el: Element | null ) => {
         if ( ! el || ! active ) return;

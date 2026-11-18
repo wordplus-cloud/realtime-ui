@@ -9,7 +9,10 @@
  * keeps a socket of its own.
  */
 export { realtime, register, compareVersions, sharedWorkerAvoided, REGISTRY, WORKER_NAME, HOLD_KEY, type RealtimeOptions, type RealtimeClient, type Registry, type Copy } from './registry.js';
-export { rooms, Rooms, Room, Online, RealtimeError, ROOMS_NAMESPACE, patternMatches, packBinary, unpackBinary, type RoomsOptions, type RoomsEvent, type RoomState, type RoomEmitter, type Grant, type PublicGrant, type Member, type EventMeta, type Identity, type KeysOptions, type UserProfile, } from './rooms.js';
+export { rooms, Rooms, Room, Online, RealtimeError, ROOMS_NAMESPACE, EMBEDDED_FINAL, EMBEDDED_RETRY_MS, patternMatches, packBinary, unpackBinary, type RoomsOptions, type RoomsEvent, type RoomState, type RoomEmitter, type RoomEvents, type RoomOwnEvents, type ConnectionEvents, type HistoryEvent, type Grant, type PublicGrant, type Member, type EventMeta, type Identity, type KeysOptions, type UserProfile, type RealtimeErrorCode, type RealtimeErrorEvent, } from './rooms.js';
+export { embeddedConnector } from './embedded.js';
+export { siteRequest, absoluteUrl, type SiteRequestOptions, type SiteRoute } from './site.js';
+export { visitorHeaders, VISITOR_HEADER, type VisitorSource } from './visitor.js';
 export { Keyring, keyring, labelOf, isSealed, validLabel, KEYRING_GLOBAL, type KeySource, type KeyResolver, type KeysListener } from './keys.js';
 export { Connector, clusterOf, SAME_CLUSTER, VERSION, type ConnectorApi, type ConnectorOptions, type Target } from './connector.js';
 export { RemoteConnector, serve, PORT_PROTOCOL, HELLO_TIMEOUT_MS, PING_INTERVAL_MS, CHECK_TIMEOUT_MS, type PortLike, type LocksLike, type RemoteOptions } from './remote.js';

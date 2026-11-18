@@ -1,18 +1,23 @@
 import React, { useState, useRef, useEffect } from "react";
 import {_x} from "../../inc/globals.ts";
 import Tooltip from "../helpers/tooltip.tsx";
-import Icon from "../../primitives/icon.tsx";
+import Icon from "../../primitives/icons.tsx";
+import { useJamTip } from "./jam-tip.tsx";
 
 interface GroupVideoGridItemInterface{
     state : string,
-    quality: string
+    quality: string,
+    /** The person's own upload is jammed: the badge carries a warning mark, and the jam's words in a tip (jam-tip.tsx). */
+    jammed?: boolean
 }
 
 /**
  * The call's connection: its state and quality as an icon with words for screen readers, bright for a moment after it
- * changes and faded again once it holds.
+ * changes and faded again once it holds. While the person's upload is jammed it stays bright, with a warning mark in
+ * the dot's place and the jam's words in place of its own tooltip, and its quality reads poor whatever the node says.
  */
-const ConnectionStatus: React.FC<GroupVideoGridItemInterface> = ({ state, quality }) => {
+const ConnectionStatus: React.FC<GroupVideoGridItemInterface> = ({ state, quality, jammed = false }) => {
+    const jam = useJamTip( jammed );
     const [lastState, setLastState] = useState<string>('');
     const [stateJustChanged, setStateJustChanged] = useState<boolean>(false);
     const removeOpacityTimeout = useRef<number | null>(null);
@@ -46,6 +51,10 @@ const ConnectionStatus: React.FC<GroupVideoGridItemInterface> = ({ state, qualit
 
     if( state === 'signalReconnecting' ) state = 'reconnecting';
 
+    // The quality is the node's word for the whole connection, which can still read good while what the person sends
+    // is stuck on their own line: a badge that warns doesn't say good beside it.
+    if( jammed && quality !== 'lost' ) quality = 'poor';
+
     if( state === 'connected' && quality !== 'unknown' ){
         state = state + ' (' + quality + ')';
     }
@@ -56,14 +65,24 @@ const ConnectionStatus: React.FC<GroupVideoGridItemInterface> = ({ state, qualit
         spanClass += ' wplus-opacity';
     }
 
+    if( jammed ) {
+        spanClass += ' wplus-upload-jammed';
+    }
+
+    const badge = (
+        <span ref={ref} className={spanClass} { ...jam.trigger }>
+            { jammed && <Icon name="warning" size={ 13 } className="wplus-jam-icon" /> }
+            {loadingIcon}
+            <span>{state}</span>
+        </span>
+    );
+
     return (
-        <div className="wplus-connection-control">
-            <Tooltip content={ _x('Connection Status (Quality)', 'Group Call Screen', 'bp-better-messages') }>
-                <span ref={ref} className={spanClass}>
-                    {loadingIcon}
-                    <span>{state}</span>
-                </span>
-            </Tooltip>
+        <div ref={ jam.wrapRef as React.RefObject<HTMLDivElement> } className="wplus-connection-control">
+            { jammed
+                ? badge
+                : <Tooltip content={ _x('Connection Status (Quality)', 'Group Call Screen', 'bp-better-messages') }>{ badge }</Tooltip> }
+            { jam.parts }
         </div>
     );
 }

@@ -17,6 +17,7 @@ import {Stage} from "./stage.tsx";
 import {Studio} from "./studio.tsx";
 import {StudioPage, type StudioPageOptions} from "./studio-page.tsx";
 import type {StreamSession} from "./sessions.ts";
+import type {StreamRecording, StreamReplay} from "./recording.tsx";
 
 // One stream's parts, each where the site put it on the page: the player, the chat, the studio, the stream's
 // details, or the stream in one piece (`all`), and the admin's studio page. They are one React tree, rendered
@@ -83,6 +84,9 @@ export interface EasyStreamPartsProps {
     room? : string;
     // The stream's own words in place of the player's.
     texts? : StreamTexts;
+    // Its recording, where the page records streams, and a recording of it to play once it has ended (recording.tsx).
+    recording? : StreamRecording;
+    replay? : StreamReplay;
     // Start the client on mount and stop it on unmount (default true).
     manage? : boolean;
 }
@@ -116,7 +120,7 @@ function PartRoot( props : { name : PartName | 'dialogs', className? : string, s
     return (
         <div
             ref={ props.rootRef }
-            className={ themeClass( appearance, videoShape ) + ' estream-part estream-part--' + props.name + ( props.className ? ' ' + props.className : '' ) }
+            className={ themeClass( appearance, videoShape ) + ' wplus-live-stream-part wplus-live-stream-part--' + props.name + ( props.className ? ' ' + props.className : '' ) }
             style={ { ...themeStyle( appearance ), ...props.style } }
             onKeyDown={ props.onKeyDown }
         >
@@ -175,8 +179,8 @@ function PlayerPart( props : { options : PartOptions } ){
     // Better Messages room stays mounted) for when it shows again.
     useEffect( () => {
         if( ! layout ) return;
-        layout.classList.toggle( 'estream-layout--no-chat', player.chatHidden );
-        return () => layout.classList.remove( 'estream-layout--no-chat' );
+        layout.classList.toggle( 'wplus-live-stream-layout--no-chat', player.chatHidden );
+        return () => layout.classList.remove( 'wplus-live-stream-layout--no-chat' );
     }, [ layout, player.chatHidden ] );
 
     const place = useCallback( ( element : HTMLDivElement | null ) => {
@@ -185,18 +189,18 @@ function PlayerPart( props : { options : PartOptions } ){
     }, [ setPlayer ] );
 
     return (
-        <div ref={ place } className="estream-part-place" style={ floating ? { height: floating + 'px' } : undefined }>
+        <div ref={ place } className="wplus-live-stream-part-place" style={ floating ? { height: floating + 'px' } : undefined }>
             <PartRoot
                 name="player"
                 rootRef={ player.root as RefObject<HTMLDivElement | null> }
-                className={ ( player.fullscreen ? 'estream-theme--full' : '' ) + ( floating ? ' estream-part--floating' : '' ) }
+                className={ ( player.fullscreen ? 'wplus-live-stream-theme--full' : '' ) + ( floating ? ' wplus-live-stream-part--floating' : '' ) }
                 onKeyDown={ shortcuts }
             >
                 <PartsHostNote />
-                <div className="estream-shell">
-                    <div className={ 'estream-app estream-app--player' + ( chat ? '' : ' estream-app--no-chat' ) }>
-                        <div className="estream-app__main"><Stage studio={ state.you?.role === 'host' && group.names.has( 'studio' ) } /></div>
-                        { chat && <aside className="estream-app__side">{ player.room ? <FullScreenRoom markup={ player.room } /> : <Chat /> }</aside> }
+                <div className="wplus-live-stream-shell">
+                    <div className={ 'wplus-live-stream-app wplus-live-stream-app--player' + ( chat ? '' : ' wplus-live-stream-app--no-chat' ) }>
+                        <div className="wplus-live-stream-app__main"><Stage studio={ state.you?.role === 'host' && group.names.has( 'studio' ) } /></div>
+                        { chat && <aside className="wplus-live-stream-app__side">{ player.room ? <FullScreenRoom markup={ player.room } /> : <Chat /> }</aside> }
                     </div>
                 </div>
             </PartRoot>
@@ -239,7 +243,7 @@ function useBesideHeight( box : RefObject<HTMLElement | null>, player : HTMLElem
 
 // What a chat part's place on the page carries while the player hides the chat (its Hide chat), which hides the place,
 // and the block it is the whole of, kept on the page unseen (a Better Messages room stays mounted).
-const CHAT_HIDDEN = 'data-estream-chat-hidden';
+const CHAT_HIDDEN = 'data-wplus-live-stream-chat-hidden';
 
 function ChatPart( props : { options : PartOptions, element : Element } ){
     const group = useGroup();
@@ -260,7 +264,7 @@ function ChatPart( props : { options : PartOptions, element : Element } ){
     if( ! group.chat ) return null;
 
     return (
-        <PartRoot name="chat" rootRef={ box } className={ height ? 'estream-part--sized' : '' } style={ height ? { height: height + 'px' } : undefined }>
+        <PartRoot name="chat" rootRef={ box } className={ height ? 'wplus-live-stream-part--sized' : '' } style={ height ? { height: height + 'px' } : undefined }>
             <Chat home />
         </PartRoot>
     );
@@ -289,7 +293,7 @@ function StudioPagePart( props : { options : PartOptions } ){
     if( state.status === 'ready' && state.you?.role !== 'host' ){
         return (
             <PartRoot name="studio-page">
-                <p className="estream-studio-page__refused">{ __( 'Only the hosts of the stream can go live from here.', 'wordplus-live-stream' ) }</p>
+                <p className="wplus-live-stream-studio-page__refused">{ __( 'Only the hosts of the stream can go live from here.', 'wordplus-live-stream' ) }</p>
             </PartRoot>
         );
     }
@@ -370,7 +374,7 @@ function Parts( props : EasyStreamPartsProps ){
 
     // The player and the chat in one of the Live stream block's ready layouts: the element holding both, one block,
     // whose player shows and hides its chat as the stream in one piece does.
-    const layoutOf = ( name : PartName ) => apart.find( ( p ) => p.name === name )?.element.closest( '.estream-layout' ) ?? null;
+    const layoutOf = ( name : PartName ) => apart.find( ( p ) => p.name === name )?.element.closest( '.wplus-live-stream-layout' ) ?? null;
     const shared = layoutOf( 'player' );
     const layout = chat && shared !== null && shared === layoutOf( 'chat' ) ? shared : null;
 
@@ -399,6 +403,8 @@ function Parts( props : EasyStreamPartsProps ){
                     connectUrl={ props.connectUrl }
                     room={ props.room }
                     texts={ props.texts }
+                    recording={ props.recording }
+                    replay={ props.replay }
                     studioHere={ names.has( 'studio' ) || names.has( 'studio-page' ) }
                 />,
                 p.element,
@@ -422,6 +428,8 @@ function Parts( props : EasyStreamPartsProps ){
                     connectUrl={ props.connectUrl }
                     room={ props.room }
                     texts={ props.texts }
+                    recording={ props.recording }
+                    replay={ props.replay }
                     chat={ playerChat }
                     chatBeside={ names.has( 'chat' ) }
                 >

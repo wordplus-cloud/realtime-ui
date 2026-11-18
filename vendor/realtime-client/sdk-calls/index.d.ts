@@ -5,12 +5,14 @@
  */
 import type { Rooms, RoomsOptions } from '../rooms.js';
 import { type Calls, type CallsOptions } from './calls.js';
-export { calls, Calls, Call, Incoming, type CallsOptions, type CallRequest, type CallGrant, type CallPerson, type CallState, type CallPath, type CallType, type RemoteMedia } from './calls.js';
-export { GroupCall, type Person, type RemoteTrack, type RoomPermissions, type ModerationAct, type GroupCallState, type GroupCallPlace } from './group-call.js';
+export { calls, Calls, Call, Incoming, type CallsOptions, type CallsEvents, type CallEvents, type CallRequest, type CallGrant, type CallPerson, type CallState, type CallPath, type CallType, type RemoteMedia } from './calls.js';
+export { GroupCall, CALL_ACTS, BASE_ACTS, ASK_ANSWERS, actsOf, type GroupCallEvents, type CallQuality, type Person, type RemoteTrack, type RoomPermissions, type ModerationAct, type GroupCallState, type GroupCallPlace, type GroupRecording, type CallAct, type RoomRules, type AskDevice, type AskAnswer, type CallAsk, type CallAskAnswer, type ModerationOptions, } from './group-call.js';
+export type { Stalled } from '../calls/stall-watch.js';
 export { callUserOf, type CallUser } from '../calls/users.js';
+export { listDevices, type DeviceChoice, type DeviceLists, type DeviceOptions } from './devices.js';
 export { Invite, type InviteState } from './invite.js';
-export { Stream, type StreamState, type StreamEvent, type StreamHand, type StreamTile, type StreamTrack, type StreamSnapshot, type PlaybackStats, type PictureLayer, type LayerQuality } from './stream.js';
-export { loadLiveKit, type MediaSource, type LiveKit } from './media.js';
+export { Stream, type StreamState, type StreamEvent, type StreamEvents, type StreamHand, type StreamTile, type StreamTrack, type StreamSnapshot, type PlaybackStats, type PictureLayer, type LayerQuality } from './stream.js';
+export { loadRoomClient, loadLiveKit, type MediaSource, type RoomClient, type LiveKit } from './media.js';
 export { supportsP2P } from '../calls/index.js';
 /**
  * The page's rooms and calls, made once from the server package's settings (`window.wordplusRealtimeConfig`) on the

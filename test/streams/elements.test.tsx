@@ -53,7 +53,7 @@ it( 'defines both elements and puts the streams stylesheet in the head once', ()
 it( 'draws a stream in one piece, joined once with its picture', async () => {
     await place( '<live-stream name="show:mugs" title="New mugs"></live-stream>' );
 
-    await waitFor( () => expect( document.querySelector( 'live-stream .estream-app' ) ).toBeTruthy() );
+    await waitFor( () => expect( document.querySelector( 'live-stream .wplus-live-stream-app' ) ).toBeTruthy() );
     expect( calls.stream ).toHaveBeenCalledTimes( 1 );
     expect( calls.stream ).toHaveBeenCalledWith( 'show:mugs', { video: true } );
 } );
@@ -71,16 +71,16 @@ it( 'offers its signed-in viewer the hand while live, which the app\'s rule allo
 it( 'gives every element of a stream one join, each part in its own element', async () => {
     await place( '<live-stream name="show:mugs" view="player"></live-stream><div><live-stream name="show:mugs" view="chat" height="480"></live-stream></div>' );
 
-    await waitFor( () => expect( document.querySelector( 'live-stream[view="player"] .estream-part--player' ) ).toBeTruthy() );
-    expect( document.querySelector( 'live-stream[view="chat"] .estream-part--chat' ) ).toBeTruthy();
+    await waitFor( () => expect( document.querySelector( 'live-stream[view="player"] .wplus-live-stream-part--player' ) ).toBeTruthy() );
+    expect( document.querySelector( 'live-stream[view="chat"] .wplus-live-stream-part--chat' ) ).toBeTruthy();
     expect( calls.stream ).toHaveBeenCalledTimes( 1 );
     // The chat its own height.
-    expect( ( document.querySelector( '.estream-part--chat' ) as HTMLElement ).style.height ).toBe( '480px' );
+    expect( ( document.querySelector( '.wplus-live-stream-part--chat' ) as HTMLElement ).style.height ).toBe( '480px' );
 } );
 
 it( 'joins without the picture where no element shows it, and asks for it once one does', async () => {
     await place( '<live-stream name="show:talk" view="chat"></live-stream>' );
-    await waitFor( () => expect( document.querySelector( '.estream-part--chat' ) ).toBeTruthy() );
+    await waitFor( () => expect( document.querySelector( '.wplus-live-stream-part--chat' ) ).toBeTruthy() );
     expect( calls.stream ).toHaveBeenCalledWith( 'show:talk', { video: false } );
     expect( shows.get( 'show:talk' )!.client.wantVideo ).not.toHaveBeenCalled();
 
@@ -93,10 +93,10 @@ it( 'shows the studio to the host alone', async () => {
     await place( '<stream-studio name="show:mugs"></stream-studio>' );
     await waitFor( () => expect( shows.get( 'show:mugs' ) ).toBeTruthy() );
     // A viewer: nothing at all.
-    expect( document.querySelector( 'stream-studio .estream-part--studio' ) ).toBeNull();
+    expect( document.querySelector( 'stream-studio .wplus-live-stream-part--studio' ) ).toBeNull();
 
     shows.get( 'show:mugs' )!.update( { you: { identity: 'u:34', role: 'host', name: 'Ann', chat: 'write', mod: true } } );
-    await waitFor( () => expect( document.querySelector( 'stream-studio .estream-part--studio' ) ).toBeTruthy() );
+    await waitFor( () => expect( document.querySelector( 'stream-studio .wplus-live-stream-part--studio' ) ).toBeTruthy() );
 } );
 
 it( 'shows its host the studio as a page of its own, with the links it is given, in the element\'s height', async () => {
@@ -105,10 +105,10 @@ it( 'shows its host the studio as a page of its own, with the links it is given,
     expect( calls.stream ).toHaveBeenCalledWith( 'lesson:7', { video: true } );
 
     shows.get( 'lesson:7' )!.update( { you: { identity: 'u:34', role: 'host', name: 'Mia', chat: 'write', mod: true } } );
-    await waitFor( () => expect( document.querySelector( 'live-stream .estream-studio-page' ) ).toBeTruthy() );
+    await waitFor( () => expect( document.querySelector( 'live-stream .wplus-live-stream-studio-page' ) ).toBeTruthy() );
     const element = document.querySelector( 'live-stream' )!;
-    expect( element.querySelector( '.estream-studio-page__title' )!.textContent ).toBe( 'Your first tune' );
-    expect( element.querySelector( '.estream-studio-page__back' )!.getAttribute( 'href' ) ).toBe( '/studio' );
+    expect( element.querySelector( '.wplus-live-stream-studio-page__title' )!.textContent ).toBe( 'Your first tune' );
+    expect( element.querySelector( '.wplus-live-stream-studio-page__back' )!.getAttribute( 'href' ) ).toBe( '/studio' );
     // Where viewers watch, whole, to open and to share.
     expect( [ ...element.querySelectorAll( 'a' ) ].map( ( a ) => a.getAttribute( 'href' ) ) ).toContain( new URL( '/lessons/7', document.baseURI ).href );
     // Its place is the element's whole height.
@@ -119,8 +119,8 @@ it( 'tells anyone but the host that the studio page is not theirs', async () => 
     await place( '<live-stream name="lesson:8" view="studio-page"></live-stream>' );
     await waitFor( () => expect( shows.get( 'lesson:8' ) ).toBeTruthy() );
     shows.get( 'lesson:8' )!.update( { status: 'ready', you: { identity: 'u:35', role: 'viewer', name: 'Ava', chat: 'write', mod: false } } );
-    await waitFor( () => expect( document.querySelector( '.estream-studio-page__refused' ) ).toBeTruthy() );
-    expect( document.querySelector( '.estream-studio-page' ) ).toBeNull();
+    await waitFor( () => expect( document.querySelector( '.wplus-live-stream-studio-page__refused' ) ).toBeTruthy() );
+    expect( document.querySelector( '.wplus-live-stream-studio-page' ) ).toBeNull();
 } );
 
 it( 'leaves the stream once its last element goes, and keeps it for one moved on the page', async () => {
@@ -139,8 +139,8 @@ it( 'leaves the stream once its last element goes, and keeps it for one moved on
 
 it( 'says what kept a stream away, in the page language', async () => {
     await place( '<live-stream name="show:closed"></live-stream>' );
-    await waitFor( () => expect( document.querySelector( 'live-stream .estream-part--refused' ) ).toBeTruthy() );
-    const said = document.querySelector( '.estream-part--refused' )!.textContent!;
+    await waitFor( () => expect( document.querySelector( 'live-stream .wplus-live-stream-part--refused' ) ).toBeTruthy() );
+    const said = document.querySelector( '.wplus-live-stream-part--refused' )!.textContent!;
     expect( said ).not.toBe( '' );
     expect( said ).not.toBe( 'You do not have access to this stream' );
 } );

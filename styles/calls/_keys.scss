@@ -1,0 +1,16 @@
+// The call's key for a row of More or of Host Controls (call-keys.tsx), at the row's end and quieter than its
+// label: the dock's own buttons name theirs in their tooltips instead.
+
+.wplus-call-wrap .wplus-call-key-hint,
+.wplus-call-popover .wplus-call-key-hint {
+    flex: none;
+    margin-inline-start: auto;
+    padding-inline-start: 12px;
+    font-size: 12px;
+    font-weight: 400;
+    line-height: 1;
+    letter-spacing: 0.02em;
+    white-space: nowrap;
+    color: rgba(255, 255, 255, 0.45);
+    font-variant-numeric: tabular-nums;
+}

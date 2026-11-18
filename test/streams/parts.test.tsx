@@ -65,7 +65,7 @@ describe( 'a stream\'s Better Messages chat room', () => {
         ( document as any ).fullscreenEnabled = true;
         const { at, rendered } = show( live(), [ 'player', 'chat' ], { room: ROOM } );
 
-        const room = at( 'chat' ).querySelector( '.estream-part--chat > .estream-bm-room > .wplus-chat-wrap' );
+        const room = at( 'chat' ).querySelector( '.wplus-live-stream-part--chat > .wplus-live-stream-bm-room > .wplus-chat-wrap' );
         expect( room?.getAttribute( 'data-thread-id' ) ).toBe( '16778' );
         expect( room?.getAttribute( 'data-chat-id' ) ).toBe( '14014' );
         expect( within( at( 'chat' ) ).queryByText( 'Hello there' ) ).toBeNull();
@@ -73,10 +73,10 @@ describe( 'a stream\'s Better Messages chat room', () => {
 
         // On the page with the player, a part of its own, the player hides and shows it, the same room kept unseen.
         fireEvent.click( within( at( 'player' ) ).getByLabelText( 'Hide chat' ) );
-        expect( at( 'chat' ).hasAttribute( 'data-estream-chat-hidden' ) ).toBe( true );
+        expect( at( 'chat' ).hasAttribute( 'data-wplus-live-stream-chat-hidden' ) ).toBe( true );
         expect( at( 'chat' ).querySelector( '.wplus-chat-wrap' ) ).toBe( room );
         fireEvent.click( within( at( 'player' ) ).getByLabelText( 'Show chat' ) );
-        expect( at( 'chat' ).hasAttribute( 'data-estream-chat-hidden' ) ).toBe( false );
+        expect( at( 'chat' ).hasAttribute( 'data-wplus-live-stream-chat-hidden' ) ).toBe( false );
 
         rendered.unmount();
         expect( document.querySelector( '.wplus-chat-wrap' ) ).toBeNull();
@@ -85,21 +85,21 @@ describe( 'a stream\'s Better Messages chat room', () => {
     it( 'is shown and hidden from the player beside it in a ready layout, one block, kept mounted while hidden', () => {
         // The Live stream block's side layout: the player in its main column, the chat in the one beside.
         const { parts, dialogs, at } = page( [ 'player', 'details', 'chat' ] );
-        document.body.insertAdjacentHTML( 'beforeend', '<div class="estream-layout estream-layout--side"><div class="estream-layout__grid"><div class="estream-layout__main"></div><div class="estream-layout__side"></div></div></div>' );
-        const layout = document.querySelector( '.estream-layout' )!;
-        layout.querySelector( '.estream-layout__main' )!.append( at( 'player' ), at( 'details' ) );
-        layout.querySelector( '.estream-layout__side' )!.append( at( 'chat' ) );
+        document.body.insertAdjacentHTML( 'beforeend', '<div class="wplus-live-stream-layout wplus-live-stream-layout--side"><div class="wplus-live-stream-layout__grid"><div class="wplus-live-stream-layout__main"></div><div class="wplus-live-stream-layout__side"></div></div></div>' );
+        const layout = document.querySelector( '.wplus-live-stream-layout' )!;
+        layout.querySelector( '.wplus-live-stream-layout__main' )!.append( at( 'player' ), at( 'details' ) );
+        layout.querySelector( '.wplus-live-stream-layout__side' )!.append( at( 'chat' ) );
         const fake = fakeClient( live() );
         render( <EasyStreamParts client={ fake.asClient } parts={ parts } dialogs={ dialogs } title="Friday Q&A" room={ ROOM } manage={ false } /> );
         const room = at( 'chat' ).querySelector( '.wplus-chat-wrap' );
 
         fireEvent.click( within( at( 'player' ) ).getByLabelText( 'Hide chat' ) );
-        expect( layout.classList.contains( 'estream-layout--no-chat' ) ).toBe( true );
+        expect( layout.classList.contains( 'wplus-live-stream-layout--no-chat' ) ).toBe( true );
         // Hidden by the layout, not taken down: the same room, for when it shows again.
         expect( at( 'chat' ).querySelector( '.wplus-chat-wrap' ) ).toBe( room );
 
         fireEvent.click( within( at( 'player' ) ).getByLabelText( 'Show chat' ) );
-        expect( layout.classList.contains( 'estream-layout--no-chat' ) ).toBe( false );
+        expect( layout.classList.contains( 'wplus-live-stream-layout--no-chat' ) ).toBe( false );
         expect( at( 'chat' ).querySelector( '.wplus-chat-wrap' ) ).toBe( room );
     } );
 
@@ -111,25 +111,25 @@ describe( 'a stream\'s Better Messages chat room', () => {
         const room = at( 'chat' ).querySelector( '.wplus-chat-wrap' ) as HTMLElement;
         room.classList.add( 'wplus-initialized' );
         room.innerHTML = '<textarea>half a message</textarea>';
-        const root = at( 'player' ).querySelector( '.estream-theme' )!;
+        const root = at( 'player' ).querySelector( '.wplus-live-stream-theme' )!;
 
         ( document as any ).fullscreenElement = root;
         await act( async () => { document.dispatchEvent( new Event( 'fullscreenchange' ) ); } );
         // The very element, not a copy, beside the picture: one room on the page.
-        expect( root.querySelector( '.estream-app__side > .estream-bm-room > .wplus-chat-wrap' ) ).toBe( room );
+        expect( root.querySelector( '.wplus-live-stream-app__side > .wplus-live-stream-bm-room > .wplus-chat-wrap' ) ).toBe( room );
         expect( document.querySelectorAll( '.wplus-chat-wrap' ) ).toHaveLength( 1 );
         expect( room.querySelector( 'textarea' )?.value ).toBe( 'half a message' );
         expect( document.body.classList.contains( 'wplus-messages-dark' ) ).toBe( true );
         // With the button and the key for it, as the light chat has.
         fireEvent.click( within( at( 'player' ) ).getByLabelText( 'Hide chat' ) );
-        expect( at( 'chat' ).querySelector( '.estream-part--chat > .estream-bm-room > .wplus-chat-wrap' ) ).toBe( room );
-        expect( root.querySelector( '.estream-bm-room' ) ).toBeNull();
+        expect( at( 'chat' ).querySelector( '.wplus-live-stream-part--chat > .wplus-live-stream-bm-room > .wplus-chat-wrap' ) ).toBe( room );
+        expect( root.querySelector( '.wplus-live-stream-bm-room' ) ).toBeNull();
         fireEvent.click( within( at( 'player' ) ).getByLabelText( 'Show chat' ) );
-        expect( root.querySelector( '.estream-bm-room > .wplus-chat-wrap' ) ).toBe( room );
+        expect( root.querySelector( '.wplus-live-stream-bm-room > .wplus-chat-wrap' ) ).toBe( room );
 
         delete ( document as any ).fullscreenElement;
         await act( async () => { document.dispatchEvent( new Event( 'fullscreenchange' ) ); } );
-        expect( at( 'chat' ).querySelector( '.estream-part--chat > .estream-bm-room > .wplus-chat-wrap' ) ).toBe( room );
+        expect( at( 'chat' ).querySelector( '.wplus-live-stream-part--chat > .wplus-live-stream-bm-room > .wplus-chat-wrap' ) ).toBe( room );
         expect( document.querySelectorAll( '.wplus-chat-wrap' ) ).toHaveLength( 1 );
         expect( document.body.classList.contains( 'wplus-messages-light' ) ).toBe( true );
         expect( document.body.classList.contains( 'wplus-messages-dark' ) ).toBe( false );
@@ -140,11 +140,11 @@ describe( 'a stream\'s Better Messages chat room', () => {
         ( document as any ).fullscreenEnabled = true;
         const { at } = show( live(), [ 'player' ], { room: ROOM } );
         expect( document.querySelector( '.wplus-chat-wrap' ) ).toBeNull();
-        const root = at( 'player' ).querySelector( '.estream-theme' )!;
+        const root = at( 'player' ).querySelector( '.wplus-live-stream-theme' )!;
 
         ( document as any ).fullscreenElement = root;
         await act( async () => { document.dispatchEvent( new Event( 'fullscreenchange' ) ); } );
-        expect( root.querySelector( '.estream-app__side > .estream-bm-room > .wplus-chat-wrap' )?.getAttribute( 'data-thread-id' ) ).toBe( '16778' );
+        expect( root.querySelector( '.wplus-live-stream-app__side > .wplus-live-stream-bm-room > .wplus-chat-wrap' )?.getAttribute( 'data-thread-id' ) ).toBe( '16778' );
 
         delete ( document as any ).fullscreenElement;
         await act( async () => { document.dispatchEvent( new Event( 'fullscreenchange' ) ); } );
@@ -154,25 +154,25 @@ describe( 'a stream\'s Better Messages chat room', () => {
 
     it( 'sits beside the player in one piece, and in the studio page\'s chat tab', () => {
         const all = show( live(), [ 'all' ], { room: ROOM } );
-        expect( all.at( 'all' ).querySelector( '.estream-app__side > .estream-bm-room > .wplus-chat-wrap' ) ).toBeTruthy();
-        expect( all.at( 'all' ).querySelector( '.estream-chat' ) ).toBeNull();
+        expect( all.at( 'all' ).querySelector( '.wplus-live-stream-app__side > .wplus-live-stream-bm-room > .wplus-chat-wrap' ) ).toBeTruthy();
+        expect( all.at( 'all' ).querySelector( '.wplus-live-stream-chat' ) ).toBeNull();
         cleanup();
         document.body.innerHTML = '';
 
         const studio = show( { you: host }, [ 'studio-page' ], { room: ROOM, options: { 'studio-page': { page: { back: '#/studio', page: '', createPage: '', nonce: 'n', settings: '' } } } } );
         expect( within( studio.at( 'studio-page' ) ).getByRole( 'tab', { name: 'Chat' } ).getAttribute( 'aria-selected' ) ).toBe( 'true' );
-        expect( studio.at( 'studio-page' ).querySelector( '.estream-bm-room > .wplus-chat-wrap' ) ).toBeTruthy();
+        expect( studio.at( 'studio-page' ).querySelector( '.wplus-live-stream-bm-room > .wplus-chat-wrap' ) ).toBeTruthy();
     } );
 
     it( 'is dark in the player\'s full screen, as Better Messages is dark by its body class, and the page\'s own after', async () => {
         ( document as any ).fullscreenEnabled = true;
         document.body.classList.add( 'wplus-messages-light', 'site' );
         const all = show( live(), [ 'all' ], { room: ROOM } );
-        const root = all.at( 'all' ).querySelector( '.estream-theme' )!;
+        const root = all.at( 'all' ).querySelector( '.wplus-live-stream-theme' )!;
 
         ( document as any ).fullscreenElement = root;
         await act( async () => { document.dispatchEvent( new Event( 'fullscreenchange' ) ); } );
-        expect( root.className ).toContain( 'estream-theme--full' );
+        expect( root.className ).toContain( 'wplus-live-stream-theme--full' );
         expect( [ ...document.body.classList ].sort() ).toEqual( [ 'site', 'wplus-messages-dark' ] );
 
         delete ( document as any ).fullscreenElement;
@@ -266,16 +266,16 @@ describe( 'the stream in a Better Messages conversation', () => {
         const { at, client } = show( live( { you: viewer, tiles: [ hostTile(), { ...hostTile( 'u:4.0a1b2c3d' ), name: 'Jordan', micMuted: true } ] } ), [ 'room-stage' ], { chat: false, options: { 'room-stage': { room } } } );
 
         const stage = at( 'room-stage' );
-        expect( stage.querySelector( '.estream-bm-stage .wplus-group-call-container .estream-stage' ) ).toBeTruthy();
+        expect( stage.querySelector( '.wplus-live-stream-bm-stage .wplus-group-call-container .wplus-live-stream-stage' ) ).toBeTruthy();
         // The call's dock, not the player's bar; the time on air beside the Live badge instead.
         const dock = stage.querySelector( '.wplus-group-call-controls-v2 > .wplus-group-call-controls-buttons' ) as HTMLElement;
         expect( dock ).toBeTruthy();
-        expect( stage.querySelector( '.estream-bar' ) ).toBeNull();
+        expect( stage.querySelector( '.wplus-live-stream-bar' ) ).toBeNull();
         expect( within( stage ).getByLabelText( 'Time on air' ).textContent ).toBe( '1:05' );
         // Each tile says who it is and that the microphone is off as a call's does.
         expect( [ ...stage.querySelectorAll( '.wplus-info-name' ) ].map( ( n ) => n.textContent ) ).toEqual( [ 'Maya Lee', 'Jordan' ] );
         expect( stage.querySelectorAll( '.wplus-caller-status > .wplus-mic-disabled' ) ).toHaveLength( 1 );
-        expect( stage.querySelector( '.estream-tile__muted' ) ).toBeNull();
+        expect( stage.querySelector( '.wplus-live-stream-tile__muted' ) ).toBeNull();
 
         fireEvent.click( within( dock ).getByRole( 'button', { name: 'Mute' } ) );
         expect( within( dock ).getByRole( 'button', { name: 'Turn sound on' } ) ).toBeTruthy();
@@ -302,7 +302,7 @@ describe( 'the stream in a Better Messages conversation', () => {
 
         // Reactions, from their own sheet.
         fireEvent.click( within( dock ).getByRole( 'button', { name: 'Reactions' } ) );
-        fireEvent.click( within( stage.querySelector( '.estream-bm-reactions' ) as HTMLElement ).getByRole( 'button', { name: 'Heart' } ) );
+        fireEvent.click( within( stage.querySelector( '.wplus-live-stream-bm-reactions' ) as HTMLElement ).getByRole( 'button', { name: 'Heart' } ) );
         expect( client.react ).toHaveBeenCalledWith( '❤️' );
 
         fireEvent.click( within( dock ).getByRole( 'button', { name: 'Close the live stream' } ) );
@@ -341,17 +341,17 @@ describe( 'the stream in a Better Messages conversation', () => {
         const voice = { ...hostTile(), camera: null, avatar: 'https://cdn.example/maya.png' };
         const { at, update } = show( live( { you: viewer, tiles: [ voice ] } ), [ 'room-stage' ], { chat: false, options: { 'room-stage': { room } } } );
 
-        const person = at( 'room-stage' ).querySelector( '.estream-person' ) as HTMLElement;
+        const person = at( 'room-stage' ).querySelector( '.wplus-live-stream-person' ) as HTMLElement;
         expect( person.querySelector( 'img' )?.getAttribute( 'src' ) ).toBe( 'https://cdn.example/maya.png' );
-        expect( person.querySelector( '.estream-person__name' )?.textContent ).toBe( 'Maya Lee' );
+        expect( person.querySelector( '.wplus-live-stream-person__name' )?.textContent ).toBe( 'Maya Lee' );
         // Its name once: not over the picture as well.
         expect( at( 'room-stage' ).querySelector( '.wplus-info-name' ) ).toBeNull();
 
         fireEvent.error( person.querySelector( 'img' )! );
-        expect( at( 'room-stage' ).querySelector( '.estream-person .estream-initials' )?.textContent ).toBe( 'ML' );
+        expect( at( 'room-stage' ).querySelector( '.wplus-live-stream-person .wplus-live-stream-initials' )?.textContent ).toBe( 'ML' );
 
         update( { tiles: [ { ...voice, avatar: null } ] } );
-        expect( at( 'room-stage' ).querySelector( '.estream-person .estream-initials' )?.textContent ).toBe( 'ML' );
+        expect( at( 'room-stage' ).querySelector( '.wplus-live-stream-person .wplus-live-stream-initials' )?.textContent ).toBe( 'ML' );
     } );
 
     it( 'keeps a stream that stays on screen open while live: nothing for a viewer to close it with, until it ends', () => {
@@ -408,9 +408,9 @@ describe( 'the stream in a Better Messages conversation', () => {
         expect( status.querySelector( '.wplus-connection-quality.wplus-quality-good' )?.textContent ).toBe( 'Good connection' );
         expect( within( status ).getByLabelText( '3 watching, peak 7' ) ).toBeTruthy();
         // The peak on the count itself, not only in its tooltip.
-        expect( status.querySelector( '.estream-bm-watching__peak' )?.textContent ).toBe( '7' );
+        expect( status.querySelector( '.wplus-live-stream-bm-watching__peak' )?.textContent ).toBe( '7' );
         fireEvent.click( within( stage ).getByRole( 'button', { name: 'Settings' } ) );
-        const figures = () => [ ...stage.querySelectorAll( '.wplus-call-settings .estream-bm-figures > div' ) ].map( ( row ) => row.querySelector( 'dt' )!.textContent + ': ' + row.querySelector( 'dd' )!.textContent );
+        const figures = () => [ ...stage.querySelectorAll( '.wplus-call-settings .wplus-live-stream-bm-figures > div' ) ].map( ( row ) => row.querySelector( 'dt' )!.textContent + ': ' + row.querySelector( 'dd' )!.textContent );
         expect( figures() ).toEqual( [ 'Video: 720p · 30 fps · 2.4 Mbps', 'Watching at the peak: 7', 'Reactions: 4' ] );
         // Nobody has it on screen: the quality chosen, nothing of a pause, here or over the picture.
         client.sendingStats.mockImplementation( async () => ( { width: 0, height: 0, fps: 0, kbps: 0, limited: null, held: false, paused: true } as any ) );
@@ -432,14 +432,14 @@ describe( 'the stream in one piece beside a Studio block', () => {
         const { at } = show( { you: host, devices: { camera: true, microphone: true } }, [ 'all', 'studio' ], { studioUrl: 'https://site.example/wp-admin/admin.php?page=wordplus-stream#/studio/12' } );
 
         expect( screen.queryByText( 'You host this stream.' ) ).toBeNull();
-        expect( at( 'all' ).querySelector( '.estream-studio' ) ).toBeNull();
+        expect( at( 'all' ).querySelector( '.wplus-live-stream-studio' ) ).toBeNull();
         expect( within( at( 'studio' ) ).getByRole( 'button', { name: 'Go live' } ) ).toBeTruthy();
 
         vi.useFakeTimers();
         fireEvent.click( within( at( 'studio' ) ).getByRole( 'button', { name: 'Go live' } ) );
-        expect( at( 'all' ).querySelector( '.estream-going__number' )?.textContent ).toBe( '3' );
+        expect( at( 'all' ).querySelector( '.wplus-live-stream-going__number' )?.textContent ).toBe( '3' );
         act( () => { vi.advanceTimersByTime( 3000 ); } );
-        expect( at( 'all' ).querySelector( '.estream-going' ) ).toBeNull();
+        expect( at( 'all' ).querySelector( '.wplus-live-stream-going' ) ).toBeNull();
     } );
 
     it( 'asks a viewer invited on stage once', () => {
@@ -452,14 +452,14 @@ describe( 'a stream\'s parts placed apart', () => {
     it( 'shows each part in its own place, from one client', () => {
         const { at, client } = show( live(), [ 'player', 'chat', 'details', 'studio' ] );
 
-        expect( at( 'player' ).querySelector( '.estream-part--player .estream-stage' ) ).toBeTruthy();
-        expect( at( 'player' ).querySelector( '.estream-chat' ) ).toBeNull();
+        expect( at( 'player' ).querySelector( '.wplus-live-stream-part--player .wplus-live-stream-stage' ) ).toBeTruthy();
+        expect( at( 'player' ).querySelector( '.wplus-live-stream-chat' ) ).toBeNull();
         expect( within( at( 'chat' ) ).getByText( 'Hello there' ) ).toBeTruthy();
         expect( within( at( 'details' ) ).getByText( 'Friday Q&A' ) ).toBeTruthy();
         // A viewer sees no studio at all.
         expect( at( 'studio' ).innerHTML ).toBe( '' );
         // Each part wears the site's theme of its own.
-        for( const name of [ 'player', 'chat', 'details' ] ) expect( at( name ).querySelector( '.estream-part--' + name )!.className ).toContain( 'estream-theme wp-exclude-emoji estream-theme--light' );
+        for( const name of [ 'player', 'chat', 'details' ] ) expect( at( name ).querySelector( '.wplus-live-stream-part--' + name )!.className ).toContain( 'wplus-live-stream-theme wp-exclude-emoji wplus-live-stream-theme--light' );
         expect( client.start ).not.toHaveBeenCalled();
     } );
 
@@ -508,16 +508,16 @@ describe( 'a stream\'s parts placed apart', () => {
 
         // On the page, the chat's own part, wherever it is: its place unseen while hidden, which hides its block too.
         fireEvent.click( within( player ).getByLabelText( 'Hide chat' ) );
-        expect( at( 'chat' ).hasAttribute( 'data-estream-chat-hidden' ) ).toBe( true );
+        expect( at( 'chat' ).hasAttribute( 'data-wplus-live-stream-chat-hidden' ) ).toBe( true );
         expect( within( at( 'chat' ) ).getByText( 'Hello there' ), 'kept on the page' ).toBeTruthy();
         fireEvent.click( within( player ).getByLabelText( 'Show chat' ) );
-        expect( at( 'chat' ).hasAttribute( 'data-estream-chat-hidden' ) ).toBe( false );
+        expect( at( 'chat' ).hasAttribute( 'data-wplus-live-stream-chat-hidden' ) ).toBe( false );
 
         // The player's root goes full screen: its chat comes beside the picture, and may hide.
-        const root = player.querySelector( '.estream-part--player' )!;
+        const root = player.querySelector( '.wplus-live-stream-part--player' )!;
         ( document as any ).fullscreenElement = root;
         await act( async () => { document.dispatchEvent( new Event( 'fullscreenchange' ) ); } );
-        expect( root.className ).toContain( 'estream-theme--full' );
+        expect( root.className ).toContain( 'wplus-live-stream-theme--full' );
         expect( within( player ).getByText( 'Hello there' ) ).toBeTruthy();
 
         await act( async () => { fireEvent.click( within( player ).getByLabelText( 'Hide chat' ) ); } );
@@ -532,11 +532,11 @@ describe( 'a stream\'s parts placed apart', () => {
 
         await act( async () => { fireEvent.click( within( at( 'studio' ) ).getByText( 'End stream' ) ); } );
         const dialog = within( dialogs ).getByRole( 'dialog', { name: 'End the stream for everyone?' } );
-        expect( dialog.closest( '.estream-theme' ) ).toBeTruthy();
+        expect( dialog.closest( '.wplus-live-stream-theme' ) ).toBeTruthy();
         await act( async () => { fireEvent.click( within( dialogs ).getByText( 'Cancel' ) ); } );
         expect( client.end ).not.toHaveBeenCalled();
 
-        const root = at( 'player' ).querySelector( '.estream-part--player' )!;
+        const root = at( 'player' ).querySelector( '.wplus-live-stream-part--player' )!;
         ( document as any ).fullscreenElement = root;
         await act( async () => { document.dispatchEvent( new Event( 'fullscreenchange' ) ); } );
         await act( async () => { fireEvent.click( within( at( 'studio' ) ).getByText( 'End stream' ) ); } );
@@ -549,13 +549,13 @@ describe( 'a stream\'s parts placed apart', () => {
         const rect = ( r : Partial<DOMRect> ) => ( { left: 0, right: 0, top: 0, bottom: 0, width: 0, height: 0, x: 0, y: 0, toJSON(){}, ...r } ) as DOMRect;
         let chatLeft = 640;
         vi.spyOn( HTMLElement.prototype, 'getBoundingClientRect' ).mockImplementation( function ( this : HTMLElement ){
-            if( this.classList.contains( 'estream-part-place' ) ) return rect( { left: 0, right: 620, top: 0, bottom: 420, width: 620, height: 420 } );
-            if( this.classList.contains( 'estream-part--chat' ) ) return rect( { left: chatLeft, right: chatLeft + 300, top: 0, bottom: 300, width: 300, height: 300 } );
+            if( this.classList.contains( 'wplus-live-stream-part-place' ) ) return rect( { left: 0, right: 620, top: 0, bottom: 420, width: 620, height: 420 } );
+            if( this.classList.contains( 'wplus-live-stream-part--chat' ) ) return rect( { left: chatLeft, right: chatLeft + 300, top: 0, bottom: 300, width: 300, height: 300 } );
             return rect( {} );
         } );
 
         const { at, rendered, parts, dialogs, asClient } = show( live(), [ 'player', 'chat' ] );
-        const chat = () => at( 'chat' ).querySelector( '.estream-part--chat' ) as HTMLElement;
+        const chat = () => at( 'chat' ).querySelector( '.wplus-live-stream-part--chat' ) as HTMLElement;
         expect( chat().style.height ).toBe( '420px' );
 
         // Under the player (a phone's columns): the site's chat height.
@@ -591,24 +591,24 @@ describe( 'a stream\'s parts placed apart', () => {
         vi.stubGlobal( 'matchMedia', ( query : string ) => ( { matches: query.includes( 'max-width' ), addEventListener(){}, removeEventListener(){} } ) );
 
         const { at } = show( live(), [ 'player' ], { options: { player: { sticky: true } } } );
-        const root = () => at( 'player' ).querySelector( '.estream-part--player' )!;
-        const place = () => at( 'player' ).querySelector( '.estream-part-place' ) as HTMLElement;
+        const root = () => at( 'player' ).querySelector( '.wplus-live-stream-part--player' )!;
+        const place = () => at( 'player' ).querySelector( '.wplus-live-stream-part-place' ) as HTMLElement;
         expect( seen ).not.toBeNull();
 
         await act( async () => { seen!( [ { isIntersecting: false, boundingClientRect: { top: -400, height: 380 } as DOMRect } ] ); } );
-        expect( root().className ).toContain( 'estream-part--floating' );
+        expect( root().className ).toContain( 'wplus-live-stream-part--floating' );
         expect( place().style.height ).toBe( '380px' );
 
         // Back in its place as the page scrolls up to it.
         await act( async () => { seen!( [ { isIntersecting: true, boundingClientRect: { top: 10, height: 380 } as DOMRect } ] ); } );
-        expect( root().className ).not.toContain( 'estream-part--floating' );
+        expect( root().className ).not.toContain( 'wplus-live-stream-part--floating' );
         expect( place().style.height ).toBe( '' );
     } );
 
     it( 'gives the player a shape of its own', () => {
         const { at } = show( live(), [ 'player', 'details' ], { options: { player: { appearance: { shape: '9:16' } } } } );
-        expect( at( 'player' ).querySelector( '.estream-part--player' )!.className ).toContain( 'estream-theme--upright' );
-        expect( at( 'details' ).querySelector( '.estream-part--details' )!.className ).not.toContain( 'estream-theme--upright' );
+        expect( at( 'player' ).querySelector( '.wplus-live-stream-part--player' )!.className ).toContain( 'wplus-live-stream-theme--upright' );
+        expect( at( 'details' ).querySelector( '.wplus-live-stream-part--details' )!.className ).not.toContain( 'wplus-live-stream-theme--upright' );
     } );
 
     it( 'shows a host live from another window the stream as everyone sees it, letting them end it but send nothing', async () => {
@@ -637,7 +637,7 @@ describe( 'the studio page', () => {
         document.body.innerHTML = '';
 
         show( { you: host }, [ 'studio-page' ], { options, guests: true } );
-        const studio = within( screen.getByRole( 'heading', { name: 'Friday Q&A' } ).closest( '.estream-part' ) as HTMLElement );
+        const studio = within( screen.getByRole( 'heading', { name: 'Friday Q&A' } ).closest( '.wplus-live-stream-part' ) as HTMLElement );
 
         expect( studio.getByRole( 'heading', { name: 'Friday Q&A' } ) ).toBeTruthy();
         expect( studio.getByLabelText( 'Back to your streams' ).getAttribute( 'href' ) ).toBe( options['studio-page'].page.back );
@@ -658,7 +658,7 @@ describe( 'the studio page', () => {
         const studio = within( part );
 
         expect( studio.getByText( 'Not connected to WordPlus Cloud yet' ) ).toBeTruthy();
-        expect( studio.getByText( 'Try your camera, microphone and screen below. Only you see the preview.' ) ).toBeTruthy();
+        expect( studio.getByText( 'Try your camera, microphone and screen below, then start a test stream and watch it on its page as your viewers will. Only you can see it.' ) ).toBeTruthy();
         expect( studio.getByRole( 'link', { name: 'Connect to go live' } ).getAttribute( 'href' ) ).toBe( connect );
         // No chat to reach, nor OBS to send to: both are the cloud's.
         expect( studio.getAllByRole( 'tab' ).map( ( t ) => t.textContent ) ).toEqual( [ 'Stream' ] );
@@ -666,20 +666,20 @@ describe( 'the studio page', () => {
 
         await act( async () => { fireEvent.click( studio.getByText( 'Turn on camera and microphone' ) ); } );
         expect( client.startPreview ).toHaveBeenCalled();
-        // The bar: the devices, and Connect to go live where Go live is.
+        // The bar: the devices, a test stream where Go live is, and Connect to go live beside it (test-stream.test.tsx).
         expect( studio.getByRole( 'button', { name: 'Camera' } ) ).toBeTruthy();
         expect( studio.queryByRole( 'button', { name: /Go live/ } ) ).toBeNull();
-        expect( part.querySelector( '.estream-studio__bar a.estream-studio__go' )?.getAttribute( 'href' ) ).toBe( connect );
+        expect( part.querySelector( '.wplus-live-stream-studio__bar .wplus-live-stream-studio__go' )?.textContent ).toBe( 'Start a test stream' );
+        expect( part.querySelector( '.wplus-live-stream-studio__bar a' )?.getAttribute( 'href' ) ).toBe( connect );
         expect( studio.queryByText( 'Stream from OBS' ) ).toBeNull();
         expect( client.goLive ).not.toHaveBeenCalled();
         cleanup();
         document.body.innerHTML = '';
 
-        // A host who may not change the licence: Go live there, and off.
+        // A host who may not change the licence: the test stream alone, and nothing to connect.
         const other = show( { ...unconnected, devices: { camera: true, microphone: true } }, [ 'studio-page' ], { options } );
-        const go = other.at( 'studio-page' ).querySelector( '.estream-studio__go' ) as HTMLButtonElement;
-        expect( [ go.tagName, go.disabled, go.textContent ] ).toEqual( [ 'BUTTON', true, 'Go live' ] );
-        expect( go.getAttribute( 'data-estream-tip' ) ).toBe( 'Going live needs the site connected to WordPlus Cloud.' );
+        const go = other.at( 'studio-page' ).querySelector( '.wplus-live-stream-studio__go' ) as HTMLButtonElement;
+        expect( [ go.tagName, go.disabled, go.textContent ] ).toEqual( [ 'BUTTON', false, 'Start a test stream' ] );
         expect( within( other.at( 'studio-page' ) ).queryByRole( 'link', { name: 'Connect to go live' } ) ).toBeNull();
         cleanup();
         document.body.innerHTML = '';
@@ -721,7 +721,7 @@ describe( 'the studio page', () => {
         await waitFor( () => expect( stats.textContent ).toContain( '720p · 30 fps · 2.4 Mbps' ) );
         expect( stats.textContent ).toContain( 'Good connection' );
         // Above the controls, inside the card the bar is in.
-        expect( stats.closest( '.estream-studio-page__controls' ) ).toBeTruthy();
+        expect( stats.closest( '.wplus-live-stream-studio-page__controls' ) ).toBeTruthy();
         expect( within( at( 'studio-page' ) ).getByText( /^Live since / ) ).toBeTruthy();
     } );
 
@@ -735,7 +735,7 @@ describe( 'the studio page', () => {
         update( { stream: { id: 's', state: 'live', started_at: lost - 600_000, ended_at: null, encoder_lost_at: lost } } );
         const said = studio.getByText( /OBS stopped sending/ );
         expect( said.textContent ).toBe( 'OBS stopped sending at ' + time( lost ) + '. Unless it comes back, the stream ends by itself at ' + time( lost + 300_000 ) + '.' );
-        expect( said.closest( '.estream-studio-page__controls' ) ).toBeTruthy();
+        expect( said.closest( '.wplus-live-stream-studio-page__controls' ) ).toBeTruthy();
 
         // Back: said no more.
         update( { stream: { id: 's', state: 'live', started_at: lost - 600_000, ended_at: null } } );

@@ -222,8 +222,8 @@
 // wraps around it and drops the time to a short line of its own only when it
 // is full, and the time is pinned over that room, at the bottom end of the
 // padding. As a column of its own beside the label it left the label ~98px in
-// a narrow mini chat: "Message hidden / (User / blocked)" (Better Messages
-// ticket 10499).
+// a narrow mini chat: "Message hidden / (User / blocked)" (from a support
+// report).
 @mixin wplus-tombstone-time {
     position: relative;
     display: inline-block;
@@ -1787,4 +1787,109 @@
     }
 }
 
+// A request in a chat (ActionCard, components/chat/message-parts.tsx): a person waits on it, or decides it. Its ink is its
+// tone mixed toward the text, so it reads on a light and a dark surface alike.
+.wplus-action-card {
+    --wplus-action-tone: var(--wplus-color-warning);
 
+    align-self: stretch;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    max-width: 100%;
+    padding: 12px 14px;
+    color: rgba(var(--wplus-color-text-primary), 1);
+    background: rgba(var(--wplus-color-bg-elevated), 1);
+    border: 1px solid rgba(var(--wplus-color-border), 1);
+    border-radius: 14px;
+    box-shadow: 0 1px 3px rgba(17, 24, 39, 0.06);
+
+    &.is-done {
+        --wplus-action-tone: var(--wplus-color-success);
+    }
+
+    &.is-plain {
+        --wplus-action-tone: var(--wplus-color-text-tertiary);
+    }
+
+    &__head {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+    &__icon {
+        flex: none;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 32px;
+        height: 32px;
+        color: color-mix(in srgb, rgb(var(--wplus-action-tone)) 60%, rgb(var(--wplus-color-text-primary)));
+        background: rgba(var(--wplus-action-tone), 0.16);
+        border-radius: 10px;
+    }
+
+    &__title {
+        flex: 1;
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 1px;
+        font-size: 13px;
+        color: rgba(var(--wplus-color-text-secondary), 1);
+        overflow-wrap: anywhere;
+
+        strong {
+            font-size: 15px;
+            color: rgba(var(--wplus-color-text-primary), 1);
+        }
+    }
+
+    &__state {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 13px;
+        font-weight: 600;
+        color: color-mix(in srgb, rgb(var(--wplus-action-tone)) 60%, rgb(var(--wplus-color-text-primary)));
+    }
+
+    &__pulse {
+        width: 8px;
+        height: 8px;
+        background: currentColor;
+        border-radius: 50%;
+        animation: wplus-action-card-pulse 1.6s ease-in-out infinite;
+    }
+
+    &__line {
+        font-size: 13px;
+        color: rgba(var(--wplus-color-text-secondary), 1);
+    }
+
+    &__body {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+    }
+
+    &__actions {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 8px;
+    }
+}
+
+@keyframes wplus-action-card-pulse {
+    50% {
+        opacity: 0.35;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .wplus-action-card__pulse {
+        animation: none;
+    }
+}

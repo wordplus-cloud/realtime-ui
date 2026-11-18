@@ -13,6 +13,9 @@ import {LOGO_INSET_MAX, LOGO_WIDTH, logoOf, safeImage} from "./appearance.ts";
 import {StatsPanel} from "./stats.tsx";
 import {offeredReactions, reactionIcon} from "./reactions.ts";
 import {EmojiGlyph} from "./emoji-glyph.tsx";
+import {RecMark} from "./recording.tsx";
+import {TestBadge, testRunning} from "./test-stream.tsx";
+import {reactionName} from "./words.ts";
 
 // The controls hide this long after the pointer stops.
 const IDLE_MS = 3000;
@@ -22,7 +25,7 @@ const withKey = ( label : string, key : string ) => sprintf( _x( '%1$s (%2$s)', 
 
 function Initials( props : { name : string } ){
     const letters = props.name.split( /\s+/ ).filter( Boolean ).slice( 0, 2 ).map( ( w ) => w[0]?.toUpperCase() ).join( '' );
-    return <div className="estream-initials" aria-hidden="true">{ letters || '?' }</div>;
+    return <div className="wplus-live-stream-initials" aria-hidden="true">{ letters || '?' }</div>;
 }
 
 // Someone on stage without a picture (the camera off, or a microphone alone): their avatar, or their initials where
@@ -32,11 +35,11 @@ function Person( props : { name : string, avatar? : string | null } ){
     const src = broken ? null : safeImage( props.avatar );
 
     return (
-        <div className="estream-person">
+        <div className="wplus-live-stream-person">
             { src
-                ? <img className="estream-person__avatar" src={ src } alt="" draggable={ false } onError={ () => setBroken( true ) } />
+                ? <img className="wplus-live-stream-person__avatar" src={ src } alt="" draggable={ false } onError={ () => setBroken( true ) } />
                 : <Initials name={ props.name } /> }
-            <span className="estream-person__name">{ props.name }</span>
+            <span className="wplus-live-stream-person__name">{ props.name }</span>
         </div>
     );
 }
@@ -60,13 +63,13 @@ function TileView( props : { tile : Tile, main? : boolean, primary? : boolean, n
     // A screen and an encoder's picture are shown whole: what they hold reaches to their edges. So is a
     // camera alone on the stage, which may be a phone's upright picture; cameras side by side fill their tiles.
     return (
-        <div className={ 'estream-tile' + ( ringed ? ' estream-tile--speaking' : '' ) }>
+        <div className={ 'wplus-live-stream-tile' + ( ringed ? ' wplus-live-stream-tile--speaking' : '' ) }>
             { track
                 ? <VideoTrack track={ track } primary={ props.primary } fills={ props.alone } mirrored={ tile.local && track === tile.camera && facing === 'user' } fit={ track === tile.screen || tile.encoder || props.alone ? 'contain' : 'cover' } />
                 : <Person name={ tile.name } avatar={ tile.avatar } /> }
             { info ? info( tile, named ) : ( named || tile.micMuted ) && (
-                <div className="estream-tile__name">
-                    { tile.micMuted && <span className="estream-tile__muted" role="img" aria-label={ __( 'Microphone off', 'wordplus-live-stream' ) }><Icon name="mic-off" /></span> }
+                <div className="wplus-live-stream-tile__name">
+                    { tile.micMuted && <span className="wplus-live-stream-tile__muted" role="img" aria-label={ __( 'Microphone off', 'wordplus-live-stream' ) }><Icon name="mic-off" /></span> }
                     { named && <span>{ tile.name }</span> }
                 </div>
             ) }
@@ -166,7 +169,7 @@ function CornerCamera( props : { tile : Tile, side : 'left' | 'right' } ){
     return (
         <div
             ref={ box }
-            className={ 'estream-tiles__corner estream-tiles__corner--' + props.side + ( movable ? ' estream-tiles__corner--movable' : '' ) + ( moving ? ' estream-tiles__corner--moving' : '' ) }
+            className={ 'wplus-live-stream-tiles__corner wplus-live-stream-tiles__corner--' + props.side + ( movable ? ' wplus-live-stream-tiles__corner--movable' : '' ) + ( moving ? ' wplus-live-stream-tiles__corner--moving' : '' ) }
             style={ style }
             { ...handlers }
         >
@@ -194,7 +197,7 @@ function Tiles( props : { tiles : Tile[] } ){
     const spotlit = layout.mode === 'spotlight' ? props.tiles.find( ( t ) => t.identity === layout.identity ) : undefined;
     if( spotlit ){
         return (
-            <div className="estream-tiles estream-tiles--n1">
+            <div className="wplus-live-stream-tiles wplus-live-stream-tiles--n1">
                 <TileView tile={ spotlit } main primary named={ false } alone />
             </div>
         );
@@ -206,9 +209,9 @@ function Tiles( props : { tiles : Tile[] } ){
     if( ! sharing && layout.mode === 'speaker' && props.tiles.length > 1 ){
         const main = props.tiles.find( ( t ) => t.identity === lastSpeaker.current ) ?? props.tiles[0]!;
         return (
-            <div className="estream-tiles estream-tiles--share estream-tiles--speaker">
-                <div className="estream-tiles__main"><TileView tile={ main } primary named={ named } /></div>
-                <div className="estream-tiles__strip">
+            <div className="wplus-live-stream-tiles wplus-live-stream-tiles--share wplus-live-stream-tiles--speaker">
+                <div className="wplus-live-stream-tiles__main"><TileView tile={ main } primary named={ named } /></div>
+                <div className="wplus-live-stream-tiles__strip">
                     { props.tiles.filter( ( t ) => t !== main ).map( ( t ) => <TileView key={ tileKey( t ) } tile={ t } named={ named } /> ) }
                 </div>
             </div>
@@ -223,16 +226,16 @@ function Tiles( props : { tiles : Tile[] } ){
         if( others.length === 0 || ( others.length === 1 && others[0] === sharing ) ){
             const side = logoOf( appearance )?.position === 'bottom-right' ? 'left' : 'right';
             return (
-                <div className="estream-tiles estream-tiles--n1">
+                <div className="wplus-live-stream-tiles wplus-live-stream-tiles--n1">
                     <TileView tile={ sharing } main primary named={ false } alone />
                     { others.length > 0 && <CornerCamera tile={ sharing } side={ side } /> }
                 </div>
             );
         }
         return (
-            <div className="estream-tiles estream-tiles--share">
-                <div className="estream-tiles__main"><TileView tile={ sharing } main primary named={ false } /></div>
-                <div className="estream-tiles__strip">
+            <div className="wplus-live-stream-tiles wplus-live-stream-tiles--share">
+                <div className="wplus-live-stream-tiles__main"><TileView tile={ sharing } main primary named={ false } /></div>
+                <div className="wplus-live-stream-tiles__strip">
                     { others.map( ( t ) => <TileView key={ tileKey( t ) } tile={ t.screen ? { ...t, screen: null } : t } named={ appearance.names !== false } /> ) }
                 </div>
             </div>
@@ -240,7 +243,7 @@ function Tiles( props : { tiles : Tile[] } ){
     }
 
     return (
-        <div className={ 'estream-tiles estream-tiles--n' + Math.min( props.tiles.length, 4 ) }>
+        <div className={ 'wplus-live-stream-tiles wplus-live-stream-tiles--n' + Math.min( props.tiles.length, 4 ) }>
             { props.tiles.map( ( t, i ) => <TileView key={ tileKey( t ) } tile={ t } primary={ i === 0 } named={ named } alone={ props.tiles.length === 1 } /> ) }
         </div>
     );
@@ -254,12 +257,12 @@ function Floating(){
     const offered = offeredReactions( appearance );
 
     return (
-        <div className="estream-floating" aria-hidden="true">
+        <div className="wplus-live-stream-floating" aria-hidden="true">
             { reactions.filter( ( r ) => offered.includes( reactionIcon( r.kind ) ) ).map( ( r ) => (
-                <span key={ r.id } className="estream-floating__item" style={ {
+                <span key={ r.id } className="wplus-live-stream-floating__item" style={ {
                     left: ( ( r.id * 37 ) % 60 + 30 ) + '%',
                     animationDelay: Math.max( 0, r.at - Date.now() ) + 'ms',
-                    '--estream-drift': ( ( r.id * 53 ) % 41 - 20 ) + 'px'
+                    '--wplus-live-stream-drift': ( ( r.id * 53 ) % 41 - 20 ) + 'px'
                 } as CSSProperties }>
                     <EmojiGlyph emoji={ reactionIcon( r.kind ) } />
                 </span>
@@ -271,7 +274,7 @@ function Floating(){
 // How long it has been on air.
 function OnAir( props : { since : number } ){
     const now = useNow( 1000 );
-    return <span className="estream-bar__time" aria-label={ __( 'Time on air', 'wordplus-live-stream' ) }>{ clock( now - props.since ) }</span>;
+    return <span className="wplus-live-stream-bar__time" aria-label={ __( 'Time on air', 'wordplus-live-stream' ) }>{ clock( now - props.since ) }</span>;
 }
 
 // An icon alone, named by `label`; its tooltip says the label, or `tip` (with its key).
@@ -279,10 +282,10 @@ export function IconButton( props : { icon : IconName, label : string, tip? : st
     return (
         <button
             type="button"
-            className="estream-icon-button"
+            className="wplus-live-stream-icon-button"
             aria-label={ props.label }
             aria-pressed={ props.pressed }
-            data-estream-tip={ props.tip ?? props.label }
+            data-wplus-live-stream-tip={ props.tip ?? props.label }
             onClick={ props.onClick }
         >
             <Icon name={ props.icon } />
@@ -298,7 +301,7 @@ function Volume(){
     const level = silent ? 0 : player.volume;
 
     return (
-        <div className="estream-volume">
+        <div className="wplus-live-stream-volume">
             <IconButton
                 icon={ silent ? 'volume-off' : player.volume < 0.5 ? 'volume-low' : 'volume' }
                 label={ silent ? __( 'Unmute', 'wordplus-live-stream' ) : __( 'Mute', 'wordplus-live-stream' ) }
@@ -312,14 +315,14 @@ function Volume(){
             { player.volumeSettable && (
                 <input
                     type="range"
-                    className="estream-volume__slider"
+                    className="wplus-live-stream-volume__slider"
                     min={ 0 }
                     max={ 1 }
                     step={ 0.05 }
                     value={ level }
                     aria-label={ __( 'Volume', 'wordplus-live-stream' ) }
                     aria-valuetext={ Math.round( level * 100 ) + '%' }
-                    style={ { '--estream-level': level * 100 + '%' } as CSSProperties }
+                    style={ { '--wplus-live-stream-level': level * 100 + '%' } as CSSProperties }
                     onChange={ ( e ) => player.setVolume( Number( e.target.value ) ) }
                 />
             ) }
@@ -383,7 +386,7 @@ function Settings( props : { quality : boolean } ){
     };
 
     return (
-        <MenuButton icon="sliders" label={ __( 'Settings', 'wordplus-live-stream' ) } className="estream-bar__settings">
+        <MenuButton icon="sliders" label={ __( 'Settings', 'wordplus-live-stream' ) } className="wplus-live-stream-bar__settings">
             { ( close ) => {
                 const choices = props.quality ? qualityChoices( client, state ) : [];
                 const shown = shownQuality( quality, choices );
@@ -422,6 +425,32 @@ function Settings( props : { quality : boolean } ){
     );
 }
 
+// A viewer's reactions in full screen, which hides the line under the player that has them (Info, ViewerControls): a
+// menu of the same ones beside the settings, open for more until a press outside it or Escape. None for the host, and
+// none while the stream takes none, as there.
+function FullScreenReactions(){
+    const client = useClient();
+    const state = useStream();
+    const { appearance } = usePlayer();
+    const kinds = state.status === 'ready' && state.stream?.state !== 'ended' && state.you?.role !== 'host' && state.reactionsOn ? offeredReactions( appearance ) : [];
+
+    if( kinds.length === 0 ) return null;
+
+    return (
+        <MenuButton icon="smile" label={ __( 'Reactions', 'wordplus-live-stream' ) } className="wplus-live-stream-bar__reactions" align="end">
+            { () => (
+                <div className="wplus-live-stream-reactions">
+                    { kinds.map( ( kind ) => (
+                        <button key={ kind } type="button" role="menuitem" className="wplus-live-stream-reaction" aria-label={ reactionName( kind ) } onClick={ () => client.react( kind ) }>
+                            <EmojiGlyph emoji={ kind } />
+                        </button>
+                    ) ) }
+                </div>
+            ) }
+        </MenuButton>
+    );
+}
+
 // The controls along the bottom of the picture.
 function Bar( props : { shown : boolean } ){
     const player = usePlayer();
@@ -432,10 +461,11 @@ function Bar( props : { shown : boolean } ){
     const sending = state.media === 'live' && state.tiles.some( ( t ) => t.local );
 
     return (
-        <div className={ 'estream-bar' + ( props.shown ? '' : ' estream-bar--hidden' ) }>
+        <div className={ 'wplus-live-stream-bar' + ( props.shown ? '' : ' wplus-live-stream-bar--hidden' ) }>
             { remote && <Volume /> }
             { live && state.stream?.started_at && player.appearance.clock !== false ? <OnAir since={ state.stream.started_at } /> : null }
-            <span className="estream-bar__spacer" />
+            <span className="wplus-live-stream-bar__spacer" />
+            { player.fullscreen && <FullScreenReactions /> }
             { ( remote || sending ) && <Settings quality={ remote } /> }
             { player.chatToggles && (
                 <IconButton
@@ -475,23 +505,26 @@ function Top( props : { shown : boolean, bare? : boolean } ){
     const weak = state.connection === 'poor' || state.connection === 'lost';
     const since = live && props.bare && player.appearance.clock !== false ? state.stream?.started_at ?? null : null;
 
-    const preview = ! live && state.tiles.some( ( t ) => t.local || t.encoder );
+    // The host's own picture before going live, but for a test stream running from it, which says so (TestBadge).
+    const preview = ! live && state.tiles.some( ( t ) => t.local || t.encoder ) && ! testRunning( state );
 
     return (
-        <div className="estream-top">
-            { live && player.appearance.liveBadge !== false && <span className="estream-badge estream-badge--live">{ _x( 'Live', 'a stream on air', 'wordplus-live-stream' ) }</span> }
-            { since !== null && <span className="estream-badge estream-top__time"><OnAir since={ since } /></span> }
-            { preview && <span className="estream-badge estream-badge--preview">{ _x( 'Preview', 'a host\'s own picture before going live', 'wordplus-live-stream' ) }</span> }
+        <div className="wplus-live-stream-top">
+            { live && player.appearance.liveBadge !== false && <span className="wplus-live-stream-badge wplus-live-stream-badge--live">{ _x( 'Live', 'a stream on air', 'wordplus-live-stream' ) }</span> }
+            <RecMark />
+            <TestBadge />
+            { since !== null && <span className="wplus-live-stream-badge wplus-live-stream-top__time"><OnAir since={ since } /></span> }
+            { preview && <span className="wplus-live-stream-badge wplus-live-stream-badge--preview">{ _x( 'Preview', 'a host\'s own picture before going live', 'wordplus-live-stream' ) }</span> }
             { live && player.fullscreen && counted && (
-                <span className="estream-badge estream-top__count">
+                <span className="wplus-live-stream-badge wplus-live-stream-top__count">
                     <Icon name="eye" />
                     { sprintf( _nx( '%s watching', '%s watching', state.viewers, 'how many people watch', 'wordplus-live-stream' ), count( state.viewers ) ) }
                 </span>
             ) }
-            { player.fullscreen && player.title && player.appearance.title !== false && <span className={ 'estream-top__title' + ( props.shown ? '' : ' estream-top__title--hidden' ) }>{ player.title }</span> }
-            <span className="estream-bar__spacer" />
+            { player.fullscreen && player.title && player.appearance.title !== false && <span className={ 'wplus-live-stream-top__title' + ( props.shown ? '' : ' wplus-live-stream-top__title--hidden' ) }>{ player.title }</span> }
+            <span className="wplus-live-stream-bar__spacer" />
             { weak && state.tiles.length > 0 && (
-                <span className="estream-badge estream-top__weak" role="status">
+                <span className="wplus-live-stream-badge wplus-live-stream-top__weak" role="status">
                     <Icon name="signal" />
                     { __( 'Weak connection', 'wordplus-live-stream' ) }
                 </span>
@@ -509,7 +542,7 @@ function MutedByHost( props : { at : number | null } ){
     if( props.at === null || now - props.at >= MUTED_SHOWN_MS ) return null;
 
     return (
-        <div className="estream-reconnecting" role="status">
+        <div className="wplus-live-stream-reconnecting" role="status">
             <Icon name="mic-off" />
             { __( 'The host muted your microphone', 'wordplus-live-stream' ) }
         </div>
@@ -517,7 +550,7 @@ function MutedByHost( props : { at : number | null } ){
 }
 
 // Where a logo was let go where it moves (a settings page's preview, a studio that places it), which the page hears as
-// `estream-logo-move` on its element: the corner nearest it, and its distance from that corner's side and from its top
+// `wplus-live-stream-logo-move` on its element: the corner nearest it, and its distance from that corner's side and from its top
 // or bottom, in per cent of the picture's width and height, to a tenth.
 export interface LogoPlace {
     position : 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right';
@@ -525,7 +558,7 @@ export interface LogoPlace {
     y : number;
 }
 
-// How wide a logo was made with its handle where it moves, which the page hears as `estream-logo-size` on its element,
+// How wide a logo was made with its handle where it moves, which the page hears as `wplus-live-stream-logo-size` on its element,
 // in per cent of the picture's width, to a tenth.
 export interface LogoSize {
     width : number;
@@ -535,7 +568,7 @@ export interface LogoSize {
 const tenth = ( value : number ) => Math.round( value * 10 ) / 10;
 
 // The main picture's video: alone on the stage, or the one beside the strip of the others, never a camera in a corner.
-const MAIN_VIDEO = '.estream-tiles--n1 > .estream-tile > video, .estream-tiles__main video';
+const MAIN_VIDEO = '.wplus-live-stream-tiles--n1 > .wplus-live-stream-tile > video, .wplus-live-stream-tiles__main video';
 
 // Where the picture shows in the stage, in the stage's own pixels, and how far its foot is above the stage's: the main
 // video without the bars a picture of another shape leaves at its sides (a screen not the player's shape, the player in
@@ -559,7 +592,7 @@ function pictureBox( stage : HTMLElement, video : HTMLVideoElement ) : PictureBo
     let height = v.height / scale;
 
     // Shown whole, it leaves bars at its sides, or above and below it, where its shape isn't its tile's.
-    if( video.classList.contains( 'estream-video--contain' ) && video.videoWidth > 0 && video.videoHeight > 0 && width > 0 && height > 0 ){
+    if( video.classList.contains( 'wplus-live-stream-video--contain' ) && video.videoWidth > 0 && video.videoHeight > 0 && width > 0 && height > 0 ){
         const ratio = video.videoWidth / video.videoHeight;
         if( width / height > ratio ){
             left += ( width - height * ratio ) / 2;
@@ -692,7 +725,7 @@ function Logo( props : { logo : NonNullable<ReturnType<typeof logoOf>>, movable 
             setWidth( null );
             if( next === null ) return;
             setSized( next );
-            ref.current?.dispatchEvent( new CustomEvent<LogoSize>( 'estream-logo-size', { bubbles: true, detail: { width: next } } ) );
+            ref.current?.dispatchEvent( new CustomEvent<LogoSize>( 'wplus-live-stream-logo-size', { bubbles: true, detail: { width: next } } ) );
         },
         onPointerCancel: () => {
             sizing.current = null;
@@ -733,7 +766,7 @@ function Logo( props : { logo : NonNullable<ReturnType<typeof logoOf>>, movable 
                 y: away( bottom ? p.room.height - p.top - p.own.height : p.top, p.room.height )
             };
             setPlaced( place );
-            ref.current?.dispatchEvent( new CustomEvent<LogoPlace>( 'estream-logo-move', { bubbles: true, detail: place } ) );
+            ref.current?.dispatchEvent( new CustomEvent<LogoPlace>( 'wplus-live-stream-logo-move', { bubbles: true, detail: place } ) );
         },
         onPointerCancel: () => {
             grab.current = null;
@@ -742,10 +775,10 @@ function Logo( props : { logo : NonNullable<ReturnType<typeof logoOf>>, movable 
     } : {};
 
     const style : Record<string, string | number> = { width: ( width ?? logo.width ) + '%' };
-    if( logo.x !== null ) style[ '--estream-logo-x' ] = logo.x + '%';
-    if( logo.y !== null ) style[ '--estream-logo-y' ] = logo.y + '%';
+    if( logo.x !== null ) style[ '--wplus-live-stream-logo-x' ] = logo.x + '%';
+    if( logo.y !== null ) style[ '--wplus-live-stream-logo-y' ] = logo.y + '%';
     if( at ) Object.assign( style, { left: at.left, top: at.top, right: 'auto', bottom: 'auto', transition: 'none' } );
-    const className = 'estream-logo estream-logo--' + logo.position + ( logo.x !== null ? ' estream-logo--x' : '' ) + ( logo.y !== null ? ' estream-logo--y' : '' );
+    const className = 'wplus-live-stream-logo wplus-live-stream-logo--' + logo.position + ( logo.x !== null ? ' wplus-live-stream-logo--x' : '' ) + ( logo.y !== null ? ' wplus-live-stream-logo--y' : '' );
 
     if( ! props.movable ){
         return <img ref={ ref as RefObject<HTMLImageElement> } className={ className } src={ logo.src } alt="" style={ { ...style, opacity: logo.opacity } as CSSProperties } draggable={ false } />;
@@ -755,9 +788,9 @@ function Logo( props : { logo : NonNullable<ReturnType<typeof logoOf>>, movable 
     // logo, and says how it moves.
     const tip = __( 'Drag the logo to place it. Pull its round handle to size it.', 'wordplus-live-stream' );
     return (
-        <span ref={ ref } className={ className + ' estream-logo--movable' + ( width !== null ? ' estream-logo--sizing' : '' ) } style={ style as CSSProperties } role="img" aria-label={ tip } data-estream-tip={ tip } { ...handlers }>
-            <img className="estream-logo__image" src={ logo.src } alt="" style={ { opacity: logo.opacity } } draggable={ false } />
-            <span className={ 'estream-logo__size estream-logo__size--' + ( top ? 'bottom-' : 'top-' ) + ( right ? 'left' : 'right' ) } aria-hidden="true" { ...sizeHandlers } />
+        <span ref={ ref } className={ className + ' wplus-live-stream-logo--movable' + ( width !== null ? ' wplus-live-stream-logo--sizing' : '' ) } style={ style as CSSProperties } role="img" aria-label={ tip } data-wplus-live-stream-tip={ tip } { ...handlers }>
+            <img className="wplus-live-stream-logo__image" src={ logo.src } alt="" style={ { opacity: logo.opacity } } draggable={ false } />
+            <span className={ 'wplus-live-stream-logo__size wplus-live-stream-logo__size--' + ( top ? 'bottom-' : 'top-' ) + ( right ? 'left' : 'right' ) } aria-hidden="true" { ...sizeHandlers } />
         </span>
     );
 }
@@ -802,7 +835,7 @@ export function Stage( props : { scheduled? : number | null, studio? : boolean, 
         if( timer.current ) clearTimeout( timer.current );
         timer.current = setTimeout( () => {
             // Measured as it rests, the bar showing: hidden, it takes no pointer, so what is under the mouse says nothing.
-            const bar = stage.current?.querySelector( '.estream-bar' )?.getBoundingClientRect();
+            const bar = stage.current?.querySelector( '.wplus-live-stream-bar' )?.getBoundingClientRect();
             const at = mouse.current;
             if( bar && at && at.x >= bar.left && at.x < bar.right && at.y >= bar.top && at.y < bar.bottom ) return;
             setAwake( false );
@@ -829,9 +862,9 @@ export function Stage( props : { scheduled? : number | null, studio? : boolean, 
 
     // A touch on the picture while the controls rest lands under them, since they take no pointer then, and waking
     // them put a button where the finger was: the click that ended the touch pressed it, play, mute or full screen
-    // (Better Messages ticket 10500 sweep). So a click on the bar is a press of its own only when its touch began on it.
+    // (from a support report). So a click on the bar is a press of its own only when its touch began on it.
     const touchBegan = useRef<{ at : number, onBar : boolean } | null>( null );
-    const onBar = ( target : EventTarget | null ) => target instanceof Element && target.closest( '.estream-bar' ) !== null;
+    const onBar = ( target : EventTarget | null ) => target instanceof Element && target.closest( '.wplus-live-stream-bar' ) !== null;
     const onPointerDown = ( event : ReactPointerEvent ) => {
         if( event.pointerType === 'mouse' ) return;
         touchBegan.current = { at: Date.now(), onBar: onBar( event.target ) };
@@ -849,7 +882,7 @@ export function Stage( props : { scheduled? : number | null, studio? : boolean, 
     return (
         <div
             ref={ stage }
-            className={ 'estream-stage' + ( picture ? ' estream-stage--picture' : '' ) + ( shown ? '' : ' estream-stage--idle' ) }
+            className={ 'wplus-live-stream-stage' + ( picture ? ' wplus-live-stream-stage--picture' : '' ) + ( shown ? '' : ' wplus-live-stream-stage--idle' ) }
             tabIndex={ picture ? 0 : undefined }
             role="region"
             aria-label={ __( 'Live stream player', 'wordplus-live-stream' ) }
@@ -867,19 +900,19 @@ export function Stage( props : { scheduled? : number | null, studio? : boolean, 
             onPointerUp={ onPointerUp }
             onClickCapture={ onClickCapture }
             onDoubleClick={ ( e ) => {
-                if( picture && player.canFullscreen && ! ( e.target as HTMLElement ).closest( '.estream-bar, .estream-top' ) ) player.toggleFullscreen();
+                if( picture && player.canFullscreen && ! ( e.target as HTMLElement ).closest( '.wplus-live-stream-bar, .wplus-live-stream-top' ) ) player.toggleFullscreen();
             } }
             onFocus={ () => setFocused( true ) }
             onBlur={ ( e ) => { if( ! e.currentTarget.contains( e.relatedTarget as Node | null ) ) setFocused( false ); } }
         >
-            { cover && <div className="estream-cover" style={ { backgroundImage: 'url("' + cover + '")' } } aria-hidden="true" /> }
+            { cover && <div className="wplus-live-stream-cover" style={ { backgroundImage: 'url("' + cover + '")' } } aria-hidden="true" /> }
             { picture ? <TileInfoContext.Provider value={ props.tileInfo ?? null }><Tiles tiles={ state.tiles } /></TileInfoContext.Provider> : screen }
             <AudioTracks tiles={ state.tiles } />
             { player.appearance.floating !== false && <Floating /> }
             { logo && (
                 <div
-                    className="estream-logo-frame"
-                    style={ box ? { left: box.left, top: box.top, width: box.width, height: box.height, '--estream-picture-below': box.below + 'px' } as CSSProperties : undefined }
+                    className="wplus-live-stream-logo-frame"
+                    style={ box ? { left: box.left, top: box.top, width: box.width, height: box.height, '--wplus-live-stream-picture-below': box.below + 'px' } as CSSProperties : undefined }
                 >
                     <Logo logo={ logo } movable={ logoMoves } />
                 </div>
@@ -890,30 +923,30 @@ export function Stage( props : { scheduled? : number | null, studio? : boolean, 
                  nothing else would bring back before the picture. */ }
             { ( picture || player.fullscreen || player.chatHidden ) && ! props.bare && <Bar shown={ shown } /> }
             { player.countdown !== null && (
-                <div className="estream-going" role="status" aria-live="assertive">
-                    <span key={ player.countdown } className="estream-going__number">{ player.countdown }</span>
-                    <span className="estream-going__label">{ __( 'Going live', 'wordplus-live-stream' ) }</span>
+                <div className="wplus-live-stream-going" role="status" aria-live="assertive">
+                    <span key={ player.countdown } className="wplus-live-stream-going__number">{ player.countdown }</span>
+                    <span className="wplus-live-stream-going__label">{ __( 'Going live', 'wordplus-live-stream' ) }</span>
                 </div>
             ) }
             <MutedByHost at={ state.mutedByHost } />
             { state.offline ? (
-                <div className="estream-reconnecting" role="status"><Icon name="signal" />{ __( 'You are offline', 'wordplus-live-stream' ) }</div>
+                <div className="wplus-live-stream-reconnecting" role="status"><Icon name="signal" />{ __( 'You are offline', 'wordplus-live-stream' ) }</div>
             ) : state.media === 'reconnecting' && (
-                <div className="estream-reconnecting" role="status"><span className="estream-spinner estream-spinner--small" />{ __( 'Reconnecting…', 'wordplus-live-stream' ) }</div>
+                <div className="wplus-live-stream-reconnecting" role="status"><span className="wplus-live-stream-spinner wplus-live-stream-spinner--small" />{ __( 'Reconnecting…', 'wordplus-live-stream' ) }</div>
             ) }
             { picture && state.stalled && state.media === 'live' && ! state.offline && (
-                <div className="estream-buffering" role="status">
-                    <span className="estream-spinner" />
-                    <span className="estream-buffering__text">{ _x( 'The picture stopped. Waiting for it.', 'a stalled video, for screen readers', 'wordplus-live-stream' ) }</span>
+                <div className="wplus-live-stream-buffering" role="status">
+                    <span className="wplus-live-stream-spinner" />
+                    <span className="wplus-live-stream-buffering__text">{ _x( 'The picture stopped. Waiting for it.', 'a stalled video, for screen readers', 'wordplus-live-stream' ) }</span>
                 </div>
             ) }
             { slow && (
-                <div className="estream-slow" role="status">
+                <div className="wplus-live-stream-slow" role="status">
                     <Icon name="signal" />
-                    <p className="estream-slow__text">{ __( 'Your connection is too slow for the picture right now. The sound goes on.', 'wordplus-live-stream' ) }</p>
-                    <div className="estream-slow__actions">
-                        { unmute && <button type="button" className="estream-slow__button" onClick={ soundOn }><Icon name="volume-off" />{ __( 'Turn sound on', 'wordplus-live-stream' ) }</button> }
-                        <button type="button" className="estream-slow__button" onClick={ () => client.retryPicture() }>
+                    <p className="wplus-live-stream-slow__text">{ __( 'Your connection is too slow for the picture right now. The sound goes on.', 'wordplus-live-stream' ) }</p>
+                    <div className="wplus-live-stream-slow__actions">
+                        { unmute && <button type="button" className="wplus-live-stream-slow__button" onClick={ soundOn }><Icon name="volume-off" />{ __( 'Turn sound on', 'wordplus-live-stream' ) }</button> }
+                        <button type="button" className="wplus-live-stream-slow__button" onClick={ () => client.retryPicture() }>
                             { _x( 'Try again', 'the picture, on a slow connection', 'wordplus-live-stream' ) }
                         </button>
                     </div>
@@ -921,7 +954,7 @@ export function Stage( props : { scheduled? : number | null, studio? : boolean, 
             ) }
             { picture && <StatsPanel /> }
             { unmute && ! slow && (
-                <button type="button" className="estream-unmute" onClick={ soundOn }>
+                <button type="button" className="wplus-live-stream-unmute" onClick={ soundOn }>
                     <Icon name="volume-off" />
                     { __( 'Turn sound on', 'wordplus-live-stream' ) }
                 </button>

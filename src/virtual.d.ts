@@ -9,3 +9,9 @@ declare module "virtual:streams-css" {
     const css: string;
     export default css;
 }
+
+// The recording player's stylesheet (recording.css), which the build hands the recording element's entry as text.
+declare module "virtual:recording-css" {
+    const css: string;
+    export default css;
+}

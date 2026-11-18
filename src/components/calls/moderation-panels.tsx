@@ -1,13 +1,19 @@
-import React, { createContext, useContext, useEffect, useLayoutEffect, useRef, useState, type ReactNode, type RefObject } from "react";
+import React, { createContext, useCallback, useContext, useEffect, useLayoutEffect, useRef, useState, type ReactNode, type RefObject } from "react";
 import { _x } from "../../inc/globals.ts";
 import { CallContext, type CallContextInterface, type CallParticipant } from "./context.ts";
 import { moderates, useModerationActs } from "./moderation.ts";
 import usePendingActions from "../../inc/calls/pending.ts";
 import Tooltip from "../helpers/tooltip.tsx";
-import Icon, { type IconName } from "../../primitives/icon.tsx";
+import Icon, { type IconName } from "../../primitives/icons.tsx";
 import UserAvatar from "../users/user-avatar.tsx";
 import { host } from "../../host.ts";
 import { handSoundOn, joinAlertsOn, keepHandSound, keepJoinAlerts } from "./host-toasts.tsx";
+import { PinsContext, SPOTLIGHT_MOST, spotlightFull, spotlitKeys, useSpotlightActs } from "./spotlight.tsx";
+import { RecordingLayerContext, recordingOn, startNote } from "./recording.tsx";
+import { useTurnOnAskActs } from "./ask-prompt.tsx";
+import { usePinOffered } from "./layout-choice.tsx";
+import { useKeyHint } from "./call-keys.tsx";
+import type { CallShortcut } from "../../inc/calls/keys.ts";
 
 /**
  * A moderator's controls, spelled out: the room's (Host Controls in the dock) and one person's (the ⋯ on their tile),
@@ -16,20 +22,36 @@ import { handSoundOn, joinAlertsOn, keepHandSound, keepJoinAlerts } from "./host
  * nothing on the tile but the corner chip of someone who never turned theirs on.
  *
  * The group video and audio layouts keep which menu is open and hand it to their tiles through
- * ModerationPanelContext: 'room', a tile's key, or null. The menus are drawn in the layout's own box (`stage`), which
- * places them beside their button and keeps them inside it, as a tile or the dock can't: a small tile or the stage's
- * floor would cut a menu off.
+ * ModerationPanelContext: 'room', a tile's key, or null, and for a person's menu whether it was opened from their tile
+ * or their row in the People list (people-panel.tsx), where it opens. The menus are drawn in the layout's own box
+ * (`stage`), which places them beside their button and keeps them inside it, as a tile or the dock can't: a small tile
+ * or the stage's floor would cut a menu off.
  */
 export type ModerationPanel = 'room' | string | null;
 
+/** Where a person's menu was opened from: the ⋯ on their tile, or the ⋯ on their row in the People list. */
+export type ModerationPanelFrom = 'tile' | 'people';
+
 export const ModerationPanelContext = createContext<{
     panel: ModerationPanel,
-    setPanel: ( panel: ModerationPanel ) => void,
+    setPanel: ( panel: ModerationPanel, from?: ModerationPanelFrom ) => void,
+    from?: ModerationPanelFrom,
 }>( { panel: null, setPanel: () => {} } );
 
-/** Whether the call takes any of the room's acts, which is when a moderator is offered Host Controls. */
-export function roomModerated( moderation: CallContextInterface['moderation'] ): boolean {
-    return [ 'mute_all', 'lock_room', 'set_broadcast_mode', 'set_participatory_mode', 'end_call' ].some( ( act ) => moderates( moderation, act ) );
+/** Which menu is open and where a person's was opened from, as a group layout keeps them for ModerationPanelContext. */
+export function useModerationPanel() {
+    const [ open, setOpen ] = useState<{ panel: ModerationPanel, from: ModerationPanelFrom }>( { panel: null, from: 'tile' } );
+    const setPanel = useCallback( ( panel: ModerationPanel, from: ModerationPanelFrom = 'tile' ) => setOpen( { panel, from } ), [] );
+    const close = useCallback( () => setOpen( ( was ) => ( { panel: null, from: was.from } ) ), [] );
+    return { panel: open.panel, from: open.from, setPanel, close };
+}
+
+/**
+ * Whether the call takes any of the room's acts, which is when a moderator is offered Host Controls: Record among them,
+ * where the call's recording says they may.
+ */
+export function roomModerated( moderation: CallContextInterface['moderation'], recording?: CallContextInterface['recording'] ): boolean {
+    return !! recording?.can || [ 'mute_all', 'lock_room', 'set_broadcast_mode', 'set_participatory_mode', 'end_call' ].some( ( act ) => moderates( moderation, act ) );
 }
 
 /**
@@ -60,7 +82,7 @@ export function personState( participant: CallParticipant, moderation: CallConte
 
 // A user of the app by their tile's key: their id of digits as a number, as Better Messages has it, any other as it is,
 // and the user's own for their own tile.
-function userIdOf( tileKey: string ): number | string {
+export function userIdOf( tileKey: string ): number | string {
     if ( ! tileKey.startsWith( 'user_' ) ) return host().currentUserId();
     const id = tileKey.substring( 5 );
     return /^[1-9][0-9]*$/.test( id ) ? Number( id ) : id;
@@ -138,14 +160,19 @@ export function MicLockedChip() {
     </Tooltip>;
 }
 
-/** The ⋯ on a tile that opens its person's panel, for a moderator. */
-export function ManageParticipant( { tileKey, participant }: { tileKey: string, participant: CallParticipant } ) {
-    const { panel, setPanel } = useContext( ModerationPanelContext );
-    const open = panel === tileKey;
+/**
+ * The ⋯ on a tile that opens its person's panel, for a moderator, after what the tile puts beside it (`children`: Pin
+ * for Me, spotlight.tsx). `shown` keeps the row on show without a hover, as for a pinned tile.
+ */
+export function ManageParticipant( { tileKey, participant, children, shown }: { tileKey: string, participant: CallParticipant, children?: ReactNode, shown?: boolean } ) {
+    const { panel, setPanel, from } = useContext( ModerationPanelContext );
+    // Their menu opened from their row in the People list is the list's: a press here moves it to the tile.
+    const open = panel === tileKey && from !== 'people';
 
-    return <span className="wplus-admin-controls" data-open={ open ? 1 : undefined }>
+    return <span className="wplus-admin-controls" data-open={ open || shown ? 1 : undefined }>
+        { children }
         <Tooltip content={_x('Manage Participant', 'Call Moderation', 'bp-better-messages')}>
-            <span onClick={ () => setPanel( open ? null : tileKey ) } className="wplus-manage-participant" data-active={ open ? 1 : undefined } aria-expanded={ open } data-name={ participant.name }>
+            <span onClick={ () => setPanel( open ? null : tileKey, 'tile' ) } className="wplus-manage-participant" data-active={ open ? 1 : undefined } aria-expanded={ open } data-name={ participant.name }>
                 <Icon name="more" size={ 14 } />
             </span>
         </Tooltip>
@@ -153,18 +180,22 @@ export function ManageParticipant( { tileKey, participant }: { tileKey: string, 
 }
 
 /**
- * Whether a moderator has anything to do on this tile: pin it (a video tile: an audio roster pins nobody), or for
- * anyone else, any of the person's acts.
+ * Whether a moderator has anything to do on this tile: spotlight it for everyone (a video tile: an audio roster has no
+ * main tiles), or for anyone else, any of the person's acts.
  */
 export function tileModerated( moderation: CallContextInterface['moderation'], tileKey: string, type: 'audio' | 'video' ): boolean {
-    if ( type === 'video' && moderates( moderation, 'pin_participant' ) ) return true;
+    if ( type === 'video' && ( moderates( moderation, 'spotlight_participant' ) || moderates( moderation, 'pin_participant' ) ) ) return true;
     if ( tileKey === 'me' ) return false;
     return [ 'mute_mic', 'mute_participant', 'remove_participant' ].some( ( act ) => moderates( moderation, act ) );
 }
 
 // The buttons that open a menu: a press on one is theirs to handle (open another, or close this one), not a press
 // outside that closes it.
-const TOGGLES = '.wplus-manage-participant, .wplus-host-controls';
+const TOGGLES = '.wplus-manage-participant, .wplus-host-controls, .wplus-call-people-more';
+
+// The People list standing as a column at the stage's end edge (people-panel.tsx): a menu held to that edge as the
+// dock is stands at the column's start edge instead, over the tiles rather than over the list.
+const COLUMN = '.wplus-call-people[data-mode="column"]';
 
 // Between a menu and its button, and the least clearance from the stage's edges.
 const GAP = 6;
@@ -183,9 +214,10 @@ interface Place {
  * A menu in the stage beside its button: on the side asked where it fits, or on the side with more room, aligned to
  * the button's start or end edge, or held to the stage's end edge as the dock is (`stage-end`), moved in from the
  * stage's edges, and no taller than the side's room (scrolling the rest). Placed again as the stage or the tiles move.
- * `anchor`: what it opens beside, by selectors tried in turn. Escape and a press outside close it.
+ * `anchor`: what it opens beside, by selectors tried in turn. Escape and a press outside close it, but for one on
+ * `keep`, the button that toggles it where that is none of TOGGLES. The dock's More is one too (call-dock.tsx).
  */
-function Popover( { stage, anchor, side, align, label, className, close, children }: {
+export function CallPopover( { stage, anchor, side, align, label, className, close, keep, children }: {
     stage: RefObject<HTMLElement | null>,
     anchor: string[],
     side: 'above' | 'below',
@@ -193,6 +225,7 @@ function Popover( { stage, anchor, side, align, label, className, close, childre
     label: string,
     className: string,
     close: () => void,
+    keep?: string,
     children: ReactNode,
 } ) {
     const box = useRef<HTMLDivElement>( null );
@@ -220,8 +253,9 @@ function Popover( { stage, anchor, side, align, label, className, close, childre
         const shown = Math.min( height, room );
 
         const start = ( align === 'start' ) !== rtl;
+        const column = root.querySelector<HTMLElement>( COLUMN )?.offsetWidth ?? 0;
         const left = align === 'stage-end'
-            ? Math.max( EDGE, rtl ? DOCK_EDGE : s.width - width - DOCK_EDGE )
+            ? Math.max( EDGE, rtl ? DOCK_EDGE + column : s.width - width - DOCK_EDGE - column )
             : Math.max( EDGE, Math.min( s.width - width - EDGE, ( start ? a.left : a.right - width ) - s.left ) );
         const top = up ? a.top - s.top - GAP - shown : a.bottom - s.top + GAP;
 
@@ -249,9 +283,11 @@ function Popover( { stage, anchor, side, align, label, className, close, childre
             event.stopPropagation();
             closeRef.current();
         };
+        // What was pressed, from the path: in a shadow root (the elements script's) the document is told the root's
+        // host, so a press on a row was outside the menu, which went before the row's click.
         const onPress = ( event: PointerEvent ) => {
-            const target = event.target as Element | null;
-            if ( ! target || box.current?.contains( target ) || target.closest?.( TOGGLES ) ) return;
+            const target = ( event.composedPath?.()[ 0 ] ?? event.target ) as Element | null;
+            if ( ! target || box.current?.contains( target ) || target.closest?.( TOGGLES ) || ( keep && target.closest?.( keep ) ) ) return;
             closeRef.current();
         };
         document.addEventListener( 'keydown', onKey, true );
@@ -288,28 +324,37 @@ interface RowProps {
     checked?: boolean,
     danger?: boolean,
     highlight?: boolean,
+    // Can't be done now, which the note says why: drawn dimmed, and a press does nothing.
+    disabled?: boolean,
+    // One of a choice, as the Layout menu's (layout-choice.tsx): `checked` drawn as a radio, not a switch.
+    radio?: boolean,
+    // The call's key that does what the row does (call-keys.tsx), shown at its end while the keys listen.
+    keys?: CallShortcut,
 }
 
 // A row is a span with a menu item's role and keys, not a <button>: inside the messenger a site's and Better Messages'
 // own resets style every button with !important (no padding, no corners, no background, the colour inherited), which
 // laid the rows flat against the menu's edge and turned Remove from Call white. The call's other controls are spans
-// for the same reason (helpers/tooltip.tsx).
-function Row( { icon, label, note, className, busy, onClick, checked, danger, highlight }: RowProps ) {
+// for the same reason (helpers/tooltip.tsx). The People list's own rows for the room are these too (people-panel.tsx).
+export function ModerationRow( { icon, label, note, className, busy, onClick, checked, danger, highlight, disabled, radio, keys }: RowProps ) {
     const toggle = checked !== undefined;
+    const hint = useKeyHint( keys );
 
     return <span
         className={ 'wplus-call-moderation-row ' + className + ( danger ? ' wplus-call-moderation-danger' : '' ) + ( highlight ? ' wplus-call-moderation-highlight' : '' ) }
-        role={ toggle ? 'menuitemcheckbox' : 'menuitem' }
+        role={ radio ? 'menuitemradio' : toggle ? 'menuitemcheckbox' : 'menuitem' }
         tabIndex={ 0 }
         aria-checked={ toggle ? checked : undefined }
+        aria-disabled={ disabled ? true : undefined }
         aria-label={ label }
+        aria-keyshortcuts={ hint?.aria }
         data-busy={ busy ? 1 : undefined }
         data-on={ checked ? 1 : undefined }
-        onClick={ onClick }
+        onClick={ disabled ? undefined : onClick }
         onKeyDown={ ( event ) => {
             if ( event.key !== 'Enter' && event.key !== ' ' && event.key !== 'Spacebar' ) return;
             event.preventDefault();
-            onClick();
+            if ( ! disabled ) onClick();
         } }
     >
         <span className="wplus-call-moderation-icon" aria-hidden="true">
@@ -319,22 +364,51 @@ function Row( { icon, label, note, className, busy, onClick, checked, danger, hi
             <span className="wplus-call-moderation-label">{ label }</span>
             { note && <span className="wplus-call-moderation-note">{ note }</span> }
         </span>
-        { toggle && <span className="wplus-call-moderation-switch" aria-hidden="true" /> }
+        { hint && <span className="wplus-call-key-hint" aria-hidden="true">{ hint.name }</span> }
+        { toggle && <span className={ radio ? 'wplus-call-moderation-radio' : 'wplus-call-moderation-switch' } aria-hidden="true" /> }
     </span>;
 }
 
 /**
+ * Mute Everyone, as Host Controls and the People list offer it: whether the call takes it, whether it is on, its
+ * request out, and the press, which mutes, or lets back on, everyone else's microphone but the moderators' and flips
+ * once its request succeeds. One request at a time, whichever of the two it was pressed in.
+ */
+export function useMuteEveryone() {
+    const { callInfo, moderate, moderation, participants, roomMuted, setRoomMuted } = useContext<CallContextInterface>( CallContext );
+    const [ isPending, run ] = usePendingActions();
+    // Whose microphones it mutes and lets back on: everyone else but the moderators.
+    const others = Array.from( participants.entries() ).filter( ( [ key, p ] ) => key !== 'me' && ! p.canAdmin ).map( ( [ , p ] ) => p.identity );
+
+    return {
+        offered: moderates( moderation, roomMuted ? 'unmute_all' : 'mute_all' ),
+        on: roomMuted,
+        busy: isPending( 'room-mute' ),
+        toggle: () => run( 'room-mute', async () => {
+            try {
+                await moderate( { act: roomMuted ? 'unmute_all' : 'mute_all', type: callInfo.type, identities: others } );
+                setRoomMuted( ! roomMuted );
+            } catch ( e ) {
+                host().showError( e );
+            }
+        } ),
+    };
+}
+
+/**
  * The room's rules for a moderator: everyone's microphone, the lock, broadcast mode, lowering every raised hand while
- * one is up, the sound of a raised hand and the toasts of who joined on this device (host-toasts.tsx), and ending the
+ * one is up, clearing the spotlight while anyone is in it (spotlight.tsx), the sound of a raised hand and the toasts of
+ * who joined on this device (host-toasts.tsx), and ending the
  * call for everyone, asked again in the app's dialog (UiHost.confirm) before it goes. Each rule flips once its request
  * succeeds, as the dock's buttons did.
  */
 export function RoomPanel( { stage, close }: { stage: RefObject<HTMLElement | null>, close: () => void } ) {
     const {
         callInfo, moderate, moderation, participants,
-        roomMuted, setRoomMuted, roomLocked, setRoomLocked,
-        callMode, setCallMode, lowerAllHands, endForEveryone,
+        roomLocked, setRoomLocked,
+        callMode, setCallMode, lowerAllHands, endForEveryone, spotlight, recording,
     } = useContext<CallContextInterface>( CallContext );
+    const recordingLayer = useContext( RecordingLayerContext );
     const [ isPending, run ] = usePendingActions();
     const [ handSound, setHandSound ] = useState( handSoundOn );
     const [ joinAlerts, setJoinAlerts ] = useState( joinAlertsOn );
@@ -367,28 +441,26 @@ export function RoomPanel( { stage, close }: { stage: RefObject<HTMLElement | nu
 
     const broadcast = callMode === 'broadcast';
     const handsUp = Array.from( participants.values() ).some( ( p ) => p.handRaised );
-    // Whose microphones Mute Everyone mutes and lets back on: everyone else but the moderators.
-    const others = Array.from( participants.entries() ).filter( ( [ key, p ] ) => key !== 'me' && ! p.canAdmin ).map( ( [ , p ] ) => p.identity );
+    const muteAll = useMuteEveryone();
+    const spot = useSpotlightActs();
+    const spotlit = spotlitKeys( participants, spotlight );
 
     const title = _x('Host Controls', 'Call Moderation', 'bp-better-messages');
 
     // Above the dock, against the stage's end edge where the dock ends too, the same on a phone and a desktop.
-    return <Popover stage={ stage } anchor={ [ '.wplus-group-call-controls-buttons', '.wplus-host-controls' ] } side="above" align="stage-end" label={ title } close={ close } className="wplus-call-moderation wplus-call-moderation-room">
+    return <CallPopover stage={ stage } anchor={ [ '.wplus-group-call-controls-buttons', '.wplus-host-controls' ] } side="above" align="stage-end" label={ title } close={ close } className="wplus-call-moderation wplus-call-moderation-room">
         <div className="wplus-call-moderation-head">
             <span className="wplus-call-moderation-badge" aria-hidden="true"><Icon name="shield" size={ 16 } /></span>
             <span className="wplus-call-moderation-title">{ title }</span>
         </div>
-        { moderates( moderation, roomMuted ? 'unmute_all' : 'mute_all' ) &&
-            <Row icon="micOff" className="wplus-room-mute" checked={ roomMuted } busy={ isPending( 'room-mute' ) }
+        { muteAll.offered &&
+            <ModerationRow icon="micOff" className="wplus-room-mute" checked={ muteAll.on } busy={ muteAll.busy }
                 label={_x('Mute Everyone', 'Call Moderation', 'bp-better-messages')}
                 note={_x('Microphones stay off until you allow them again. Cameras and screens keep going.', 'Call Moderation', 'bp-better-messages')}
-                onClick={ () => act( 'room-mute', async () => {
-                    await moderate( { act: roomMuted ? 'unmute_all' : 'mute_all', type: callInfo.type, identities: others } );
-                    setRoomMuted( ! roomMuted );
-                } ) } /> }
+                onClick={ muteAll.toggle } /> }
 
         { moderates( moderation, roomLocked ? 'unlock_room' : 'lock_room' ) &&
-            <Row icon="lock" className="wplus-room-lock" checked={ roomLocked } busy={ isPending( 'room-lock' ) }
+            <ModerationRow icon="lock" className="wplus-room-lock" checked={ roomLocked } busy={ isPending( 'room-lock' ) }
                 label={_x('Lock Room', 'Group Video Chat', 'bp-better-messages')}
                 note={_x('Nobody else can join.', 'Call Moderation', 'bp-better-messages')}
                 onClick={ () => act( 'room-lock', async () => {
@@ -397,13 +469,13 @@ export function RoomPanel( { stage, close }: { stage: RefObject<HTMLElement | nu
                 } ) } /> }
 
         { moderates( moderation, broadcast ? 'set_participatory_mode' : 'set_broadcast_mode' ) &&
-            <Row icon="megaphone" className="wplus-room-broadcast" checked={ broadcast } busy={ isPending( 'mode' ) }
+            <ModerationRow icon="megaphone" className="wplus-room-broadcast" checked={ broadcast } busy={ isPending( 'mode' ) }
                 label={_x('Broadcast Mode', 'Call Moderation', 'bp-better-messages')}
                 note={_x('Only speakers can turn on a camera or microphone. Everyone else watches and can raise a hand.', 'Call Moderation', 'bp-better-messages')}
                 onClick={ () => run( 'mode', () => setCallMode( broadcast ? 'participatory' : 'broadcast' ) ) } /> }
 
         { ( broadcast || moderates( moderation, 'raise_hand' ) ) &&
-            <Row icon="bell" className="wplus-room-hand-sound" checked={ handSound } busy={ false }
+            <ModerationRow icon="bell" className="wplus-room-hand-sound" checked={ handSound } busy={ false }
                 label={_x('Sound for Raised Hands', 'Call Moderation', 'bp-better-messages')}
                 note={_x('A short sound when someone raises a hand, on this device.', 'Call Moderation', 'bp-better-messages')}
                 onClick={ () => {
@@ -411,7 +483,7 @@ export function RoomPanel( { stage, close }: { stage: RefObject<HTMLElement | nu
                     setHandSound( ! handSound );
                 } } /> }
 
-        <Row icon="userPlus" className="wplus-room-join-alerts" checked={ joinAlerts } busy={ false }
+        <ModerationRow icon="userPlus" className="wplus-room-join-alerts" checked={ joinAlerts } busy={ false }
             label={_x('Join Alerts', 'Call Moderation', 'bp-better-messages')}
             note={_x('A toast when someone joins the call, on this device.', 'Call Moderation', 'bp-better-messages')}
             onClick={ () => {
@@ -421,35 +493,73 @@ export function RoomPanel( { stage, close }: { stage: RefObject<HTMLElement | nu
 
         { handsUp && <>
             <span className="wplus-call-moderation-divider" role="separator" />
-            <Row icon="raisehand" className="wplus-lower-all-hands" busy={ isPending( 'hands' ) }
+            <ModerationRow icon="raisehand" className="wplus-lower-all-hands" busy={ isPending( 'hands' ) }
                 label={_x('Lower All Hands', 'Group Video Chat', 'bp-better-messages')}
                 onClick={ () => run( 'hands', lowerAllHands ) } />
         </> }
 
+        {/* An act, not a rule of the room: it asks first in the call's own dialog (recording.tsx), and the pill at the
+            top of the call stops it too. */}
+        { recording?.can && <>
+            <span className="wplus-call-moderation-divider" role="separator" />
+            { recordingOn( recording )
+                ? <ModerationRow icon="record" className="wplus-room-record" danger busy={ recording.state === 'starting' } keys="record"
+                    label={_x('Stop Recording', 'Call recording', 'bp-better-messages')}
+                    note={_x('Asks you first. It is ready to watch a few minutes later.', 'Call recording', 'bp-better-messages')}
+                    onClick={ () => {
+                        if ( recording.state !== 'on' ) return;
+                        close();
+                        recordingLayer.confirm( 'stop' );
+                    } } />
+                : <ModerationRow icon="record" className="wplus-room-record" busy={ recording.state === 'stopping' } keys="record"
+                    label={_x('Start Recording', 'Call recording', 'bp-better-messages')}
+                    note={ startNote( recording ) }
+                    onClick={ () => {
+                        if ( recording.state !== 'off' ) return;
+                        close();
+                        recordingLayer.confirm( 'start' );
+                    } } /> }
+        </> }
+
+        { ( spotlit.length > 0 && spot.clears ) && <>
+            <span className="wplus-call-moderation-divider" role="separator" />
+            <ModerationRow icon="star" className="wplus-room-clear-spotlight" busy={ isPending( 'spotlight' ) }
+                label={_x('Clear Spotlight', 'Call Moderation', 'bp-better-messages')}
+                note={_x('Everyone sees the usual tiles again.', 'Call Moderation', 'bp-better-messages')}
+                onClick={ () => run( 'spotlight', spot.clear ) } />
+        </> }
+
         { ( endForEveryone && moderates( moderation, 'end_call' ) ) && <>
             <span className="wplus-call-moderation-divider" role="separator" />
-            <Row icon="logout" className="wplus-room-end" danger busy={ false }
+            <ModerationRow icon="logout" className="wplus-room-end" danger busy={ false }
                 label={_x('End for Everyone', 'Call Moderation', 'bp-better-messages')}
                 note={_x('Everyone leaves the call, you too.', 'Call Moderation', 'bp-better-messages')}
                 onClick={ () => void endCall( endForEveryone ) } />
         </> }
-    </Popover>;
+    </CallPopover>;
 }
 
 /**
- * One person's actions, for a moderator: pin them, and for anyone else their microphone, whether they may send at all
- * (a viewer or a speaker, by the call's mode), their raised hand, and removing them. Its second line says what is on
- * now. A row waits until the tile shows what it asked for (pending.ts), and the panel closes when they leave.
+ * One person's actions, for a moderator: on a video call the spotlight for everyone and their own Pin for Me
+ * (spotlight.tsx), and for anyone else their microphone, whether they may send at all (a viewer or a speaker, by the
+ * call's mode), their raised hand, and removing them. Its second line says what is on now. A row waits until the tile
+ * shows what it asked for (pending.ts), and the panel closes when they leave.
  */
-export function PersonPanel( { stage, tileKey, type, close }: { stage: RefObject<HTMLElement | null>, tileKey: string, type: 'audio' | 'video', close: () => void } ) {
+export function PersonPanel( { stage, tileKey, type, close, from = 'tile' }: { stage: RefObject<HTMLElement | null>, tileKey: string, type: 'audio' | 'video', close: () => void, from?: ModerationPanelFrom } ) {
     const {
-        participants, moderate, moderation, callMode, promoteParticipant, demoteParticipant, lowerHand,
+        participants, moderate, moderation, callMode, promoteParticipant, demoteParticipant, lowerHand, spotlight, banFromCalls,
     } = useContext<CallContextInterface>( CallContext );
     const participant = participants.get( tileKey );
     const { kickUser, muteUser, unmuteUser, muteMic, unmuteMic, pinUser, unpinUser } = useModerationActs( moderate, type );
+    const spot = useSpotlightActs();
+    const asks = useTurnOnAskActs();
+    const pins = useContext( PinsContext );
+    const pinOffered = usePinOffered()( tileKey );
+    const spotlit = spotlitKeys( participants, spotlight );
+    const inSpotlight = spotlit.includes( tileKey );
 
     const [ isPending, run ] = usePendingActions(
-        participant ? [ participant.isPinned, participant.canPublish, participant.micMuted, participant.handRaised ].join( '|' ) : 'gone'
+        participant ? [ participant.isPinned, inSpotlight, participant.canPublish, participant.micMuted, participant.handRaised ].join( '|' ) : 'gone'
     );
 
     useEffect( () => {
@@ -462,13 +572,26 @@ export function PersonPanel( { stage, tileKey, type, close }: { stage: RefObject
     const other = tileKey !== 'me';
     const broadcast = callMode === 'broadcast';
     const state = personState( participant, moderation );
-    const pins = type === 'video';
+    const video = type === 'video';
+    const full = spotlit.length >= SPOTLIGHT_MOST;
+    const pinnedHere = pins.pinned.has( tileKey );
     const removable = other && moderates( moderation, 'remove_participant' );
-    const anchor = `[data-key="${ tileKey.replace( /["\\]/g, '\\$&' ) }"] .wplus-manage-participant`;
+    const quoted = tileKey.replace( /["\\]/g, '\\$&' );
+    const onTile = `[data-key="${ quoted }"] .wplus-manage-participant`;
+    // From Participants: below the row's ⋯, toward the tiles, and at their tile should the list close under it.
+    const anchor = from === 'people' ? [ `.wplus-call-people [data-person="${ quoted }"] .wplus-call-people-more`, onTile ] : [ onTile ];
+    // What is off to ask for: their microphone, unless a moderator holds it off, and on a video call their camera. Both
+    // off, one row asks for both (asked on 2026-11-02: "i have 2 options and need to click both of them"), unless one
+    // of them was asked for alone a moment ago, when each keeps its own row.
+    const askMicrophone = other && participant.canPublish && asks.offered( 'microphone' ) && ! participant.audio && ! participant.micMuted;
+    const askCamera = other && video && participant.canPublish && asks.offered( 'camera' ) && ! participant.video && ! participant.videoPublished;
+    const askBoth = askMicrophone && askCamera && asks.offered( 'both' ) && asks.isAsked( identity, 'camera' ) === asks.isAsked( identity, 'microphone' );
+    // Whether they send anything a stop would take: their microphone, camera or screen.
+    const sending = !! ( participant.audio || participant.video || participant.videoPublished || participant.screen || participant.screenPublished || participant.screenAudio );
 
-    return <Popover stage={ stage } anchor={ [ anchor ] } side="below" align="start" label={ participant.name } close={ close } className="wplus-call-moderation wplus-call-moderation-person">
+    return <CallPopover stage={ stage } anchor={ anchor } side="below" align={ from === 'people' ? 'end' : 'start' } label={ participant.name } close={ close } className="wplus-call-moderation wplus-call-moderation-person">
         <div className="wplus-call-moderation-head">
-            <span className="wplus-call-moderation-avatar" aria-hidden="true"><UserAvatar user_id={ userIdOf( tileKey ) } size={ 32 } /></span>
+            <span className="wplus-call-moderation-avatar" aria-hidden="true"><UserAvatar user_id={ userIdOf( tileKey ) } size={ 32 } presence={ false } /></span>
             <span className="wplus-call-moderation-who">
                 <span className="wplus-call-moderation-title">{ participant.name }</span>
                 { state.length > 0 && <span className="wplus-call-moderation-state">
@@ -478,22 +601,60 @@ export function PersonPanel( { stage, tileKey, type, close }: { stage: RefObject
                 </span> }
             </span>
         </div>
-        { pins && ! participant.isPinned && moderates( moderation, 'pin_participant' ) &&
-            <Row icon="pin" className="wplus-pin-participant" busy={ isPending( 'pin' ) }
+        {/* Asking them to turn on what is off (ask-prompt.tsx), both at once where both are. "Asked…" for a while
+            after, with their answer under it once it comes. */}
+        { askBoth &&
+            <ModerationRow icon="video" className="wplus-ask-camera-microphone" busy={ asks.busy( identity, 'both' ) } disabled={ asks.isAsked( identity, 'both' ) }
+                label={ asks.isAsked( identity, 'both' ) ? _x('Asked…', 'Call Ask', 'bp-better-messages') : _x('Ask to Turn On Camera and Microphone', 'Call Ask', 'bp-better-messages') }
+                note={ asks.answered( identity, 'both', participant.name ) }
+                onClick={ () => void asks.ask( identity, 'both' ) } /> }
+        { askMicrophone && ! askBoth &&
+            <ModerationRow icon="mic" className="wplus-ask-microphone" busy={ asks.busy( identity, 'microphone' ) } disabled={ asks.isAsked( identity, 'microphone' ) }
+                label={ asks.isAsked( identity, 'microphone' ) ? _x('Asked…', 'Call Ask', 'bp-better-messages') : _x('Ask to Turn On Microphone', 'Call Ask', 'bp-better-messages') }
+                note={ asks.answered( identity, 'microphone', participant.name ) }
+                onClick={ () => void asks.ask( identity, 'microphone' ) } /> }
+        { askCamera && ! askBoth &&
+            <ModerationRow icon="video" className="wplus-ask-camera" busy={ asks.busy( identity, 'camera' ) } disabled={ asks.isAsked( identity, 'camera' ) }
+                label={ asks.isAsked( identity, 'camera' ) ? _x('Asked…', 'Call Ask', 'bp-better-messages') : _x('Ask to Turn On Camera', 'Call Ask', 'bp-better-messages') }
+                note={ asks.answered( identity, 'camera', participant.name ) }
+                onClick={ () => void asks.ask( identity, 'camera' ) } /> }
+
+        {/* The spotlight for everyone, the room's: where the call takes it, in place of the pin for everyone of
+            before, which the call keeps for a call that only pins. */}
+        { video && spot.offered && ! inSpotlight &&
+            <ModerationRow icon="star" className="wplus-spotlight-participant" busy={ isPending( 'spot' ) } disabled={ full }
+                label={_x('Spotlight for Everyone', 'Call Moderation', 'bp-better-messages')}
+                note={ full ? spotlightFull() : _x('Their tile is the main one for everyone in the call.', 'Call Moderation', 'bp-better-messages') }
+                onClick={ () => run( 'spot', () => spot.spotlight( identity ) ) } /> }
+        { video && spot.clears && inSpotlight &&
+            <ModerationRow icon="x" className="wplus-unspotlight-participant" busy={ isPending( 'spot' ) }
+                label={_x('Remove Spotlight', 'Call Moderation', 'bp-better-messages')}
+                onClick={ () => run( 'spot', () => spot.unspotlight( identity ) ) } /> }
+        { video && ! spot.offered && ! participant.isPinned && moderates( moderation, 'pin_participant' ) &&
+            <ModerationRow icon="pin" className="wplus-pin-participant" busy={ isPending( 'pin' ) }
                 label={_x('Pin Participant', 'Group Video Chat', 'bp-better-messages')}
                 onClick={ () => run( 'pin', () => pinUser( identity ) ) } /> }
-        { pins && participant.isPinned && moderates( moderation, 'unpin_participant' ) &&
-            <Row icon="pinOff" className="wplus-unpin-participant" busy={ isPending( 'pin' ) }
+        { video && ! spot.offered && participant.isPinned && moderates( moderation, 'unpin_participant' ) &&
+            <ModerationRow icon="pinOff" className="wplus-unpin-participant" busy={ isPending( 'pin' ) }
                 label={_x('Unpin Participant', 'Group Video Chat', 'bp-better-messages')}
                 onClick={ () => run( 'pin', () => unpinUser( identity ) ) } /> }
+        { video && pinOffered &&
+            <ModerationRow icon={ pinnedHere ? 'pinOff' : 'pin' } className="wplus-pin-for-me-row" busy={ false }
+                label={ pinnedHere ? _x('Unpin for Me', 'Call Moderation', 'bp-better-messages') : _x('Pin for Me', 'Call Moderation', 'bp-better-messages') }
+                onClick={ () => pins.toggle( tileKey ) } /> }
 
+        {/* A mute holds the microphone off until it is allowed: where it is off already, the row says that, as "Mute
+            Microphone" read as if it were on (asked on 2026-11-02: "shown even if user does not have them enabled and
+            this can create confusion"). Stop Camera and Microphone below likewise, both named in full as the asks above
+            name them. */}
         { other && participant.canPublish && <>
             { ! participant.micMuted && moderates( moderation, 'mute_mic' ) &&
-                <Row icon="micOff" className="wplus-mute-mic" busy={ isPending( 'mic' ) }
-                    label={_x('Mute Microphone', 'Group Video Chat', 'bp-better-messages')}
+                <ModerationRow icon="micOff" className="wplus-mute-mic" busy={ isPending( 'mic' ) }
+                    label={ participant.audio ? _x('Mute Microphone', 'Group Video Chat', 'bp-better-messages') : _x('Keep Microphone Off', 'Call Moderation', 'bp-better-messages') }
+                    note={ participant.audio ? undefined : _x('They cannot turn it on until you allow it.', 'Call Moderation', 'bp-better-messages') }
                     onClick={ () => run( 'mic', () => muteMic( identity ) ) } /> }
             { participant.micMuted && moderates( moderation, 'unmute_mic' ) &&
-                <Row icon="mic" className="wplus-allow-unmute" busy={ isPending( 'mic' ) }
+                <ModerationRow icon="mic" className="wplus-allow-unmute" busy={ isPending( 'mic' ) }
                     label={_x('Allow Microphone', 'Call Moderation', 'bp-better-messages')}
                     onClick={ () => run( 'mic', () => unmuteMic( identity ) ) } /> }
         </> }
@@ -501,11 +662,11 @@ export function PersonPanel( { stage, tileKey, type, close }: { stage: RefObject
         {/* A viewer or a speaker: in broadcast mode by promoting and demoting, otherwise by the right to send. */}
         { other && broadcast && ! participant.canAdmin && <>
             { participant.canPublish &&
-                <Row icon="arrowDown" className="wplus-demote-participant" busy={ isPending( 'speaker' ) }
+                <ModerationRow icon="arrowDown" className="wplus-demote-participant" busy={ isPending( 'speaker' ) }
                     label={_x('Demote to Viewer', 'Group Video Chat', 'bp-better-messages')}
                     onClick={ () => run( 'speaker', () => demoteParticipant( identity ) ) } /> }
             { ! participant.canPublish &&
-                <Row icon="arrowUp" className="wplus-promote-participant" busy={ isPending( 'speaker' ) } highlight={ participant.handRaised }
+                <ModerationRow icon="arrowUp" className="wplus-promote-participant" busy={ isPending( 'speaker' ) } highlight={ participant.handRaised }
                     label={_x('Promote to Speaker', 'Group Video Chat', 'bp-better-messages')}
                     onClick={ () => run( 'speaker', () => promoteParticipant( identity ) ) } /> }
         </> }
@@ -513,25 +674,32 @@ export function PersonPanel( { stage, tileKey, type, close }: { stage: RefObject
             screen) stopped, or let back on. An audio call has no camera to name, and keeps viewer and speaker. */}
         { other && ! broadcast && <>
             { participant.canPublish && moderates( moderation, 'mute_participant' ) &&
-                <Row icon={ type === 'video' ? 'videoOff' : 'arrowDown' } className="wplus-demote-participant" busy={ isPending( 'speaker' ) }
-                    label={ type === 'video' ? _x('Stop Camera & Mic', 'Call Moderation', 'bp-better-messages') : _x('Demote to Viewer', 'Group Video Chat', 'bp-better-messages') }
+                <ModerationRow icon={ type === 'video' ? 'videoOff' : 'arrowDown' } className="wplus-demote-participant" busy={ isPending( 'speaker' ) }
+                    label={ type !== 'video'
+                        ? _x('Demote to Viewer', 'Group Video Chat', 'bp-better-messages')
+                        : sending ? _x('Stop Camera and Microphone', 'Call Moderation', 'bp-better-messages') : _x('Keep Camera and Microphone Off', 'Call Moderation', 'bp-better-messages') }
+                    note={ type === 'video' && ! sending ? _x('They cannot turn them on until you allow them.', 'Call Moderation', 'bp-better-messages') : undefined }
                     onClick={ () => run( 'speaker', () => muteUser( identity ) ) } /> }
             { ! participant.canPublish && moderates( moderation, 'unmute_participant' ) &&
-                <Row icon={ type === 'video' ? 'video' : 'arrowUp' } className="wplus-promote-participant" busy={ isPending( 'speaker' ) } highlight={ participant.handRaised }
-                    label={ type === 'video' ? _x('Allow Camera & Mic', 'Call Moderation', 'bp-better-messages') : _x('Promote to Speaker', 'Group Video Chat', 'bp-better-messages') }
+                <ModerationRow icon={ type === 'video' ? 'video' : 'arrowUp' } className="wplus-promote-participant" busy={ isPending( 'speaker' ) } highlight={ participant.handRaised }
+                    label={ type === 'video' ? _x('Allow Camera and Microphone', 'Call Moderation', 'bp-better-messages') : _x('Promote to Speaker', 'Group Video Chat', 'bp-better-messages') }
                     onClick={ () => run( 'speaker', () => unmuteUser( identity ) ) } /> }
         </> }
 
         { other && participant.handRaised &&
-            <Row icon="raisehand" className="wplus-lower-participant-hand" busy={ isPending( 'hand' ) }
+            <ModerationRow icon="raisehand" className="wplus-lower-participant-hand" busy={ isPending( 'hand' ) }
                 label={_x('Lower Hand', 'Group Video Chat', 'bp-better-messages')}
                 onClick={ () => run( 'hand', () => lowerHand( identity ) ) } /> }
 
         { removable && <>
             <span className="wplus-call-moderation-divider" role="separator" />
-            <Row icon="userX" className="wplus-remove-participant" busy={ isPending( 'kick' ) } danger
+            <ModerationRow icon="userX" className="wplus-remove-participant" busy={ isPending( 'kick' ) } danger
                 label={_x('Remove from Call', 'Call Moderation', 'bp-better-messages')}
                 onClick={ () => run( 'kick', () => kickUser( identity ) ) } />
+            {/* The ban asks for how long in the app's own dialog (the context's `banFromCalls`), so the menu goes first. */}
+            { banFromCalls && <ModerationRow icon="ban" className="wplus-ban-participant" busy={ false } danger
+                label={_x('Remove and Ban from Calls…', 'Call Moderation', 'bp-better-messages')}
+                onClick={ () => { close(); banFromCalls( participant ); } } /> }
         </> }
-    </Popover>;
+    </CallPopover>;
 }

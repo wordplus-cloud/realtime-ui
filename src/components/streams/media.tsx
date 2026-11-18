@@ -82,7 +82,7 @@ export function VideoTrack( props : { track : AttachableTrack, mirrored? : boole
     return (
         <video
             ref={ ref }
-            className={ 'estream-video' + ( props.mirrored ? ' estream-video--mirrored' : '' ) + ( props.fit === 'contain' ? ' estream-video--contain' : '' ) }
+            className={ 'wplus-live-stream-video' + ( props.mirrored ? ' wplus-live-stream-video--mirrored' : '' ) + ( props.fit === 'contain' ? ' wplus-live-stream-video--contain' : '' ) }
             autoPlay
             playsInline
             muted
@@ -123,7 +123,7 @@ export function AudioTracks( props : { tiles : Tile[] } ){
     const { volume, muted, speaker } = usePlayer();
 
     return (
-        <div className="estream-audio" aria-hidden="true">
+        <div className="wplus-live-stream-audio" aria-hidden="true">
             { props.tiles.flatMap( ( tile ) => tile.audio.map( ( track ) => (
                 <AudioTrack key={ tile.identity + ( track.sid ?? track.mediaStreamTrack.id ) } track={ track } volume={ volume } muted={ muted } speaker={ speaker } />
             ) ) ) }

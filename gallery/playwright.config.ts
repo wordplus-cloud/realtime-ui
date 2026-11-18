@@ -1,11 +1,14 @@
 // The picture checks: gallery.spec.ts photographs every shot of the gallery in each theme and direction, at a
 // computer's width and a phone's, and compares each with its picture in gallery/pictures. `npm run gallery` checks,
-// `npm run gallery:update` takes the pictures again after a change meant to be seen.
+// `npm run gallery:update` takes the pictures again after a change meant to be seen. Beside them, what only a real
+// browser can say: entities.spec.ts reads every character reference, browser-info.spec.ts answers the questions about
+// the browser on Playwright's devices, markup.spec.ts draws the markup screens are given, and label.spec.ts names a
+// tooltip's control, as the libraries the kit used before did.
 import { defineConfig, devices } from '@playwright/test';
 
 export default defineConfig( {
     testDir: '.',
-    testMatch: 'gallery.spec.ts',
+    testMatch: [ 'gallery.spec.ts', 'entities.spec.ts', 'browser-info.spec.ts', 'markup.spec.ts', 'label.spec.ts' ],
     snapshotPathTemplate: '{testDir}/pictures/{projectName}/{arg}{ext}',
     fullyParallel: true,
     reporter: [ [ 'line' ] ],

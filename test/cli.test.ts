@@ -41,7 +41,10 @@ function olderOurs( dir: string, component: string, file: string, then: string, 
     if ( yoursToo ) writeFileSync( join( dir, 'components/wordplus', component, file ), then );
 }
 
-describe( 'npx @wordplus/realtime-ui', () => {
+// Each test starts the bin as a process of its own several times, 4 s alone for the slowest: in the whole suite, the
+// other files running beside it, a busy machine took it past the 20 s every test in-process has, and the SDK's import of
+// a commit stopped there.
+describe( 'npx @wordplus/realtime-ui', { timeout: 90_000 }, () => {
     it( 'copies a view with its tests, its imports the package\'s entries, and records each file', () => {
         const dir = app();
         const said = run( dir, 'add', 'chat' );

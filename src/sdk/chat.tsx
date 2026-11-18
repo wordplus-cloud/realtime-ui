@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ClipboardEvent, type DragEvent, type FormEvent, type KeyboardEvent } from "react";
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ClipboardEvent, type FormEvent, type KeyboardEvent } from "react";
 import { ActivityIndicator, Avatar } from "../components/presence/presence.tsx";
 import { DaySeparator, EmptyThread, MessageBody, MessageMeta, MessageStack, MessageText, MetaPieces, StatusTick, TypingPinned } from "../components/chat/message-parts.tsx";
 import { ComposerRow } from "../components/chat/composer-row.tsx";
@@ -6,15 +6,15 @@ import { ReactionPicker, ReactionPill, ReactionPills, decodeReaction } from "../
 import Btn from "../inc/helpers/btn.tsx";
 import Icon from "../primitives/icon.tsx";
 import { host } from "../host.ts";
-import { __, _x, sprintf } from "../inc/globals.ts";
+import { __, _x } from "../inc/globals.ts";
 import { plainName } from "../inc/names.ts";
-import type { SdkRooms } from "./rooms.ts";
+import { roomName, useRealtime, type SdkRooms } from "./rooms.ts";
 import { grouped, useChat, type ChatEvents, type ChatFile, type ChatLoader, type SentMessage } from "./use-chat.ts";
 import { routeLoader } from "./route-loader.ts";
 import { Piece, PiecesProvider, type Pieces } from "../pieces.tsx";
 import Tooltip from "../primitives/tooltip.tsx";
 import { useChatCall, useChatPeer, useStartCall, type ChatCall, type ChatPeer } from "./chat-call.tsx";
-import { DropStrip, ImageViewer, MessageFiles, StagedFiles, routeUploader, type ChatUploader, type StagedFile, type ViewedImage } from "./chat-files.tsx";
+import { DropStrip, ImageViewer, MessageFiles, StagedFiles, useFileDrop, useStagedFiles, type ChatUploader, type ViewedImage } from "./chat-files.tsx";
 
 export type { StoredMessage, ChatPage, ChatLoader, SentMessage, ChatFile } from "./use-chat.ts";
 export type { ChatUploader } from "./chat-files.tsx";
@@ -25,8 +25,12 @@ export type { ChatUploader } from "./chat-files.tsx";
 // its `upload`: each goes up to the app's own server as it is picked, and the message carries where it is.
 
 export interface ChatProps {
-    rt: SdkRooms | null | undefined;
-    /** A room of the app's whose rule lets its members emit `message` (and `typing`, `reaction`, `read`). */
+    /** The page's connection: <RealtimeProvider>'s when left out. */
+    rt?: SdkRooms | null;
+    /**
+     * A room of the app's whose rule lets its members emit `message` (and `typing`, `reaction`, `read`). `{pair}` in its
+     * name is the page's user and `to`, in order, so both of them name the same room: `chat:{pair}`.
+     */
     room: string;
     /** The events' names, where the app's are others. */
     events?: ChatEvents;
@@ -94,6 +98,8 @@ export interface ChatProps {
      * and the `rt` gives its calls (`useRealtime()`).
      */
     call?: boolean | string;
+    /** A call button that asks your own route, as CallButton's `tokenUrl` does: it also gets the call's `name`, for your token. */
+    tokenUrl?: string;
     /**
      * Calls `to` as the chat opens, once: for the page a call button elsewhere opens, such as Video on a list of people,
      * so the call starts in the chat rather than where the button was. Needs `to` and `call`.
@@ -134,15 +140,17 @@ export function Chat( { components, messages, load, ...props }: ChatProps ) {
     return <PiecesProvider pieces={ components }><Conversation { ...props } load={ load ?? fromRoute } /></PiecesProvider>;
 }
 
-function Conversation( { rt, room, events, reactions = DEFAULT_REACTIONS, maxLength = 0, placeholder, locale, load, onSent, upload, accept, maxFileSize = 0, maxFiles = 10,
-                         fileHosts, to, name, avatar, people, call, startCall }: Omit<ChatProps, "components"> ) {
+function Conversation( { rt: given, room: named, events, reactions = DEFAULT_REACTIONS, maxLength = 0, placeholder, locale, load, onSent, upload, accept, maxFileSize = 0, maxFiles = 10,
+                         fileHosts, to, name, avatar, people, call, tokenUrl, startCall }: Omit<ChatProps, "components"> ) {
+    const rt = useRealtime<SdkRooms>( given );
+    const other = to === undefined || to === null || to === "" ? null : String( to );
+    const room = other !== null && rt?.user ? roomName( named, rt.user, other ) : named;
     const chat = useChat( { rt, room, events, maxLength, load, onSent } );
-    const files = useStagedFiles( upload, room, maxFileSize, maxFiles );
+    const files = useStagedFiles( upload, { room, maxFileSize, maxFiles } );
     const [ viewing, setViewing ] = useState<{ images: ViewedImage[]; index: number } | null>( null );
     const view = ( images: ViewedImage[], index: number ) => setViewing( { images, index } );
     const { me, messages, history, writers } = chat;
-    const other = to === undefined || to === null || to === "" ? null : String( to );
-    const ownCall = useChatCall( rt, room, call, other );
+    const ownCall = useChatCall( rt, room, call, other, tokenUrl );
     const peer = useChatPeer( rt, other, chat.person, { name, avatar } );
     // The other person, and anyone of a group, by the name and picture the page gave, on their messages too.
     const person = ( id: string ) => {
@@ -232,34 +240,7 @@ function Conversation( { rt, room, events, reactions = DEFAULT_REACTIONS, maxLen
     };
 
     // Files dragged over the chat: the strip over the composer takes them, wherever on the chat they are dropped.
-    const [ dragging, setDragging ] = useState( false );
-    const depth = useRef( 0 );
-    const carriesFiles = ( e: DragEvent ) => Array.from( e.dataTransfer?.types ?? [] ).includes( "Files" );
-    const dropping = files.can ? {
-        onDragEnter: ( e: DragEvent ) => {
-            if ( ! carriesFiles( e ) ) return;
-            e.preventDefault();
-            depth.current += 1;
-            setDragging( true );
-        },
-        onDragOver: ( e: DragEvent ) => {
-            if ( ! carriesFiles( e ) ) return;
-            e.preventDefault();
-            e.dataTransfer.dropEffect = "copy";
-        },
-        onDragLeave: ( e: DragEvent ) => {
-            if ( ! carriesFiles( e ) ) return;
-            depth.current = Math.max( 0, depth.current - 1 );
-            if ( depth.current === 0 ) setDragging( false );
-        },
-        onDrop: ( e: DragEvent ) => {
-            if ( ! carriesFiles( e ) ) return;
-            e.preventDefault();
-            depth.current = 0;
-            setDragging( false );
-            files.add( Array.from( e.dataTransfer.files ) );
-        },
-    } : {};
+    const { dragging, dropping } = useFileDrop( files.add, files.can );
 
     const time = useMemo( () => new Intl.DateTimeFormat( lang, { hour: "2-digit", minute: "2-digit" } ), [ lang ] );
     const full = useMemo( () => new Intl.DateTimeFormat( lang, { dateStyle: "medium", timeStyle: "medium" } ), [ lang ] );
@@ -457,66 +438,6 @@ function Conversation( { rt, room, events, reactions = DEFAULT_REACTIONS, maxLen
             { viewing && <ImageViewer images={ viewing.images } index={ viewing.index } onClose={ () => setViewing( null ) } /> }
         </div>
     );
-}
-
-/** A picked file as it goes up, then as the app's server keeps it. */
-interface Picked extends StagedFile {
-    abort: AbortController;
-}
-
-/**
- * The files the user picked for the next message: each goes up to the app's server at once, so Send has nothing left
- * to wait for, and a picture shows from this page while it does. Refused at once when over the size or the count.
- */
-function useStagedFiles( upload: string | ChatUploader | undefined, room: string, maxFileSize: number, maxFiles: number ) {
-    const [ staged, setStaged ] = useState<Picked[]>( [] );
-    const uploader = useMemo<ChatUploader | undefined>( () => ( typeof upload === "string" ? routeUploader( upload, room ) : upload ), [ upload, room ] );
-    const update = ( key: string, change: Partial<Picked> ) => setStaged( ( list ) => list.map( ( s ) => ( s.key === key ? { ...s, ...change } : s ) ) );
-    const forget = ( s: Picked ) => {
-        s.abort.abort();
-        if ( s.preview ) URL.revokeObjectURL( s.preview );
-    };
-    // The pictures made on this page, let go with the chat.
-    const current = useRef( staged );
-    current.current = staged;
-    useEffect( () => () => current.current.forEach( forget ), [] );
-
-    const add = ( picked: File[] ) => {
-        if ( ! uploader ) return;
-        const left = Math.max( 0, maxFiles - current.current.length );
-        for ( const file of picked.slice( 0, left ) ) {
-            const key = `f${ Date.now() }-${ Math.random().toString( 36 ).slice( 2 ) }`;
-            const tooLarge = maxFileSize > 0 && file.size > maxFileSize;
-            const entry: Picked = {
-                key, name: file.name, type: file.type, size: file.size, abort: new AbortController(),
-                preview: file.type.startsWith( "image/" ) && typeof URL.createObjectURL === "function" ? URL.createObjectURL( file ) : null,
-                status: tooLarge ? "error" : "uploading", progress: 0,
-                error: tooLarge ? sprintf( _x( "Exceeds maximum size of %s MB", "Native uploader: rejected oversized file", "bp-better-messages" ), Math.round( maxFileSize / 1024 / 1024 * 10 ) / 10 ) : undefined,
-            };
-            setStaged( ( list ) => [ ...list, entry ] );
-            if ( tooLarge ) continue;
-            uploader( file, ( done ) => update( key, { progress: Math.min( 1, Math.max( 0, done ) ) } ), entry.abort.signal ).then(
-                ( kept ) => update( key, { status: "done", progress: 1, file: kept } ),
-                ( error: unknown ) => {
-                    if ( entry.abort.signal.aborted ) return;
-                    update( key, { status: "error", error: error instanceof Error ? error.message : "" } );
-                },
-            );
-        }
-    };
-    const remove = ( key: string ) => {
-        const gone = current.current.find( ( s ) => s.key === key );
-        if ( gone ) forget( gone );
-        setStaged( ( list ) => list.filter( ( s ) => s.key !== key ) );
-    };
-    const ready = () => staged.flatMap( ( s ) => ( s.status === "done" && s.file ? [ s.file ] : [] ) );
-    // Sent: the files that went up leave the composer, their pictures with them. Those that failed stay, saying why.
-    const sent = () => {
-        for ( const s of current.current ) if ( s.status === "done" && s.preview ) URL.revokeObjectURL( s.preview );
-        setStaged( ( list ) => list.filter( ( s ) => s.status !== "done" ) );
-    };
-
-    return { can: !! uploader, uploader, staged, add, remove, ready, sent, uploading: staged.some( ( s ) => s.status === "uploading" ) };
 }
 
 /** The chat's top bar: the other person, and the call buttons where the chat has its call. */

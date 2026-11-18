@@ -76,7 +76,7 @@ const images = ( box : Element ) => [ ...box.querySelectorAll( 'img' ) ].map( ( 
 describe( 'the chat\'s emoji field', () => {
     it( 'reads its text with each emoji image as its emoji, WordPress\'s too, on one line', () => {
         const box = document.createElement( 'div' );
-        box.innerHTML = 'So <img class="estream-emoji-image" alt="🔥" src="x.png"> hot<br><span>and <img class="emoji" alt="🎉" src="https://s.w.org/images/core/emoji/16.0.1/svg/1f389.svg"></span>\nyes';
+        box.innerHTML = 'So <img class="wplus-live-stream-emoji-image" alt="🔥" src="x.png"> hot<br><span>and <img class="emoji" alt="🎉" src="https://s.w.org/images/core/emoji/16.0.1/svg/1f389.svg"></span>\nyes';
         expect( fieldText( box ) ).toBe( 'So 🔥 hotand 🎉 yes' );
     } );
 

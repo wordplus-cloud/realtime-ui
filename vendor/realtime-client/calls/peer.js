@@ -1,7 +1,10 @@
 import { RemoteMediaTrack } from "./remote-track.js";
-import { answerOrder, applyCodecPreferences, chooseSendFamily, familyOf, fastDirection, negotiatedCodec, offerOrder } from "./codecs.js";
+import { answerOrder, applyCodecPreferences, applyRedPreferences, chooseSendFamily, familyOf, fastDirection, negotiatedCodec, offerOrder, sendCapabilities } from "./codecs.js";
+import { MIC_CEILING, MicCeiling } from "./mic-ceiling.js";
+import { CallHold, receiveHoldOff, soundHold } from "./receive-hold.js";
 import { VIEW_STEPS } from "./types.js";
 import { QualityWatch } from "./quality.js";
+import { selectedPair } from "./pair.js";
 // How a direct path that has died is left, and how fast.
 //
 // The measure of 19 to 21 Sep 2026 was that every failure took the same
@@ -30,22 +33,54 @@ import { QualityWatch } from "./quality.js";
 // ten seconds on one side put a call in the room for good.
 //
 // None of it runs while a restart could not be negotiated: this side's
-// socket down, or the relay having said the other side's is. A deadline that
-// runs out then proves nothing about the path, so escalation waits, for up to
-// SIGNALING_HOLD_MAX, and starts over with a fresh budget once both sides can
-// be reached. A connection that has carried media for HEALTHY_RESET since its
-// last trouble has its restarts back, so every incident in a long call gets
-// the whole trial.
+// socket down or answering nothing, or the relay having said the other
+// side's is gone. A deadline that runs out then proves nothing about the
+// path, so escalation waits, for up to SIGNALING_HOLD_MAX, and starts over
+// with a fresh budget once both sides can be reached — at most
+// HOLD_REFRESHES times until the connection has been healthy again, so a
+// socket that keeps stalling and coming back cannot hold a dead call out of
+// the room for ever. A connection that has carried media for HEALTHY_RESET
+// since its last trouble has its restarts back, so every incident in a long
+// call gets the whole trial.
+//
+// After a first connection both sides see the same trouble at about the same
+// moment, and the impolite one restarts first. The polite one waits
+// POLITE_RESTART_DELAY, and twice its own latest round trip to the relay on
+// top (POLITE_RESTART_MAX in all), for that restart to arrive: the other
+// side asks the relay for fresh credentials first, up to two seconds, and
+// its offer then crosses two sockets. It waited a second and a half, so on a
+// slow socket the two restarted into each other and the polite side spent an
+// attempt of its two on an offer it then rolled back (a call of
+// 31 Oct 2026, the caller's socket about a second each way).
 const MAX_RESTARTS = 2;
+// Refused answers rolled back and restarted over before an answer applies
+// again (`recoverRefusedAnswer`).
+const ANSWER_RECOVERIES = 2;
+// A restart whose negotiation has not begun this long after `restartIce()`,
+// with nothing in the way, is offered by the peer itself: until it is, every
+// offer from the other side counts as a collision (`restartPending`).
+const RESTART_PENDING_MAX = 2000;
 const RESTART_DEADLINE = 8000;
 const DISCONNECT_GRACE = 1000;
-const POLITE_RESTART_DELAY = 1500;
+const POLITE_RESTART_DELAY = 3000;
+const POLITE_RESTART_MAX = 6000;
+const POLITE_UNREACHABLE_DELAY = 1500;
 const HEALTHY_RESET = 30000;
 const SIGNALING_HOLD_MAX = 60000;
+const HOLD_REFRESHES = 2;
 const RENEW_POLITE_DELAY = 10000;
 const STATS_INTERVAL = 2000;
-const CAMERA_MAX_BITRATE = 4000000;
-const MICROPHONE_MAX_BITRATE = 64000;
+// A camera's ceiling at full size. On a direct path nothing between the two
+// browsers is ours, so the ceiling sits well above what a camera needs and
+// the bandwidth estimate the two sides keep between them decides. Through a
+// relay every bit is our TURN server's traffic, so there it stays at 4 Mbps;
+// so it does until the first candidate pair is known. Leaving the ceiling out
+// would be no "unlimited": libwebrtc then holds a camera to 2.5 Mbps above
+// 960×540 and 2 Mbps at or below, which is what a refused write left two H.265
+// senders on for whole calls (7 Nov 2026, 0 loss, estimates of 3.6 and 5.5
+// Mbps).
+const CAMERA_DIRECT_MAX_BITRATE = 10000000;
+const CAMERA_RELAY_MAX_BITRATE = 4000000;
 const SCREEN_AUDIO_MAX_BITRATE = 128000;
 const PRIVATE_HOLD = 2000;
 const STALL_TIMEOUT = 4000;
@@ -104,8 +139,37 @@ const REFRESH_HOLD = 500;
 // CONNECT_DEADLINE — both of them run out — is given up for the room. It was
 // fourteen seconds, which left a relay allocation over TCP on 443 through a
 // slow network six to come up in.
+//
+// Both clocks start once this side holds both descriptions, the offer and
+// the answer, not when the peer is made: before that ICE has nothing to
+// check, and a wait says nothing about the path. They used to start at the
+// peer's birth. On a call whose caller got the relay's messages five seconds
+// late (ppl.travel, 30 Oct 2026), the callee's eight seconds ran out a second
+// and a half after its answer went, before the caller had even read it, and
+// it restarted the checks the caller was about to begin; the two sides then
+// restarted over each other until the call went to the room, empty, as its
+// people hung up. A negotiation that never completes is given
+// NEGOTIATE_DEADLINE from the peer's birth before the room, and once the
+// other side has spoken, NEGOTIATE_IDLE from the last word it said, up to
+// NEGOTIATE_MAX from the birth: a side that is still at work on the call is
+// a slow one, not a gone one. A callee gave up at twenty-four seconds on a
+// caller whose page and socket had stalled for sixteen just after it spoke,
+// and whose offer arrived nine seconds after the call had gone to the room
+// (31 Oct 2026).
+//
+// Before a first connection only the impolite side restarts, over the relay
+// alone. The polite one keeps every candidate and answers, each of the other
+// side's restarts watched as its attempt as it arrives: two sides whose
+// clocks start a slow trip apart can't take turns by waiting.
 const CONNECT_RELAY_AT = 8000;
 const CONNECT_DEADLINE = CONNECT_RELAY_AT + MAX_RESTARTS * RESTART_DEADLINE + 2000;
+const NEGOTIATE_DEADLINE = CONNECT_DEADLINE;
+const NEGOTIATE_IDLE = NEGOTIATE_DEADLINE;
+const NEGOTIATE_MAX = 2 * NEGOTIATE_DEADLINE;
+// An attempt's deadline also counts from its own answer, so a restart over a
+// slow path gets its whole RESTART_DEADLINE of checks; an answer that has
+// not come by RESTART_DEADLINE + ANSWER_WAIT is the attempt failed.
+const ANSWER_WAIT = 8000;
 // When a negotiated codec is declared dead, and how fast.
 //
 // The receiving half is judged on assembled frames, not packets: a frame is
@@ -218,13 +282,15 @@ function trackHeight(track) {
     catch (e) { }
     return DEFAULT_TRACK_HEIGHT;
 }
-function cameraShape(wanted, track) {
+// `ceiling`: the full size's, CAMERA_DIRECT_MAX_BITRATE on a direct path and
+// CAMERA_RELAY_MAX_BITRATE through a relay. The rungs sit under both.
+function cameraShape(wanted, track, ceiling) {
     if (wanted === 0) {
-        return { active: false, maxBitrate: CAMERA_MAX_BITRATE, scale: 1, maxFramerate: null };
+        return { active: false, maxBitrate: ceiling, scale: 1, maxFramerate: null };
     }
     const rung = typeof wanted === 'number' && wanted < FULL_HEIGHT ? CAMERA_RUNGS.find((item) => item.height >= wanted) : undefined;
     if (!rung) {
-        return { active: true, maxBitrate: CAMERA_MAX_BITRATE, scale: 1, maxFramerate: null };
+        return { active: true, maxBitrate: ceiling, scale: 1, maxFramerate: null };
     }
     return {
         active: true,
@@ -232,6 +298,11 @@ function cameraShape(wanted, track) {
         scale: Math.max(1, trackHeight(track) / rung.height),
         maxFramerate: rung.maxFramerate
     };
+}
+// A negotiated codec as `refusedCodecs` keeps it: one family can be listed
+// several times with different parameters.
+function codecKey(codec) {
+    return codec.mimeType.toLowerCase() + ' ' + (codec.sdpFmtpLine ?? '');
 }
 // `fast`: both ends run the chosen codec smoothly at 60 frames, so the
 // capture's own rate goes through; otherwise 30.
@@ -248,7 +319,7 @@ function screenShape(wanted, track, fast) {
     return { active: true, maxBitrate: screenCeiling(height), scale: Math.max(1, full / height), maxFramerate: fast ? null : SCREEN_FRAMERATE };
 }
 function audioCeiling(source) {
-    return source === 'screen_share_audio' ? SCREEN_AUDIO_MAX_BITRATE : MICROPHONE_MAX_BITRATE;
+    return source === 'screen_share_audio' ? SCREEN_AUDIO_MAX_BITRATE : MIC_CEILING;
 }
 // Screen audio is music or a video's sound as often as speech, and Opus
 // only sends it in stereo when the side receiving it says so in its SDP
@@ -330,6 +401,12 @@ function parseCandidate(candidate) {
     const type = typeIndex > -1 ? parts[typeIndex + 1] : '';
     const isPrivate = /\.local$/i.test(address) || PRIVATE_V4.test(address) || PRIVATE_V6.test(address);
     return { type, address, isPrivate };
+}
+// A description's ICE username fragment (the first section's: the call is
+// bundled), which an ICE restart changes.
+function iceUfrag(sdp) {
+    const match = /^a=ice-ufrag:(\S+)/m.exec(sdp);
+    return match ? match[1] : null;
 }
 // WebKit refuses a TURN URL that carries a transport query ("Invalid TURN
 // URL query string"). The forms the server hands out say nothing the scheme
@@ -413,9 +490,20 @@ export class P2PPeer {
         this.signalChain = Promise.resolve();
         this.makingOffer = false;
         this.ignoreOffer = false;
+        // From this side's `restartIce()` until the offer it calls for is being
+        // made (`requestIceRestart`): an offer from the other side meanwhile is a
+        // collision, because the answer to it would carry the new credentials.
+        this.restartPending = false;
+        this.restartPendingAt = 0;
+        // Refused answers rolled back and restarted over since the last answer
+        // that applied (`recoverRefusedAnswer`).
+        this.answerRecoveries = 0;
         this.restartCount = 0;
         this.restartsTotal = 0;
         this.restartTimer = null;
+        // What a polite wait for the other side's restart does when it ends, so a
+        // restart that arrives in it can end it early (endRestartWait).
+        this.restartTimerRun = null;
         this.restartDeadline = null;
         this.statsTimer = null;
         this.previousInbound = new Map();
@@ -453,9 +541,21 @@ export class P2PPeer {
         // can be reached again: while it is, a side that is still out of reach
         // escalates as though nothing held it.
         this.holdSpent = false;
+        // How many times a release has given the restarts back since the
+        // connection was last healthy (HOLD_REFRESHES), and when the last was.
+        this.holdRefreshes = 0;
+        this.lastReleaseAt = 0;
+        // When the other side last said anything, of any kind.
+        this.peerHeardAt = 0;
         this.connectStartedAt = Date.now();
+        // When this side first held both descriptions (the connect clocks start
+        // then), and when it last did, which an attempt's deadline counts from.
+        this.negotiatedAt = 0;
+        this.stableAt = 0;
         this.restarting = false;
         this.lastOfferAt = 0;
+        // When the other side last offered new ICE credentials: a restart of its.
+        this.lastRestartOfferAt = 0;
         // The polite side is on the relay alone for an attempt and owes the
         // call's own policy back once it is over (liftRelayOnly).
         this.relayOnlyOwed = false;
@@ -463,9 +563,18 @@ export class P2PPeer {
         this.failed = false;
         this.refreshWatch = new Map();
         this.lastOutbound = new Map();
+        this.micCeiling = new MicCeiling();
+        // Audio senders whose shape the browser refused (applyAudioShape).
+        this.audioShapeRefused = new Set();
         // Which of the other side's video sources a picture is expected from:
         // announced on, and not paused by a wish of this side's own.
         this.expectedVideo = new Set();
+        // How long what arrives is held before it plays (receive-hold.ts): the
+        // ladder, the pictures' hold last applied (-1 before any), and each
+        // expected picture stream's counts at the last look.
+        this.receiveHold = new CallHold();
+        this.holdApplied = -1;
+        this.holdSeen = new Map();
         // Decoded-frame progress per expected source, and whether the sender has
         // already been asked for a fresh picture in the current silence.
         this.videoProgress = new Map();
@@ -494,6 +603,12 @@ export class P2PPeer {
         this.expectedAudio = new Set();
         this.connection = 'connecting';
         this.stats = { bytesSent: 0, bytesReceived: 0, rtt: null, packetLoss: 0, quality: 'unknown', candidatePair: null, restarts: 0, codecs: { videoSend: null, videoRecv: null, audioSend: null, audioRecv: null }, impl: { enc: null, dec: null }, counters: { inAudio: 0, inVideo: 0, outAudio: 0, outVideo: 0, remoteAudio: 0, remoteVideo: 0, remoteAt: 0 } };
+        // Whether the pair in use goes through a relay on either side, from the
+        // stats passes; null until one names a pair. It picks the camera's ceiling.
+        this.relayed = null;
+        // The codecs a sender's setParameters refused, as "<mimeType> <fmtp>":
+        // the shape is written without them from then on (applyWanted).
+        this.refusedCodecs = new Set();
         this.ownCaps = options.caps;
         this.pc = openPeerConnection({
             iceServers: options.iceServers,
@@ -506,6 +621,7 @@ export class P2PPeer {
         this.pc.ontrack = (event) => this.onTrack(event);
         this.pc.oniceconnectionstatechange = () => this.onIceStateChange();
         this.pc.onconnectionstatechange = () => this.onConnectionStateChange();
+        this.pc.onsignalingstatechange = () => this.onSignalingStateChange();
         // The impolite side offers first, with a warm section per source. The
         // polite side makes none of its own: a browser only matches offered
         // sections against transceivers made by addTrack, so a set made here
@@ -516,7 +632,7 @@ export class P2PPeer {
             for (const source of SOURCE_ORDER) {
                 const init = { direction: 'sendrecv' };
                 if (SOURCE_KIND[source] === 'video') {
-                    init.sendEncodings = [{ maxBitrate: source === 'screen_share' ? screenCeiling(SCREEN_DEFAULT_HEIGHT) : CAMERA_MAX_BITRATE }];
+                    init.sendEncodings = [{ maxBitrate: source === 'screen_share' ? screenCeiling(SCREEN_DEFAULT_HEIGHT) : CAMERA_RELAY_MAX_BITRATE }];
                 }
                 else {
                     init.sendEncodings = [{ maxBitrate: audioCeiling(source) }];
@@ -527,20 +643,53 @@ export class P2PPeer {
                 if (SOURCE_KIND[source] === 'video') {
                     applyCodecPreferences(transceiver, offerOrder(this.ownCaps, source));
                 }
+                else if (source === 'microphone' && applyRedPreferences(transceiver)) {
+                    this.trace('microphone offers RED first');
+                }
             }
         }
         this.statsTimer = window.setInterval(() => { void this.collectStats(); }, STATS_INTERVAL);
-        // A connection that has not come up in CONNECT_RELAY_AT is tried
-        // over the relay alone before it is given up on: a path that ICE
-        // cannot find in eight seconds is not going to be found, and a relay
-        // allocation takes one or two.
-        // A hold lets both of these go by: the ladder starts over when it
-        // lifts (`releaseHold`).
+        // The connect clocks start with the negotiation (startConnectClock);
+        // until then only a negotiation that never completes is given up.
+        this.armConnectDeadline(NEGOTIATE_DEADLINE);
+    }
+    // Both descriptions held: the first time, the connect clocks start; every
+    // time, an attempt in flight counts its deadline from here.
+    onSignalingStateChange() {
+        if (this.closed || this.pc.signalingState !== 'stable' || !this.pc.localDescription || !this.pc.remoteDescription)
+            return;
+        this.stableAt = Date.now();
+        if (this.negotiatedAt > 0)
+            return;
+        this.negotiatedAt = this.stableAt;
+        this.trace('negotiated ' + (this.negotiatedAt - this.connectStartedAt) + 'ms after the peer was made: the connect clock starts');
+        this.startConnectClock();
+    }
+    // A connection that has not come up CONNECT_RELAY_AT after the
+    // negotiation is tried over the relay alone before it is given up on: a
+    // path that ICE cannot find in eight seconds of checks is not going to
+    // be found, and a relay allocation takes one or two. The impolite side
+    // restarts; the polite one goes to the relay alone and answers it.
+    // A hold lets both of these go by: the ladder starts over when it lifts
+    // (`releaseHold`).
+    startConnectClock() {
+        if (this.closed || this.everConnected)
+            return;
+        if (this.connectRelayTimer !== null)
+            window.clearTimeout(this.connectRelayTimer);
         this.connectRelayTimer = window.setTimeout(() => {
             this.connectRelayTimer = null;
             if (this.closed || this.everConnected || this.held || this.restarting || this.restartDeadline !== null)
                 return;
-            this.trace('no connection after ' + CONNECT_RELAY_AT + 'ms, trying the relay alone');
+            // The polite side keeps every candidate, its relay's among them:
+            // the other side's restart over the relay alone pairs with any
+            // of them, and a side that reaches no TURN server keeps its way.
+            // Its own ICE failing is what makes it restart (onIceStateChange).
+            if (this.polite) {
+                this.trace('no connection ' + CONNECT_RELAY_AT + 'ms after the negotiation: the other side restarts over the relay alone, this side answers');
+                return;
+            }
+            this.trace('no connection ' + CONNECT_RELAY_AT + 'ms after the negotiation, trying the relay alone');
             void this.restart(true, 'no connection', true);
         }, CONNECT_RELAY_AT);
         this.armConnectDeadline(CONNECT_DEADLINE);
@@ -551,11 +700,52 @@ export class P2PPeer {
             this.connectDeadline = null;
             if (this.closed || this.everConnected || this.held)
                 return;
-            this.fail('ice_failed', 'no connection after ' + (Date.now() - this.connectStartedAt) + 'ms');
+            // An attempt in flight is judged by its own deadline, which
+            // counts from its answer: the restarts are few, so this ends.
+            if (this.restarting || this.restartDeadline !== null) {
+                this.armConnectDeadline(RESTART_DEADLINE);
+                return;
+            }
+            const now = Date.now();
+            const since = now - this.connectStartedAt;
+            // No offer and answer yet, from a side that has spoken lately:
+            // it is slow, not gone, and the room would wait for it as well.
+            if (this.negotiatedAt === 0 && this.peerHeardAt > 0) {
+                const more = Math.min(NEGOTIATE_IDLE - (now - this.peerHeardAt), NEGOTIATE_MAX - since);
+                if (more > 250) {
+                    this.trace('the offer and answer were not exchanged in ' + since + 'ms, but the other side spoke ' + (now - this.peerHeardAt) + 'ms ago: waiting up to ' + more + 'ms more');
+                    this.armConnectDeadline(more);
+                    return;
+                }
+            }
+            this.fail('ice_failed', this.negotiatedAt === 0
+                ? 'the offer and answer were not exchanged in ' + since + 'ms'
+                : 'no connection ' + (Date.now() - this.negotiatedAt) + 'ms after the negotiation, ' + since + 'ms after the peer was made');
         }, after);
     }
     get polite() {
         return this.options.polite;
+    }
+    // Told by the session of every signal the other side sends this peer,
+    // whatever its kind.
+    heardFromPeer() {
+        this.peerHeardAt = Date.now();
+    }
+    // How long the polite side gives the other side's restart to arrive
+    // before it makes its own (POLITE_RESTART_DELAY). With the hold spent,
+    // one side cannot be reached and no restart of the other side's can
+    // arrive: the moment it always had, for a glare alone, and a side whose
+    // own socket stayed down for a minute reached the room seconds later
+    // than it did.
+    politeWait() {
+        if (this.holdSpent)
+            return POLITE_UNREACHABLE_DELAY;
+        let roundTrip = 0;
+        try {
+            roundTrip = this.options.signalRoundTrip ? this.options.signalRoundTrip() : 0;
+        }
+        catch (e) { }
+        return Math.min(POLITE_RESTART_MAX, POLITE_RESTART_DELAY + 2 * Math.max(0, Number.isFinite(roundTrip) ? roundTrip : 0));
     }
     trace(line) {
         if (this.options.onTrace) {
@@ -657,6 +847,17 @@ export class P2PPeer {
             return null;
         }
     }
+    // The mode a source's capture was opened at, for a quality reading.
+    captureMode(source) {
+        try {
+            const settings = this.localTracks.get(source)?.getSettings();
+            if (settings && typeof settings.width === 'number' && typeof settings.height === 'number') {
+                return { width: settings.width, height: settings.height, ...(typeof settings.frameRate === 'number' ? { fps: Math.round(settings.frameRate) } : {}) };
+            }
+        }
+        catch (e) { }
+        return undefined;
+    }
     // Which sources a quality reading speaks of at this stats pass: this
     // side's that are live, switched on and not paused for the other side
     // drawing none of them, and the other side's that are on and shown here.
@@ -674,7 +875,8 @@ export class P2PPeer {
             sources,
             sending,
             playing: new Set([...this.expectedVideo, ...this.expectedAudio]),
-            sourceOfTrack: (id) => this.sourceOfInboundTrack(id)
+            sourceOfTrack: (id) => this.sourceOfInboundTrack(id),
+            modeOf: (source) => this.captureMode(source)
         };
     }
     get isConnected() {
@@ -714,10 +916,9 @@ export class P2PPeer {
         // degradation, the screen's codec), so a 4K capture is never encoded
         // whole for the second or two before the wish arrives. A track taken
         // away is shaped too: the encoding goes inactive for the pause, and
-        // its coming back is then a change the browser acts on.
-        if (SOURCE_KIND[source] === 'video') {
-            this.applyWanted(source);
-        }
+        // its coming back is then a change the browser acts on. Audio goes
+        // inactive and comes back the same way (applyAudioShape).
+        this.applyWanted(source);
     }
     nextFreeSource(kind) {
         for (const source of SOURCE_ORDER) {
@@ -751,6 +952,9 @@ export class P2PPeer {
             }
             if (kind === 'video') {
                 applyCodecPreferences(transceiver, answerOrder(this.ownCaps, this.peerCaps, source));
+            }
+            else if (source === 'microphone' && applyRedPreferences(transceiver)) {
+                this.trace('microphone answers RED first');
             }
             const track = this.localTracks.get(source);
             if (track) {
@@ -819,8 +1023,8 @@ export class P2PPeer {
     }
     // Chrome refuses setParameters before the first negotiation, so a wish
     // that arrives early is kept and applied once ICE connects. Audio has no
-    // wish, only its ceiling, which the adopted sections of the polite side
-    // get the same way.
+    // wish, only its ceiling and whether it has a track, which the adopted
+    // sections of the polite side get the same way.
     applyWanted(source) {
         if (this.closed || !this.negotiated)
             return;
@@ -828,7 +1032,7 @@ export class P2PPeer {
         if (!transceiver)
             return;
         if (SOURCE_KIND[source] === 'audio') {
-            this.applyAudioCeiling(transceiver, source);
+            this.applyAudioShape(transceiver, source);
             return;
         }
         const run = async () => {
@@ -851,9 +1055,14 @@ export class P2PPeer {
             // both handle if not; for the screen, the codec that keeps text.
             const negotiated = (params.codecs || []).map((codec) => familyOf(codec)).filter((family) => family !== null);
             const family = this.peerCaps && negotiated.length > 0 ? chooseSendFamily(this.ownCaps, this.peerCaps, negotiated, source) : null;
-            const codec = family ? negotiatedCodec(params.codecs || [], family) : null;
+            const picked = family ? negotiatedCodec(params.codecs || [], family, sendCapabilities()) : null;
+            // A codec this sender's browser refused once is not written again
+            // (the catch below), and the encoding's own codec, if any, is left
+            // as it is.
+            const refused = !!picked && this.refusedCodecs.has(codecKey(picked));
+            const codec = refused ? null : picked;
             const fast = !!family && !!this.peerCaps && fastDirection(this.ownCaps, this.peerCaps, family);
-            const shape = source === 'screen_share' ? screenShape(wanted, sender.track, fast) : cameraShape(wanted, sender.track);
+            const shape = source === 'screen_share' ? screenShape(wanted, sender.track, fast) : cameraShape(wanted, sender.track, this.relayed === false ? CAMERA_DIRECT_MAX_BITRATE : CAMERA_RELAY_MAX_BITRATE);
             // A source with no track is an inactive encoding, not an idle
             // active one. The pause is then a real allocation change held for
             // as long as the camera is off, and the camera coming back is
@@ -886,7 +1095,7 @@ export class P2PPeer {
                 && encoding.maxBitrate === shape.maxBitrate
                 && encoding.scaleResolutionDownBy === shape.scale
                 && (encoding.maxFramerate ?? null) === (shape.maxFramerate ?? null)
-                && currentCodec === wantedCodec
+                && (refused || currentCodec === wantedCodec)
                 && this.shapedFrom.get(source) === trackHeight(sender.track)
                 && (source !== 'screen_share' || this.screenDegradationWritten === this.screenDegradation)) {
                 return;
@@ -921,14 +1130,39 @@ export class P2PPeer {
                     this.screenDegradationWritten = degradation;
             }
             catch (e) {
-                if (!this.closed)
-                    this.warn('setParameters failed', e);
+                if (this.closed)
+                    return;
+                // A browser can refuse the very codec its own negotiation
+                // lists ("Attempted to use an unsupported codec for layer 0"),
+                // and the whole write goes with it: the ceiling, the scale and
+                // the pause the other side asked for. Two H.265 senders, Safari
+                // on a Mac and Chrome on Android, had every write refused so
+                // for whole calls (7 Nov 2026) and sent on libwebrtc's own
+                // 2.5 and 2 Mbps caps at 763p and 960p, on clean paths with
+                // estimates of 5.5 and 3.6 Mbps. So the codec is set aside and
+                // the shape written again without it, on fresh parameters; the
+                // sender keeps the codec it already sends with.
+                if (codec && /codec/i.test(String(e?.message ?? e))) {
+                    this.refusedCodecs.add(codecKey(codec));
+                    this.warn('setParameters refused ' + codec.mimeType + ', written again without it', e);
+                    await run();
+                    return;
+                }
+                this.warn('setParameters failed', e);
             }
         };
         const chain = (this.paramChains.get(source) ?? Promise.resolve()).then(run, run);
         this.paramChains.set(source, chain);
     }
-    applyAudioCeiling(transceiver, source) {
+    // An audio source with no track is an inactive encoding, as a video one
+    // is: it sends nothing either way, but an active one still weighs on the
+    // sender's bandwidth. Measured 4 Nov 2026 in Chrome 156 through a shaped
+    // upload, with the shared screen's sender empty as it is in nearly every
+    // call: on 300 kbps or less the estimate stayed at about 262 kbps and the
+    // camera's target at 30, as in the production traces of that week. The
+    // camera's target with it inactive, caller and callee: 300 kbps 30 -> 122
+    // and 88, 450 kbps 30 -> 204 and 213.
+    applyAudioShape(transceiver, source) {
         const run = async () => {
             if (this.closed)
                 return;
@@ -941,16 +1175,27 @@ export class P2PPeer {
             }
             if (!params.encodings || params.encodings.length === 0)
                 return;
-            const ceiling = audioCeiling(source);
-            if (params.encodings[0].maxBitrate === ceiling)
+            const encoding = params.encodings[0];
+            const ceiling = source === 'microphone' ? this.micCeiling.bitrate : audioCeiling(source);
+            const active = !!transceiver.sender.track;
+            if (encoding.maxBitrate === ceiling && encoding.active === active) {
+                this.audioShapeRefused.delete(source);
                 return;
-            params.encodings[0].maxBitrate = ceiling;
+            }
+            encoding.maxBitrate = ceiling;
+            encoding.active = active;
             try {
                 await transceiver.sender.setParameters(params);
+                this.audioShapeRefused.delete(source);
             }
             catch (e) {
-                if (!this.closed)
+                if (this.closed)
+                    return;
+                // A microphone left inactive is silent under a control that
+                // reads on, so this is asked again at each stats pass.
+                if (!this.audioShapeRefused.has(source))
                     this.warn('audio setParameters failed', e);
+                this.audioShapeRefused.add(source);
             }
         };
         const chain = (this.paramChains.get(source) ?? Promise.resolve()).then(run, run);
@@ -970,10 +1215,14 @@ export class P2PPeer {
         if (this.closed)
             return;
         if (this.polite && !this.pc.remoteDescription) {
+            this.restartPending = false;
             return;
         }
         try {
             this.makingOffer = true;
+            // This offer is the one a pending restart called for: the browser
+            // puts the new credentials in it.
+            this.restartPending = false;
             await this.pc.setLocalDescription();
             if (this.closed)
                 return;
@@ -1001,7 +1250,14 @@ export class P2PPeer {
             return;
         if (body.kind === 'sdp') {
             const description = body.description;
-            const offerCollision = description.type === 'offer' && (this.makingOffer || this.pc.signalingState !== 'stable');
+            // A restart of this side's still waiting for its offer counts as
+            // an offer of its own: Chrome and Safari answer with new ICE
+            // credentials whenever a restart is pending, and Firefox refuses
+            // such an answer to an offer that did not restart ICE, left
+            // holding its own offer with the call's media stopped. The
+            // impolite side's restart goes first, and the polite side's offer
+            // is made again after it.
+            const offerCollision = description.type === 'offer' && (this.makingOffer || this.pc.signalingState !== 'stable' || this.restartPending);
             if (description.type === 'offer')
                 this.lastOfferAt = Date.now();
             this.ignoreOffer = !this.polite && offerCollision;
@@ -1010,6 +1266,12 @@ export class P2PPeer {
             if (body.mids) {
                 this.applyRemoteMids(body.mids);
             }
+            // An offer over a description already held, with ICE credentials
+            // of its own, is the other side's ICE restart.
+            const heldUfrag = this.pc.remoteDescription ? iceUfrag(this.pc.remoteDescription.sdp) : null;
+            const restarted = description.type === 'offer' && heldUfrag !== null && iceUfrag(description.sdp ?? '') !== heldUfrag;
+            if (restarted)
+                this.lastRestartOfferAt = Date.now();
             // Lines for payload types the description does not declare go
             // first, whatever else happens to it: a description that arrived
             // with them is refused whole (withoutOrphanPayloads). Then the
@@ -1031,11 +1293,16 @@ export class P2PPeer {
                     if (!this.closed)
                         this.warn('setRemoteDescription failed', again);
                 }
-                if (!recovered)
+                if (!recovered) {
+                    if (description.type === 'answer')
+                        await this.recoverRefusedAnswer();
                     return;
+                }
             }
             if (this.closed)
                 return;
+            if (description.type === 'answer')
+                this.answerRecoveries = 0;
             await this.flushCandidates();
             if (description.type === 'offer' && !this.closed) {
                 await this.adoptOfferedSections();
@@ -1056,6 +1323,24 @@ export class P2PPeer {
                 // is set the same way a wish is, now that the answer is in.
                 for (const source of SOURCE_ORDER) {
                     this.applyWanted(source);
+                }
+                // The other side's ICE restart, answered before a first
+                // connection: this side's attempt too, watched from now, so
+                // its own connect clock does not restart over it. Either side
+                // may make it, the one whose own ICE failed: a callee whose
+                // caller heard the relay late answered at once and checked
+                // alone until its browser gave up, and only its own offer
+                // has the two sides start their checks together.
+                if (restarted && !this.everConnected && !this.isConnected && !this.held && !this.closed && !this.failed) {
+                    if (this.restartDeadline !== null) {
+                        this.watchAttempt('the other side\'s restart', null);
+                    }
+                    else if (!this.takeOtherAttempt(null)) {
+                        this.trace('the other side restarted once more than this side counts: its deadline ends it');
+                    }
+                }
+                else if (restarted && this.polite && !this.closed && !this.failed) {
+                    this.endRestartWait();
                 }
             }
             return;
@@ -1315,6 +1600,7 @@ export class P2PPeer {
         this.options.onConnection(state);
     }
     clearRestartTimers() {
+        this.restartTimerRun = null;
         if (this.restartTimer !== null) {
             window.clearTimeout(this.restartTimer);
             this.restartTimer = null;
@@ -1376,18 +1662,30 @@ export class P2PPeer {
     // the wait ran out whatever had arrived: on a slow path — TURN over TCP on
     // 443 — that abandoned the checks the other side's restart had begun, the
     // other side's next restart did the same to this one's, and the two ran
-    // both budgets out between them.
+    // both budgets out between them. A restart of the other side's that came
+    // in just before this side noticed the trouble is its attempt too: the
+    // other side often notices first, and a restart made over it abandoned
+    // the checks it had begun.
     scheduleRestart(delay, why) {
         if (this.restartTimer !== null || this.restarting || this.restartDeadline !== null)
             return;
         const startedAt = Date.now();
-        const wait = this.polite ? delay + POLITE_RESTART_DELAY : delay;
-        this.restartTimer = window.setTimeout(() => {
+        const politeWait = this.polite ? this.politeWait() : 0;
+        const wait = delay + politeWait;
+        const run = () => {
             this.restartTimer = null;
-            if (this.polite && this.lastOfferAt >= startedAt && !this.isConnected && this.takeOtherAttempt(null))
+            this.restartTimerRun = null;
+            // The other side's restart, taken as this side's attempt when it
+            // arrived (before a first connection): its own deadline decides.
+            if (this.restartDeadline !== null)
+                return;
+            const otherRestarted = this.lastOfferAt >= startedAt || this.lastRestartOfferAt >= startedAt - politeWait;
+            if (this.polite && otherRestarted && !this.isConnected && this.takeOtherAttempt(null))
                 return;
             void this.restart(false, why, this.restartCount > 0);
-        }, wait);
+        };
+        this.restartTimer = window.setTimeout(run, wait);
+        this.restartTimerRun = this.polite ? run : null;
     }
     // The other side's restart, arrived while this side was waiting to make
     // its own, taken as this side's attempt: counted, and watched on the same
@@ -1407,8 +1705,9 @@ export class P2PPeer {
         return this.heldSince > 0;
     }
     // Told by the session on every stats tick and whenever either side's
-    // presence changes. While this side's socket is down, or the relay has
-    // said the other side's is, no offer can reach the other side: a restart
+    // presence changes. While this side's socket is down or answers nothing,
+    // or the relay has said the other side's is gone, no offer can reach the
+    // other side: a restart
     // made then counted as a failed attempt, and a network change of ten
     // seconds on one side ran the budget out and put the call in the room for
     // good. Held, nothing escalates; released, the ladder starts over.
@@ -1454,13 +1753,23 @@ export class P2PPeer {
             this.holdTimer = null;
         }
         // What was tried while the other side could not hear it says nothing
-        // about the path, so the restarts are all there again.
-        this.restartCount = 0;
-        this.trace('escalation released after ' + (heldFor / 1000).toFixed(1) + 's: ' + why);
+        // about the path, so the restarts are all there again — HOLD_REFRESHES
+        // times until the connection has been healthy since. A socket that
+        // stalls and answers again every few seconds is held and released as
+        // often, and each release gave a dead call a whole new trial.
+        const refresh = this.holdRefreshes < HOLD_REFRESHES;
+        this.lastReleaseAt = Date.now();
+        if (refresh) {
+            this.holdRefreshes++;
+            this.restartCount = 0;
+        }
+        this.trace('escalation released after ' + (heldFor / 1000).toFixed(1) + 's: ' + why + (refresh ? '' : ', the restarts stay as they were: given back ' + HOLD_REFRESHES + ' times since the connection was last healthy'));
         if (this.closed || this.failed)
             return;
-        if (!this.everConnected) {
-            this.armConnectDeadline(MAX_RESTARTS * RESTART_DEADLINE + 2000);
+        // A deadline that ran out during the hold waited for this (it ends
+        // nothing while held), so one is armed again either way.
+        if (!this.everConnected && (refresh || this.connectDeadline === null)) {
+            this.armConnectDeadline(refresh ? MAX_RESTARTS * RESTART_DEADLINE + 2000 : RESTART_DEADLINE);
         }
         if (!this.isConnected) {
             this.scheduleRestart(0, 'the other side can be reached again');
@@ -1553,8 +1862,9 @@ export class P2PPeer {
         }
         const startedAt = Date.now();
         void this.useRelayOnly();
-        this.restartTimer = window.setTimeout(() => {
+        const run = () => {
             this.restartTimer = null;
+            this.restartTimerRun = null;
             if (this.closed || this.failed || this.held)
                 return;
             if (this.lastOfferAt >= startedAt) {
@@ -1564,39 +1874,124 @@ export class P2PPeer {
                 return;
             }
             void this.restart(true, why + ', no restart came from the other side', true, 'path_dead');
-        }, POLITE_RESTART_DELAY);
+        };
+        this.restartTimer = window.setTimeout(run, this.politeWait());
+        this.restartTimerRun = run;
     }
     // The deadline an attempt has to bring the media back. A connection
     // still down is restarted again over the relay alone, and so is one that
     // came back carrying nothing; the restarts running out is the room. On
-    // the polite side an offer that arrived meanwhile is the other side's
-    // next attempt, begun at its own earlier deadline, and it is watched in
-    // turn rather than restarted over.
+    // the polite side an offer that arrived after the answer the attempt's
+    // checks counted from is the other side's next attempt, begun at its own
+    // earlier deadline, and it is watched in turn rather than restarted over;
+    // with none yet, the polite side waits for it (awaitOtherAttempt), since
+    // the two deadlines run out at about the same moment and the impolite
+    // side restarts at once. An offer that crossed this side's own restart,
+    // and was answered in its place, is the same attempt, not a next one: it
+    // was counted as one, and a polite side that crossed once ran its budget
+    // out an attempt early.
     watchAttempt(what, giveUp) {
         if (this.restartDeadline !== null)
             window.clearTimeout(this.restartDeadline);
         const startedAt = Date.now();
         const inboundThen = this.inboundPackets;
-        this.restartDeadline = window.setTimeout(() => {
+        let extended = false;
+        const judge = () => {
             this.restartDeadline = null;
             if (this.closed || this.failed || this.held)
                 return;
             const down = !this.isConnected;
             const empty = !down && this.expectInbound && this.inboundPackets === inboundThen;
+            // A connection still down gets RESTART_DEADLINE of checks from the
+            // attempt's own answer: over a slow trip the answer comes seconds
+            // after the offer, and the deadline used to run out on checks
+            // that had barely begun. No answer by ANSWER_WAIT more is the
+            // attempt failed.
+            // (An attempt this side answered was answered as it began.)
+            const answeredAt = this.pc.signalingState === 'stable' ? Math.max(this.stableAt, startedAt) : 0;
+            if (down) {
+                const now = Date.now();
+                const left = answeredAt ? RESTART_DEADLINE - (now - answeredAt) : startedAt + RESTART_DEADLINE + ANSWER_WAIT - now;
+                if (left > 250) {
+                    if (!extended) {
+                        extended = true;
+                        this.trace(what + (answeredAt ? ' was answered ' + (answeredAt - startedAt) + 'ms after it began: its checks get ' + RESTART_DEADLINE + 'ms from the answer' : ' has no answer yet: waiting up to ' + ANSWER_WAIT + 'ms more'));
+                    }
+                    this.restartDeadline = window.setTimeout(judge, left);
+                    return;
+                }
+            }
             if (!down && !empty) {
                 this.trace(what + ' brought the media back in ' + (Date.now() - startedAt) + 'ms');
                 this.liftRelayOnly(what + ' brought the media back');
                 return;
             }
-            if (this.polite && this.lastOfferAt >= startedAt && this.takeOtherAttempt(down ? giveUp : 'path_dead'))
-                return;
+            const failedWhy = down
+                ? what + ' did not connect in ' + RESTART_DEADLINE + 'ms' + (answeredAt ? ' from its answer' : ', and was never answered')
+                : what + ' connected and brought nothing in ' + RESTART_DEADLINE + 'ms';
+            // (With the restarts run out there is nothing to wait for: the
+            // restart below gives the call up. Nor with the hold spent: no
+            // restart of the other side's can arrive.)
+            if (this.polite) {
+                if (this.lastOfferAt > (answeredAt || startedAt) && this.takeOtherAttempt(down ? giveUp : 'path_dead'))
+                    return;
+                if (this.restartCount < MAX_RESTARTS && !this.holdSpent) {
+                    this.awaitOtherAttempt(failedWhy, giveUp);
+                    return;
+                }
+            }
             if (down) {
-                void this.restart(false, what + ' did not connect in ' + RESTART_DEADLINE + 'ms', true, giveUp);
+                void this.restart(false, failedWhy, true, giveUp);
             }
             else {
-                void this.restart(true, what + ' connected and brought nothing in ' + RESTART_DEADLINE + 'ms', true, 'path_dead');
+                void this.restart(true, failedWhy, true, 'path_dead');
             }
-        }, RESTART_DEADLINE);
+        };
+        this.restartDeadline = window.setTimeout(judge, RESTART_DEADLINE);
+    }
+    // The polite side's attempt is over and the media is not back: the
+    // other side's next restart is due about now, so it is given politeWait
+    // to arrive and taken as this side's attempt if it does. Only if none
+    // does is the restart this side's own.
+    awaitOtherAttempt(why, giveUp) {
+        if (this.restartTimer !== null)
+            window.clearTimeout(this.restartTimer);
+        const waitFrom = Date.now();
+        const wait = this.politeWait();
+        const inboundThen = this.inboundPackets;
+        this.trace(why + ': waiting up to ' + wait + 'ms for the other side\'s next restart');
+        const run = () => {
+            this.restartTimer = null;
+            this.restartTimerRun = null;
+            if (this.closed || this.failed || this.held || this.restarting || this.restartDeadline !== null)
+                return;
+            const down = !this.isConnected;
+            if (!down && (!this.expectInbound || this.inboundPackets !== inboundThen)) {
+                this.trace('the media came back while this side waited for the other side\'s restart');
+                this.liftRelayOnly('the media came back');
+                return;
+            }
+            if (this.lastOfferAt >= waitFrom && this.takeOtherAttempt(down ? giveUp : 'path_dead'))
+                return;
+            if (down) {
+                void this.restart(false, why + ', and no restart came from the other side', true, giveUp);
+            }
+            else {
+                void this.restart(true, why + ', and no restart came from the other side', true, 'path_dead');
+            }
+        };
+        this.restartTimer = window.setTimeout(run, wait);
+        this.restartTimerRun = run;
+    }
+    // A restart of the other side's arrived while the polite side waited for
+    // one: the wait ends now, so the attempt's deadline counts from this very
+    // answer rather than from the end of the wait.
+    endRestartWait() {
+        const run = this.restartTimerRun;
+        if (this.restartTimer === null || !run)
+            return;
+        window.clearTimeout(this.restartTimer);
+        run();
     }
     // The call's own ICE policy, back on the polite side once a relay-only
     // attempt of its is over: the attempt brought the media back, or the
@@ -1715,8 +2110,51 @@ export class P2PPeer {
             return;
         this.watchAttempt('restart #' + this.restartsTotal, giveUp);
     }
-    async restartIceNow() {
+    // A restart takes its turn with the signals from the other side, so it
+    // never lands while an offer of theirs is being answered: the answer
+    // would carry the new credentials (`restartPending`).
+    restartIceNow() {
+        const run = () => this.requestIceRestart().catch((e) => {
+            if (!this.closed)
+                this.warn('ice restart failed', e);
+        });
+        this.signalChain = this.signalChain.then(run, run);
+        return this.signalChain;
+    }
+    // An answer this side's browser will not take leaves it holding its own
+    // offer, where no later negotiation can begin and the other side's
+    // candidates name credentials it never applied: Firefox refusing an
+    // answer that changed ICE credentials stopped a call's media for good
+    // (31 Oct 2026). The offer is rolled back and ICE restarted, and the
+    // answer to a restart may carry any credentials. Twice at most until an
+    // answer applies, so two sides that cannot agree do not go on forever.
+    // Runs inside its turn in the signal chain, so it restarts directly.
+    async recoverRefusedAnswer() {
+        if (this.closed || this.pc.signalingState !== 'have-local-offer')
+            return;
+        if (this.answerRecoveries >= ANSWER_RECOVERIES) {
+            this.trace('the answer was refused again, ' + ANSWER_RECOVERIES + ' recoveries since the last one that applied: left to the attempt\'s deadline');
+            return;
+        }
+        this.answerRecoveries++;
+        try {
+            await this.pc.setLocalDescription({ type: 'rollback' });
+        }
+        catch (e) {
+            this.warn('could not roll back the offer whose answer was refused', e);
+            return;
+        }
+        if (this.closed)
+            return;
+        this.trace('the answer was refused: this side\'s offer rolled back, ICE restarted so the next answer may carry new credentials');
+        await this.requestIceRestart();
+    }
+    async requestIceRestart() {
+        if (this.closed)
+            return;
         if (typeof this.pc.restartIce === 'function') {
+            this.restartPending = true;
+            this.restartPendingAt = Date.now();
             this.pc.restartIce();
             return;
         }
@@ -1777,6 +2215,51 @@ export class P2PPeer {
             void this.restartIceNow();
         }, this.polite ? RENEW_POLITE_DELAY : 0);
     }
+    // The receive hold at a stats pass (receive-hold.ts): the look goes to
+    // the ladder while a picture is being watched (connected, one expected,
+    // frames moving or freezing, the page in sight), a step it takes goes to
+    // the trace, and every receiver is held as the ladder says — checked
+    // every pass, so a receiver the peer gained since, a polite side's
+    // adopted section or a renegotiated one, is held as well.
+    reviewReceiveHold(look) {
+        if (this.closed || !this.isConnected || receiveHoldOff())
+            return;
+        const now = Date.now();
+        const visible = typeof document === 'undefined' || document.visibilityState !== 'hidden';
+        const watching = visible && this.expectedVideo.size > 0 && (look.decoded > 0 || look.freezes > 0);
+        const change = this.receiveHold.look({ at: now, watching, freezes: look.freezes, frozenMs: look.frozenMs, lost: look.lost, nacks: look.nacks, jitterMs: look.jitterMs });
+        if (change) {
+            this.trace('receive hold ' + change.from + ' -> ' + change.to + 'ms, sound ' + soundHold(change.to) + 'ms: ' + (change.up
+                ? (change.freezes ?? 0) + ' freezes (' + ((change.frozenMs ?? 0) / 1000).toFixed(1) + 's) with ' + (change.lost ?? 0) + ' lost, ' + (change.nacks ?? 0) + ' asked again, jitter up to ' + Math.round(change.jitterMs ?? 0) + 'ms'
+                : Math.round((change.cleanMs ?? 0) / 1000) + 's without trouble'));
+        }
+        this.applyReceiveHold(this.receiveHold.ms);
+    }
+    // Sound is held only beside a picture it must keep up with: with the
+    // other side's camera and screen off, or an audio call, it plays as the
+    // browser would (null).
+    applyReceiveHold(pictureMs) {
+        let held = false;
+        const sound = this.expectedVideo.size > 0 ? soundHold(pictureMs) : null;
+        for (const [source, transceiver] of this.transceivers.entries()) {
+            const receiver = transceiver.receiver;
+            if (!('jitterBufferTarget' in receiver))
+                continue;
+            const target = SOURCE_KIND[source] === 'video' ? pictureMs : sound;
+            held = true;
+            if (receiver.jitterBufferTarget === target)
+                continue;
+            try {
+                receiver.jitterBufferTarget = target;
+            }
+            catch (e) { }
+        }
+        if (held && this.holdApplied === -1) {
+            this.trace('receive hold: pictures ' + pictureMs + 'ms, sound ' + soundHold(pictureMs) + 'ms');
+        }
+        if (held)
+            this.holdApplied = pictureMs;
+    }
     // A local capture can change size on its own: a shared window being
     // resized, or a browser switching the shared surface. The scale in the
     // encoding was worked out from the old size, so it is redone when the
@@ -1801,6 +2284,16 @@ export class P2PPeer {
     // visible from the end it is happening at.
     reviewCodecs(report, byId) {
         const now = Date.now();
+        // Nothing is encoded or decoded before the connection is up, whatever
+        // the codec, so no verdict comes before it has been up a stats tick;
+        // the clocks run as before. A callee whose caller heard the relay
+        // late (bm_p2p_lag, 30 Oct 2026) wrote off H264 and then VP9 while
+        // the two were still connecting, and each write-off's offer crossed
+        // the caller's restart. Clocks that started at the connection moved a
+        // real write-off seconds later, onto an ICE restart the other side
+        // was making: Chrome answered its offer with new ICE credentials,
+        // which Firefox refuses.
+        const judging = this.isConnected && this.connectedAt > 0 && now - this.connectedAt >= STATS_INTERVAL;
         const watch = (key, dead, ready, grace) => {
             if (!dead) {
                 this.codecWatch.delete(key);
@@ -1813,7 +2306,7 @@ export class P2PPeer {
                 this.codecWatch.set(key, now);
                 return false;
             }
-            return now - since > grace;
+            return judging && now - since > grace;
         };
         // Whether anything is actually arriving for this sender to encode.
         //
@@ -1910,10 +2403,25 @@ export class P2PPeer {
         this.warn(family + ' negotiated but ' + (direction === 'dec' ? 'decoded no frame' : 'encoded no frame') + (why ? ' (' + why + ')' : '') + ', dropping it');
         this.options.onCodecBroken(family, direction);
     }
+    // The microphone's ceiling on a slow upload (mic-ceiling.ts), from this
+    // tick's estimate and whether any video went out since the last.
+    reviewMicCeiling(now, estimate, outbound) {
+        const videoSending = Array.from(outbound.entries()).some(([source, stream]) => stream.encoded > (this.lastOutbound.get(source)?.encoded ?? 0));
+        if (!this.micCeiling.review(now, estimate, videoSending))
+            return;
+        this.trace('microphone ceiling ' + kbps(this.micCeiling.bitrate) + ': bwe out=' + kbps(estimate) + (videoSending ? '' : ', no video going out'));
+        this.applyWanted('microphone');
+    }
     async collectStats() {
         if (this.closed)
             return;
+        for (const source of this.audioShapeRefused)
+            this.applyWanted(source);
         this.reviewLocalSizes();
+        if (this.restartPending && !this.makingOffer && this.pc.signalingState === 'stable' && Date.now() - this.restartPendingAt > RESTART_PENDING_MAX) {
+            this.trace('the restart\'s negotiation did not begin by itself, offering it');
+            void this.negotiate();
+        }
         try {
             const report = await this.pc.getStats();
             const byId = new Map();
@@ -1964,6 +2472,10 @@ export class P2PPeer {
             // looks like, and these are the only numbers that show it.
             let bweOut = null;
             let bweIn = null;
+            // What the pictures this side expects did since the last look,
+            // for the receive hold: freezes, ms frozen, packets lost and
+            // asked again, frames decoded, and the most jitter of them.
+            const holdLook = { freezes: 0, frozenMs: 0, lost: 0, nacks: 0, decoded: 0, jitterMs: 0 };
             report.forEach((entry) => {
                 if (entry.type === 'outbound-rtp') {
                     bytesSent += Number(entry.bytesSent ?? 0);
@@ -2020,6 +2532,25 @@ export class P2PPeer {
                                 nack: Number(entry.nackCount ?? 0),
                                 family: codecEntry && typeof codecEntry.mimeType === 'string' ? familyOf(codecEntry) : null
                             });
+                            if (this.expectedVideo.has(source)) {
+                                const now = {
+                                    freezes: Number(entry.freezeCount ?? 0),
+                                    frozenMs: Number(entry.totalFreezesDuration ?? 0) * 1000,
+                                    lost: Number(entry.packetsLost ?? 0),
+                                    nacks: Number(entry.nackCount ?? 0),
+                                    decoded: frames
+                                };
+                                // A stream seen for the first time is its own
+                                // baseline: what it did before is not this look's.
+                                const seen = this.holdSeen.get(entry.id) ?? now;
+                                holdLook.freezes += Math.max(0, now.freezes - seen.freezes);
+                                holdLook.frozenMs += Math.max(0, now.frozenMs - seen.frozenMs);
+                                holdLook.lost += Math.max(0, now.lost - seen.lost);
+                                holdLook.nacks += Math.max(0, now.nacks - seen.nacks);
+                                holdLook.decoded += Math.max(0, now.decoded - seen.decoded);
+                                holdLook.jitterMs = Math.max(holdLook.jitterMs, Number(entry.jitter ?? 0) * 1000);
+                                this.holdSeen.set(entry.id, now);
+                            }
                         }
                     }
                     else if (entry.kind === 'audio') {
@@ -2050,23 +2581,25 @@ export class P2PPeer {
                     if (at > counters.remoteAt)
                         counters.remoteAt = at;
                 }
-                else if (entry.type === 'candidate-pair' && entry.state === 'succeeded' && (entry.selected || entry.nominated)) {
-                    if (typeof entry.currentRoundTripTime === 'number') {
-                        rtt = entry.currentRoundTripTime;
-                    }
-                    const local = byId.get(entry.localCandidateId);
-                    const remote = byId.get(entry.remoteCandidateId);
-                    if (typeof entry.availableOutgoingBitrate === 'number')
-                        bweOut = entry.availableOutgoingBitrate;
-                    if (typeof entry.availableIncomingBitrate === 'number')
-                        bweIn = entry.availableIncomingBitrate;
-                    candidatePair = {
-                        local: local ? local.candidateType ?? null : null,
-                        remote: remote ? remote.candidateType ?? null : null,
-                        protocol: local ? (local.relayProtocol ?? local.protocol ?? null) : null
-                    };
-                }
             });
+            // The pair in use, not any pair once nominated (pair.ts).
+            const pair = selectedPair(report);
+            if (pair) {
+                if (typeof pair.currentRoundTripTime === 'number') {
+                    rtt = pair.currentRoundTripTime;
+                }
+                const local = byId.get(pair.localCandidateId);
+                const remote = byId.get(pair.remoteCandidateId);
+                if (typeof pair.availableOutgoingBitrate === 'number')
+                    bweOut = pair.availableOutgoingBitrate;
+                if (typeof pair.availableIncomingBitrate === 'number')
+                    bweIn = pair.availableIncomingBitrate;
+                candidatePair = {
+                    local: local ? local.candidateType ?? null : null,
+                    remote: remote ? remote.candidateType ?? null : null,
+                    protocol: local ? (local.relayProtocol ?? local.protocol ?? null) : null
+                };
+            }
             const now = Date.now();
             // The same report, for the quality reading the next pulse may
             // carry: only while connected, which is when there is a call to
@@ -2128,7 +2661,14 @@ export class P2PPeer {
                 this.restartCount = 0;
                 this.liftRelayOnly('the restarts are back');
             }
+            // And a hold's release gives them back as often as ever again,
+            // once the connection has been as healthy since the last one.
+            if (this.holdRefreshes > 0 && !this.held && this.isConnected && now - this.lastReleaseAt >= HEALTHY_RESET && now - this.troubleAt >= HEALTHY_RESET && (now - this.inboundChangedAt < STALL_TIMEOUT || !this.expectInbound)) {
+                this.holdRefreshes = 0;
+            }
+            this.reviewReceiveHold(holdLook);
             this.bwe = { out: bweOut, in: bweIn };
+            this.reviewMicCeiling(now, bweOut, outboundVideo);
             this.lastOutbound = outboundVideo;
             this.reviewVideoSources(now, inboundVideo);
             // A source this side was asked to start over says what it has put
@@ -2177,6 +2717,17 @@ export class P2PPeer {
             }
             this.stats = { bytesSent, bytesReceived, rtt, packetLoss, quality, candidatePair, restarts: this.restartsTotal, codecs, impl, counters };
             this.options.onStats(this.stats);
+            // The camera's ceiling follows the path: a relay on either side is
+            // our TURN server's traffic. A pass that names no pair (the path
+            // down for a moment) keeps what the last one said.
+            if (candidatePair) {
+                const relayed = candidatePair.local === 'relay' || candidatePair.remote === 'relay';
+                if (relayed !== this.relayed) {
+                    this.relayed = relayed;
+                    this.trace('camera ceiling ' + (relayed ? CAMERA_RELAY_MAX_BITRATE : CAMERA_DIRECT_MAX_BITRATE) / 1000 + 'k: ' + (relayed ? 'relayed' : 'direct'));
+                    this.applyWanted('camera');
+                }
+            }
             // A call that reports nothing moving is a call nobody can see, and
             // until now the only place the browser said so was a statistics
             // sheet nobody opens; the apps have written this line for a while,

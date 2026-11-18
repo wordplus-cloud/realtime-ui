@@ -4,7 +4,7 @@ import {isMobile} from "../../inc/functions/browser-info.ts";
 import { deepFocus, focusBack } from "./focus-return.ts";
 import UserAvatar from "../users/user-avatar.tsx";
 import {__, _x} from "../../inc/globals.ts";
-import DevicePanel from "./device-panel.tsx";
+import DevicePanel, { ConfigureBadge, EffectsSlowNotice, NoiseAutoNotice, useConfigureCall, useDevicesBlocked } from "./device-panel.tsx";
 import Tooltip from "../helpers/tooltip.tsx";
 import {
     pictureInPictureSupport as pictureInPicture,
@@ -14,21 +14,23 @@ import {
 import {formatSize, msToTime} from "../../inc/functions.ts";
 import useStateRef from "../../inc/hooks/state-ref.ts";
 import Resizable from "../helpers/resizable.tsx";
-import Icon, { IconName } from "../../primitives/icon.tsx";
-import CallDock from "./call-dock.tsx";
-import { AddPersonButton, AddPersonPanel } from "./add-person.tsx";
+import Icon, { IconName } from "../../primitives/icons.tsx";
+import CallDock, { DockMore } from "./call-dock.tsx";
+import { AddPersonPanel } from "./add-person.tsx";
+import { addPersonItem } from "./people-panel.tsx";
 import { cssRatio, useMediaRatio, usePictureDrawn } from "../../inc/calls/ratio.ts";
 import useHeld, { PAUSED_NOTICE_MS } from "../../inc/hooks/held.ts";
 import { Piece } from "../../pieces.tsx";
 import { CallViewContext, fullScreenItems } from "./call-view.tsx";
 import { CameraOptimizingNotice, useCameraOptimizing } from "./optimizing.tsx";
 import { pictureless, stalledShown, STALLED_VIDEO_CLASS, VideoInterruptedNotice } from "./stalled.tsx";
+import UploadJamChip from "./upload-jam.tsx";
 
 /**
  * A call between two people, from the CallContext: ringing out (the other side's picture, Calling..., cancel) or in
  * (Answer and Reject), then their camera or shared screen with the user's own picture in a corner that can be resized,
- * the call's time, and the dock (microphone, camera, turning it, sharing the screen, picture in picture, full screen,
- * the settings with the devices, Show Chat / Hide Chat beside a chat, Add Person, hanging up).
+ * the call's time, and the dock (microphone, camera, turning it, sharing the screen, Show Chat / Hide Chat beside a
+ * chat, the settings with the devices, full screen, hanging up, and in More picture in picture and Add Person).
  */
 export default function PrivateCallLayout() {
     const {
@@ -59,9 +61,11 @@ export default function PrivateCallLayout() {
         enableCamera,
         disableCamera,
         cameraChecking,
+        cameraTurningOn,
         optimizingMaxMs,
         enableMic,
         disableMic,
+        microphoneTurningOn,
         enableShareScreen,
         disableShareScreen,
         enableFullScreen,
@@ -89,13 +93,21 @@ export default function PrivateCallLayout() {
     const bytesReceived = bytesReceivedRef ? bytesReceivedRef.current : 0;
 
     const configAvailable = useConfigAvailable();
+    // A mark on Configure while the browser blocks the camera or the microphone: the settings say why.
+    const devicesBlocked = useDevicesBlocked( true );
+    const configure = useConfigureCall();
 
     const [ configOpen, setConfigOpen ] = useState( false );
     const [ addOpen, setAddOpen ] = useState( false );
 
-    // The camera spins while it is checked before it goes out (context.ts), as a group call's controls do while their
-    // request is out. It still takes a press: turning the camera off wins over its check at once.
-    const cameraGlyph = ( name: IconName ) => cameraChecking
+    // The camera spins while it turns on (turning-on.ts) and while it is checked before it goes out (context.ts), as a
+    // group call's controls do while their request is out, and the microphone while it turns on. The camera still takes
+    // a press: turning it off wins over its check at once.
+    const cameraBusy = cameraChecking || cameraTurningOn;
+    const cameraGlyph = ( name: IconName ) => cameraBusy
+        ? <Icon name="spinner" size={ 20 } className="wplus-svg-animate" />
+        : <Icon name={ name } size={ 20 } />;
+    const micGlyph = ( name: IconName ) => microphoneTurningOn
         ? <Icon name="spinner" size={ 20 } className="wplus-svg-animate" />
         : <Icon name={ name } size={ 20 } />;
 
@@ -184,7 +196,7 @@ export default function PrivateCallLayout() {
 
     // While the controls are hidden on a phone, a touch lands on the picture under them, and showing them at once put
     // a button where the finger was: the click that ended the touch pressed it. A tap meant only to bring the controls
-    // back ended the call when it fell on End Call (Better Messages ticket 10500 sweep). So a click on the controls is
+    // back ended the call when it fell on End Call (from a support report). So a click on the controls is
     // a press of theirs only when its touch began on them.
     const controlsRef = useRef<HTMLDivElement | null>( null );
     const touchBegan = useRef<{ at: number, onControls: boolean } | null>( null );
@@ -331,7 +343,7 @@ export default function PrivateCallLayout() {
     const peerFaceShown = ( peerStalled === 'all' || peerInterrupted ) && !! otherParticipant?.video
         && ( ! otherParticipant.screen || primaryVideo === 'camera' ) && pictureless( videoElement );
     const peerFace = peerFaceShown && <div className="wplus-call-animation wplus-animation-pause">
-        <UserAvatar user_id={ thread.participants[0] } link={ false } size={ 100 } fromThread={ thread } />
+        <UserAvatar user_id={ thread.participants[0] } link={ false } size={ 100 } fromThread={ thread } presence={ false } />
     </div>;
 
     // A keyboard reaches the call (an SDK review, 2026-10-14): the window is a stop in the Tab order and takes the focus
@@ -407,12 +419,15 @@ export default function PrivateCallLayout() {
 
 
         { ( action === 'call_in_progress' || action === 'connecting' ) && <>
+            {/* The 1:1 screen has no connection badge to carry the jam's mark: it stands alone in the stage's top end corner. */}
+            <UploadJamChip />
             <Piece name="VideoTile" props={ { participant: otherParticipant, action } } always={ sound }>
             <div className="wplus-main-video" part="video-tile">
                 { ( ! otherParticipant || ( ! otherParticipant.video && ! otherParticipant.screen ) ) &&
                     <div className="wplus-main-placeholder">
                         <div className="wplus-call-animation wplus-animation-pause">
-                            <UserAvatar user_id={thread.participants[0]} link={false} size={100} fromThread={thread}/>
+                            {/* Answered: they are plainly there, and the dot says so no more (it does while it rings). */}
+                            <UserAvatar user_id={thread.participants[0]} link={false} size={100} fromThread={thread} presence={false}/>
                         </div>
                         <Piece name="CallStatus" props={ { layout: 'private', action, text: statusMessage, duration: callDuration } }>
                         <div className={"wplus-placeholder-message"} part="call-status">
@@ -538,6 +553,17 @@ export default function PrivateCallLayout() {
 
             { addOpen && <AddPersonPanel close={ () => setAddOpen( false ) } /> }
 
+            {/* The camera's background slowing this device, once a call, with Turn Off (device-panel.tsx). */}
+            <EffectsSlowNotice />
+
+            {/* AI Noise Removal turned on by the app's default, once a call (device-panel.tsx). */}
+            <NoiseAutoNotice />
+
+            {/* The lean dock (asked on 2026-10-30: "i feel like there is alot of buttons now"): the chat beside the
+                call and the devices at its start, where they were before it ("configure button should be on left
+                side after chat, like it was before"), then the microphone, the camera, the screen and the size in
+                the row, in that order, so the size folds first on a narrow stage; what is used now and then in More
+                whatever the room (DockMore): picture in picture and Add Person, the one of them alone its own button. */}
             <CallDock className="wplus-call-buttons" pinned={ 1 }>
                 {action === 'incoming_call' &&
                     <Tooltip content={_x('Answer', 'Private Call Screen', 'bp-better-messages')}>
@@ -547,8 +573,7 @@ export default function PrivateCallLayout() {
                     </Tooltip>
                 }
 
-                {/* Show / hide the conversation — see the group video room.
-                    After Answer, which leads a ringing dock. */}
+                {/* Show / hide the conversation beside the call: see the group video room. */}
                 { ( chatToggle && ! expanded ) &&
                     <Tooltip content={ chatShown ? _x('Hide Chat', 'Call Controls', 'bp-better-messages') : _x('Show Chat', 'Call Controls', 'bp-better-messages') }>
                         <span onClick={ () => chatToggle( ( shown: boolean ) => ! shown ) } className="wplus-toggle-chat" data-active={ chatShown ? 1 : undefined }>
@@ -558,36 +583,13 @@ export default function PrivateCallLayout() {
                 }
 
                 { configAvailable &&
-                    <Tooltip content={_x('Configure', 'Private Call Screen', 'bp-better-messages')}>
-                        <span onClick={ () => { setConfigOpen(!configOpen) }} className="wplus-configure-call">
+                    <Tooltip content={ configure.label }>
+                        <span onClick={ () => { setConfigOpen(!configOpen) }} className="wplus-configure-call" aria-label={ configure.label } aria-expanded={ configOpen } data-warning={ devicesBlocked ? 1 : undefined } data-noise={ configure.noise ? 1 : undefined }>
                             <Icon name="settings" size={ 20 } />
+                            <ConfigureBadge noise={ configure.noise } />
                         </span>
                     </Tooltip>
                 }
-
-                { action === 'call_in_progress' && <AddPersonButton open={ addOpen } setOpen={ setAddOpen } /> }
-
-                { ( ! selectedCameraDevice && ( myCameraTrack || switchingCamera ) && isMobile() ) &&
-                <Tooltip content={_x('Switch Camera', 'Private Call Screen', 'bp-better-messages')}>
-                        <span onClick={switchCamera} className="wplus-switch-camera-video">
-                            <Icon name="switchCamera" size={ 20 } />
-                        </span>
-                </Tooltip> }
-
-                { myCameraTrack &&
-                    <Tooltip content={_x('Disable Camera', 'Private Call Screen', 'bp-better-messages')}>
-                        <span onClick={ disableCamera } data-busy={ cameraChecking ? 1 : undefined } className="wplus-disable-video">
-                            { cameraGlyph( iconsReverted ? 'video' : 'videoOff' ) }
-                        </span>
-                    </Tooltip>
-                }
-
-                {!myCameraTrack &&
-                    <Tooltip content={_x('Enable Camera', 'Private Call Screen', 'bp-better-messages')}>
-                            <span onClick={ enableCamera } data-busy={ cameraChecking ? 1 : undefined } className="wplus-enable-video">
-                                { cameraGlyph( iconsReverted ? 'videoOff' : 'video' ) }
-                            </span>
-                    </Tooltip>}
 
                 {myMicrophoneTrack &&
                     <Tooltip content={_x('Disable Microphone', 'Private Call Screen', 'bp-better-messages')}>
@@ -600,28 +602,34 @@ export default function PrivateCallLayout() {
 
                 { ! myMicrophoneTrack &&
                     <Tooltip content={_x('Enable Microphone', 'Private Call Screen', 'bp-better-messages')}>
-                            <span onClick={enableMic} className="wplus-enable-mic">
-                                {!iconsReverted && <Icon name="mic" size={ 20 } />}
-                                {iconsReverted && <Icon name="micOff" size={ 20 } />}
+                            <span onClick={enableMic} data-busy={ microphoneTurningOn ? 1 : undefined } className="wplus-enable-mic">
+                                { micGlyph( iconsReverted ? 'micOff' : 'mic' ) }
                             </span>
                     </Tooltip>
                 }
 
-                { ( action === 'call_in_progress' && pictureInPicture && !! otherParticipant && ( otherParticipant.video || otherParticipant.screen )) &&
-                        <>
-                            <Tooltip content={_x('Picture In Picture', 'Private Call Screen', 'bp-better-messages')}>
-                                <span onClick={switchPicInPic} className="wplus-pic-in-pic" data-active={ picInPic ? 1 : undefined }>
-                                    { ! picInPic &&
-                                        <Icon name="pip" size={ 20 } />
-                                    }
-
-                                    { picInPic &&
-                                        <Icon name="pip" size={ 20 } />
-                                    }
-                                </span>
-                            </Tooltip>
-                        </>
+                { myCameraTrack &&
+                    <Tooltip content={_x('Disable Camera', 'Private Call Screen', 'bp-better-messages')}>
+                        <span onClick={ disableCamera } data-busy={ cameraBusy ? 1 : undefined } className="wplus-disable-video">
+                            { cameraGlyph( iconsReverted ? 'video' : 'videoOff' ) }
+                        </span>
+                    </Tooltip>
                 }
+
+                {!myCameraTrack &&
+                    <Tooltip content={_x('Enable Camera', 'Private Call Screen', 'bp-better-messages')}>
+                            <span onClick={ enableCamera } data-busy={ cameraBusy ? 1 : undefined } className="wplus-enable-video">
+                                { cameraGlyph( iconsReverted ? 'videoOff' : 'video' ) }
+                            </span>
+                    </Tooltip>}
+
+                {/* A phone's front and back cameras, beside the camera they turn. */}
+                { ( ! selectedCameraDevice && ( myCameraTrack || switchingCamera ) && isMobile() ) &&
+                <Tooltip content={_x('Switch Camera', 'Private Call Screen', 'bp-better-messages')}>
+                        <span onClick={switchCamera} className="wplus-switch-camera-video">
+                            <Icon name="switchCamera" size={ 20 } />
+                        </span>
+                </Tooltip> }
 
                 { screenShareSupport &&
                     <>
@@ -646,6 +654,18 @@ export default function PrivateCallLayout() {
 
                 {/* Expand to the window, then the whole screen (call-view.tsx). */}
                 { fullScreenItems( call, view ) }
+
+                <DockMore>
+                    { ( action === 'call_in_progress' && pictureInPicture && !! otherParticipant && ( otherParticipant.video || otherParticipant.screen ) ) &&
+                        <Tooltip content={_x('Picture in Picture', 'Call Controls', 'bp-better-messages')}>
+                            <span onClick={switchPicInPic} className="wplus-pic-in-pic" data-active={ picInPic ? 1 : undefined }>
+                                <Icon name="pip" size={ 20 } />
+                            </span>
+                        </Tooltip>
+                    }
+
+                    { action === 'call_in_progress' && addPersonItem( call, addOpen, () => setAddOpen( ! addOpen ) ) }
+                </DockMore>
 
                 {action === 'outgoing_call' &&
                     <Tooltip content={_x('Cancel', 'Private Call Screen', 'bp-better-messages')}>

@@ -57,14 +57,17 @@ const ICONS = {
     external: <path { ...S } d="M14 4h6v6M20 4l-9 9M18 14v4.5a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 4 18.5v-11A1.5 1.5 0 0 1 5.5 6H10" />,
     settings: <><circle { ...S } cx="12" cy="12" r="3" /><path { ...S } d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M5.3 18.7l2.1-2.1M16.6 7.4l2.1-2.1" /></>,
     // A line rising to its high: the most watching at once.
-    peak: <path { ...S } d="M3 17l5.5-5.5 4 4L21 7M15 7h6v6" />
+    peak: <path { ...S } d="M3 17l5.5-5.5 4 4L21 7M15 7h6v6" />,
+    // A ring round a dot: recording.
+    record: <><circle { ...S } cx="12" cy="12" r="9" /><circle { ...F } cx="12" cy="12" r="4.5" /></>,
+    play: <path { ...F } d="M8 5.5v13a1 1 0 0 0 1.5.9l10.4-6.5a1 1 0 0 0 0-1.8L9.5 4.6A1 1 0 0 0 8 5.5z" />
 } satisfies Record<string, ReactNode>;
 
 export type IconName = keyof typeof ICONS;
 
 export function Icon( props : { name : IconName, className? : string } ){
     return (
-        <svg className={ 'estream-icon' + ( props.className ? ' ' + props.className : '' ) } viewBox="0 0 24 24" width="24" height="24" aria-hidden="true" focusable="false">
+        <svg className={ 'wplus-live-stream-icon' + ( props.className ? ' ' + props.className : '' ) } viewBox="0 0 24 24" width="24" height="24" aria-hidden="true" focusable="false">
             { ICONS[ props.name ] }
         </svg>
     );

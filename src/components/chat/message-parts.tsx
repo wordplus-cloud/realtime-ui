@@ -50,7 +50,8 @@ export interface SystemRowProps {
     /** What kind of event (`user_joined`, `call_missed` …), for styles that tell them apart. */
     type?: string;
     tone?: SystemTone;
-    icon?: IconName;
+    /** Its icon, the bolt by default: null for the words alone. */
+    icon?: IconName | null;
     /** When it happened, in full, in its tooltip. */
     title?: string;
     children: ReactNode;
@@ -62,7 +63,7 @@ export function SystemRow( { type, tone = "neutral", icon = "bolt", title, child
         <div className="wplus-system-row" data-system-type={ type ?? undefined }>
             <Tooltip label={ title ?? "" }>
                 <div className="wplus-system-row__pill" data-tone={ tone }>
-                    <Icon name={ icon } size={ 11 } />
+                    { icon !== null && <Icon name={ icon } size={ 11 } /> }
                     <span className="wplus-system-row__text">{ children }</span>
                 </div>
             </Tooltip>
@@ -347,19 +348,80 @@ export function TypingPinned( { avatar, children }: { avatar?: ReactNode; childr
     );
 }
 
-/** A conversation with no messages yet. */
-export function EmptyThread() {
+export interface EmptyThreadProps {
+    /** Its title, "Say hi" by default. */
+    title?: ReactNode;
+    /** The line under it, by default that nothing is here yet and the composer starts the conversation. */
+    text?: ReactNode;
+}
+
+/** A conversation with no messages yet, in the app's words where it gives them. */
+export function EmptyThread( { title, text }: EmptyThreadProps = {} ) {
     return (
         <div className="wplus-empty-thread">
             <div className="wplus-empty-thread__disc">
                 <Icon name="thread" size={ 28 } strokeWidth={ 1.5 } />
             </div>
             <div className="wplus-empty-thread__text">
-                <div className="wplus-empty-thread__title">{ _x( "Say hi", "Empty conversation", "bp-better-messages" ) }</div>
+                <div className="wplus-empty-thread__title">{ title ?? _x( "Say hi", "Empty conversation", "bp-better-messages" ) }</div>
                 <div className="wplus-empty-thread__sub">
-                    { _x( "No messages here yet — start the conversation from the composer below", "Empty conversation", "bp-better-messages" ) }
+                    { text ?? _x( "No messages here yet — start the conversation from the composer below", "Empty conversation", "bp-better-messages" ) }
                 </div>
             </div>
+        </div>
+    );
+}
+
+/** What an ActionCard says of how a request stands: its edge and its icon's colours. */
+export type ActionCardTone = "waiting" | "done" | "plain";
+
+export interface ActionCardProps {
+    tone?: ActionCardTone;
+    /** What stands for it, on a tint of its tone. */
+    icon?: ReactNode;
+    title: ReactNode;
+    /** A line under the title. */
+    subtitle?: ReactNode;
+    /** At the end of its head: a badge, a state in one word. */
+    badge?: ReactNode;
+    /** How it stands, in words, under the head. A request that waits pulses before it. */
+    state?: ReactNode;
+    /** More of how it stands. */
+    line?: ReactNode;
+    /** What it holds: its values, its result. */
+    children?: ReactNode;
+    /** What can be done, in a bar under it. */
+    actions?: ReactNode;
+    /** Says itself to a screen reader as it changes, as a card a person waits on does. */
+    live?: boolean;
+    label?: string;
+}
+
+/**
+ * A request in a chat: something someone asked to be done, that waits for a person or is decided. The chat's own card, for
+ * what a line of what happened cannot hold: a person who waits reads how it stands, and the one who decides reads what it
+ * would do. An app gives it its words and its buttons.
+ */
+export function ActionCard( { tone = "waiting", icon, title, subtitle, badge, state, line, children, actions, live, label }: ActionCardProps ) {
+    return (
+        <div className={ `wplus-action-card is-${ tone }` } role={ live ? "status" : "group" } aria-live={ live ? "polite" : undefined } aria-label={ label }>
+            <div className="wplus-action-card__head">
+                { icon ? <span className="wplus-action-card__icon" aria-hidden="true">{ icon }</span> : null }
+                <div className="wplus-action-card__title">
+                    <strong>{ title }</strong>
+                    { subtitle ? <span>{ subtitle }</span> : null }
+                </div>
+                { badge }
+            </div>
+            { state ? (
+                <span className="wplus-action-card__state">
+                    { tone === "waiting" ? <span className="wplus-action-card__pulse" aria-hidden="true" /> : null }
+                    { state }
+                </span>
+            ) : null }
+            { line ? <span className="wplus-action-card__line">{ line }</span> : null }
+            { children ? <div className="wplus-action-card__body">{ children }</div> : null }
+            { actions ? <div className="wplus-action-card__actions">{ actions }</div> : null }
         </div>
     );
 }

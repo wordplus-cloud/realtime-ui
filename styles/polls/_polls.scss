@@ -1,0 +1,769 @@
+// Polls: the poll in a message (PollCard), the form that makes one (PollForm) and who voted (PollVoters).
+//
+// The poll stands in its message's bubble in place of the text and has no frame of its own: the bubble is its frame,
+// so it looks like the conversation in every bubble style. Its words take the bubble's ink (currentColor), its quiet
+// parts that ink at a lower strength, and its marks, lines and acts the pick colour: the accent, or on the user's own
+// filled bubble, whose ground is the accent, the bubble's text colour. Options are rows with a mark, and once the
+// shares show, a line under each as long as its share. A quiz's right and wrong marks are the fixed success and danger
+// colours.
+//
+// Browsers without color-mix() (before Chrome 111, Safari 16.2, Firefox 113) get the token colours just before each.
+//
+// Every control is a span (Btn), which no theme styles. The fields are real inputs, which themes do style, so their
+// rules carry :not(#\9) to outrank a theme's `input[type=text]` and `textarea`.
+//
+// Source: src/components/polls/.
+
+.wplus-poll {
+    --wplus-poll-pick: rgba(var(--wplus-color-accent), 1);
+    --wplus-poll-on-pick: rgba(var(--wplus-color-text-on-accent), 1);
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    width: 290px;
+    max-width: 100%;
+    padding: 2px 0 0;
+    color: inherit;
+    font-size: inherit;
+    line-height: var(--wplus-line-height-normal);
+    text-align: start;
+    white-space: normal;
+    // A host's message text may break anywhere (Better Messages' word-break: break-word), which let a row squeeze an
+    // option to a letter per line: here words break only when one is wider than the line.
+    word-break: normal;
+    overflow-wrap: break-word;
+    // A narrow poll (a mini chat, a phone) tightens its rows: the @container rules below.
+    container: wplus-poll / inline-size;
+}
+
+// The user's own filled bubble is the accent: the poll picks in the bubble's text colour on it.
+.wplus-msg-stack[data-bubble="filled"][data-is-me="1"] .wplus-poll {
+    --wplus-poll-pick: rgba(var(--wplus-color-bubble-self-text), 1);
+    --wplus-poll-on-pick: rgba(var(--wplus-color-bubble-self-bg), 1);
+}
+
+.wplus-poll__question {
+    font-weight: var(--wplus-font-weight-semibold);
+    line-height: 1.35;
+    overflow-wrap: anywhere;
+}
+
+// What kind of poll, whether it takes more than one answer, when it ends: one quiet line.
+.wplus-poll__meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0 6px;
+    margin-top: -4px;
+    font-size: var(--wplus-font-size-xs);
+    color: rgba(var(--wplus-color-text-secondary), 1);
+    color: color-mix(in srgb, currentColor 62%, transparent);
+
+    > span + span::before {
+        content: "·";
+        margin-inline-end: 6px;
+    }
+}
+
+.wplus-poll__deadline {
+    font-variant-numeric: tabular-nums;
+}
+
+.wplus-poll__options {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-top: 4px;
+}
+
+// A row: its mark, its words, the faces of a public poll and its share, and under them its line.
+.wplus-poll__option {
+    position: relative;
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto auto;
+    grid-template-rows: auto auto;
+    align-items: center;
+    column-gap: 10px;
+    row-gap: 5px;
+    margin: 0 -6px;
+    padding: 5px 6px;
+    &:not(#\9) { border-radius: var(--wplus-radius-sm); }
+    text-align: start;
+    user-select: none;
+    -webkit-user-select: none;
+
+    &.wplus-btn {
+        cursor: pointer;
+        transition: background 0.12s ease;
+
+        &:hover { background: rgba(var(--wplus-color-bg-hover), 1); background: color-mix(in srgb, currentColor 6%, transparent); }
+        &:active { background: color-mix(in srgb, currentColor 10%, transparent); }
+        &:focus-visible { outline: 2px solid var(--wplus-poll-pick); outline-offset: 1px; }
+    }
+}
+
+// The share: a faint track under the words, the width of the row, filled from the leading edge as far as the
+// option's percent. An option no one picked shows its empty track, so every row ends the same way, hovered or not.
+.wplus-poll__bar {
+    position: relative;
+    grid-row: 2;
+    grid-column: 2 / -1;
+    block-size: 4px;
+    overflow: hidden;
+    &:not(#\9) { border-radius: var(--wplus-radius-pill); }
+    background: rgba(var(--wplus-color-text-tertiary), 0.15);
+    background: color-mix(in srgb, currentColor 10%, transparent);
+
+    &::before {
+        content: "";
+        position: absolute;
+        inset-block: 0;
+        inset-inline-start: 0;
+        inline-size: calc(var(--wplus-poll-share, 0) * 100%);
+        border-radius: inherit;
+        background: rgba(var(--wplus-color-text-tertiary), 0.45);
+        background: color-mix(in srgb, currentColor 32%, transparent);
+        transition: inline-size 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
+
+        @media (prefers-reduced-motion: reduce) { transition: none; }
+    }
+
+    [data-picked="1"] > &::before,
+    [data-leading="1"] > &::before { background: var(--wplus-poll-pick); }
+    [data-result="right"] > &::before { background: rgba(var(--wplus-color-success), 1); }
+    [data-result="wrong"] > &::before { background: rgba(var(--wplus-color-danger), 1); }
+}
+
+// A round mark, square for a multiple-answer poll: empty for a choice, a tick for a pick, a cross for a wrong answer.
+// Empty, it is drawn in the bubble's ink: its tick in the pick's own text colour.
+.wplus-poll__mark {
+    grid-row: 1;
+    grid-column: 1;
+    box-sizing: border-box;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    border: 1.5px solid rgba(var(--wplus-color-border-strong), 1);
+    border: 1.5px solid color-mix(in srgb, currentColor 40%, transparent);
+    &:not(#\9) { border-radius: var(--wplus-radius-circle); }
+    color: inherit;
+    transition: background 0.12s ease, border-color 0.12s ease;
+
+    > svg { color: var(--wplus-poll-on-pick); }
+
+    [role="checkbox"] > & { &:not(#\9) { border-radius: 5px; } }
+
+    [data-ticked="1"] > &,
+    [data-picked="1"] > & {
+        border-color: var(--wplus-poll-pick);
+        background: var(--wplus-poll-pick);
+    }
+
+    [data-result="right"] > & {
+        border-color: rgba(var(--wplus-color-success), 1);
+        background: rgba(var(--wplus-color-success), 1);
+        > svg { color: #fff; }
+    }
+
+    [data-result="wrong"] > & {
+        border-color: rgba(var(--wplus-color-danger), 1);
+        background: rgba(var(--wplus-color-danger), 1);
+        > svg { color: #fff; }
+    }
+
+    // Results read, not picked: an option the user did not pick needs no empty mark.
+    [data-shares="1"] .wplus-poll__option:not(.wplus-btn):not([data-picked="1"]):not([data-result]) > & {
+        visibility: hidden;
+    }
+}
+
+.wplus-poll__label {
+    grid-row: 1;
+    grid-column: 2;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    min-width: 0;
+    text-align: start;
+}
+
+.wplus-poll__text {
+    overflow-wrap: break-word;
+
+    [data-leading="1"] & { font-weight: var(--wplus-font-weight-semibold); }
+}
+
+.wplus-poll__by {
+    font-size: var(--wplus-font-size-xs);
+    color: rgba(var(--wplus-color-text-tertiary), 1);
+    color: color-mix(in srgb, currentColor 55%, transparent);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 100%;
+
+    a { color: inherit; text-decoration: none; }
+}
+
+.wplus-poll__faces {
+    grid-row: 1;
+    grid-column: 3;
+    display: inline-flex;
+    flex-direction: row-reverse;
+
+    > * { display: inline-flex; }
+    > * + * { margin-inline-end: -6px; }
+
+    &.wplus-btn { cursor: pointer; }
+    &.wplus-btn:focus-visible { outline: 2px solid var(--wplus-poll-pick); outline-offset: 2px; &:not(#\9) { border-radius: var(--wplus-radius-pill); } }
+}
+
+.wplus-poll__share {
+    grid-row: 1;
+    grid-column: 4;
+    min-width: 3ch;
+    text-align: end;
+    font-size: var(--wplus-font-size-sm);
+    font-weight: var(--wplus-font-weight-semibold);
+    font-variant-numeric: tabular-nums;
+    color: rgba(var(--wplus-color-text-secondary), 1);
+    color: color-mix(in srgb, currentColor 70%, transparent);
+
+    [data-picked="1"] > &,
+    [data-leading="1"] > & { color: inherit; }
+}
+
+// Adding an option: a quiet row under the options, then a field in its place.
+.wplus-poll__add {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    align-self: flex-start;
+    margin: 0 -6px;
+    padding: 5px 6px;
+    &:not(#\9) { border-radius: var(--wplus-radius-sm); }
+    color: rgba(var(--wplus-color-text-secondary), 1);
+    color: color-mix(in srgb, currentColor 65%, transparent);
+    font-size: var(--wplus-font-size-sm);
+    font-weight: var(--wplus-font-weight-medium);
+    cursor: pointer;
+
+    &:hover { color: var(--wplus-poll-pick); background: color-mix(in srgb, currentColor 6%, transparent); }
+    &:focus-visible { outline: 2px solid var(--wplus-poll-pick); outline-offset: 1px; }
+}
+
+.wplus-poll__adding {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+}
+
+.wplus-poll .wplus-poll__add-input:not(#\9) {
+    box-sizing: border-box;
+    flex: 1 1 140px;
+    min-width: 0;
+    min-height: 36px;
+    margin: 0;
+    padding: 6px 10px;
+    border: 1px solid var(--wplus-poll-pick);
+    border-radius: var(--wplus-radius-sm);
+    background: rgba(var(--wplus-color-bg), 1);
+    box-shadow: none;
+    color: rgba(var(--wplus-color-field-text), 1);
+    font: inherit;
+    outline: none;
+
+    &::placeholder { color: rgba(var(--wplus-color-field-placeholder), 1); opacity: 1; }
+    &[aria-invalid="true"] { border-color: rgba(var(--wplus-color-danger), 1); }
+}
+
+.wplus-poll__add-error {
+    flex-basis: 100%;
+    font-size: var(--wplus-font-size-xs);
+    color: rgba(var(--wplus-color-danger), 1);
+}
+
+.wplus-poll__note {
+    font-size: var(--wplus-font-size-sm);
+    color: rgba(var(--wplus-color-text-secondary), 1);
+    color: color-mix(in srgb, currentColor 65%, transparent);
+}
+
+.wplus-poll__explanation {
+    padding: 6px 10px;
+    border-inline-start: 3px solid rgba(var(--wplus-color-success), 1);
+    background: rgba(var(--wplus-color-success), 0.08);
+    &:not(#\9) { border-radius: var(--wplus-radius-xs); }
+    font-size: var(--wplus-font-size-sm);
+    overflow-wrap: anywhere;
+}
+
+// The count and the acts, under a hairline.
+.wplus-poll__footer {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--wplus-space-xs) var(--wplus-space-sm);
+    margin-top: 2px;
+    padding-top: 6px;
+    border-top: 1px solid rgba(var(--wplus-color-border), 1);
+    border-top: 1px solid color-mix(in srgb, currentColor 14%, transparent);
+    font-size: var(--wplus-font-size-sm);
+    color: rgba(var(--wplus-color-text-secondary), 1);
+    color: color-mix(in srgb, currentColor 65%, transparent);
+}
+
+.wplus-poll__count {
+    font-variant-numeric: tabular-nums;
+}
+
+.wplus-poll__actions {
+    display: inline-flex;
+    flex-wrap: wrap;
+    gap: 2px;
+    margin-inline-start: auto;
+    margin-inline-end: -8px;
+}
+
+// A text button: the poll's acts, the form's, the voters list's.
+.wplus-poll__action {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 28px;
+    padding: 3px 8px;
+    &:not(#\9) { border-radius: var(--wplus-radius-pill); }
+    font-size: var(--wplus-font-size-sm);
+    font-weight: var(--wplus-font-weight-semibold);
+    color: var(--wplus-poll-pick, rgba(var(--wplus-color-accent), 1));
+    white-space: nowrap;
+    cursor: pointer;
+    transition: background 0.12s ease;
+
+    &:hover { background: rgba(var(--wplus-color-accent), 0.1); background: color-mix(in srgb, currentColor 10%, transparent); }
+    &:focus-visible { outline: 2px solid var(--wplus-poll-pick, rgba(var(--wplus-color-accent), 1)); outline-offset: 1px; }
+
+    &[data-primary="1"] {
+        padding: 3px 12px;
+        background: var(--wplus-poll-pick, rgba(var(--wplus-color-accent), 1));
+        color: var(--wplus-poll-on-pick, rgba(var(--wplus-color-text-on-accent), 1));
+        &:hover { filter: brightness(0.94); }
+    }
+
+    &[data-disabled="1"] {
+        opacity: 0.45;
+        cursor: default;
+        &:hover { background: transparent; filter: none; }
+        &[data-primary="1"]:hover { background: var(--wplus-poll-pick, rgba(var(--wplus-color-accent), 1)); }
+    }
+}
+
+.wplus-poll[data-sending="1"] .wplus-poll__option.wplus-btn { cursor: progress; }
+
+.wplus-poll-icon { flex: 0 0 auto; }
+
+// A narrow poll: tighter rows, the share in the small size, no faces, the acts on a line of their own.
+@container wplus-poll (max-width: 240px) {
+    .wplus-poll__option { column-gap: 8px; }
+    .wplus-poll__share { min-width: 0; font-size: var(--wplus-font-size-xs); }
+    .wplus-poll__faces { display: none; }
+    .wplus-poll__actions { margin-inline-start: -8px; }
+}
+
+// A poll that ended, where its conversation says so (PollEndedCard): the poll's card in a frame of its own, as a
+// message of no one's, under a quiet line that says it ended and leads back to the poll.
+.wplus-poll-ended {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    width: min(100%, 324px);
+    margin: 6px auto;
+    padding: 10px 16px 8px;
+    &:not(#\9) { border-radius: var(--wplus-radius-bubble); }
+    border: 1px solid rgba(var(--wplus-color-border), 1);
+    background: rgba(var(--wplus-color-bg-elevated), 1);
+    color: rgba(var(--wplus-color-text-primary), 1);
+    font-size: var(--wplus-font-size-base, 14px);
+    text-align: start;
+
+    .wplus-poll { width: auto; }
+}
+
+.wplus-poll-ended__head {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 28px;
+    margin-inline-end: -8px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid rgba(var(--wplus-color-border), 1);
+    font-size: var(--wplus-font-size-xs);
+    font-weight: var(--wplus-font-weight-semibold);
+    color: rgba(var(--wplus-color-text-tertiary), 1);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.wplus-poll-ended__title {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.wplus-poll-ended__show {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    padding: 3px 4px 3px 8px;
+    &:not(#\9) { border-radius: var(--wplus-radius-pill); }
+    color: rgba(var(--wplus-color-accent), 1);
+    font-size: var(--wplus-font-size-sm);
+    letter-spacing: 0;
+    text-transform: none;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: background 0.12s ease;
+
+    &:hover { background: rgba(var(--wplus-color-accent), 0.1); }
+    &:focus-visible { outline: 2px solid rgba(var(--wplus-color-accent), 1); outline-offset: 1px; }
+}
+
+// The form. Its width is its own, so a note that grows or a switch that opens a field never resizes the dialog it
+// is in: a dialog sized by its content took the width of the longest line.
+
+.wplus-poll-form {
+    --wplus-poll-pick: rgba(var(--wplus-color-accent), 1);
+    --wplus-poll-on-pick: rgba(var(--wplus-color-text-on-accent), 1);
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    gap: var(--wplus-space-xs);
+    width: 440px;
+    max-width: 100%;
+    color: rgba(var(--wplus-color-text-primary), 1);
+    font-size: var(--wplus-font-size-md);
+}
+
+.wplus-poll-form__label {
+    margin-top: var(--wplus-space-sm);
+    font-size: var(--wplus-font-size-sm);
+    font-weight: var(--wplus-font-weight-semibold);
+    color: rgba(var(--wplus-color-text-secondary), 1);
+}
+
+.wplus-poll-form__field {
+    position: relative;
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.wplus-poll-form .wplus-poll-form__input:not(#\9) {
+    box-sizing: border-box;
+    display: block;
+    width: 100%;
+    min-height: 38px;
+    margin: 0;
+    padding: 8px 10px;
+    border: 1px solid rgba(var(--wplus-color-border), 1);
+    border-radius: var(--wplus-radius-input);
+    background: rgba(var(--wplus-color-bg), 1);
+    box-shadow: none;
+    color: rgba(var(--wplus-color-field-text), 1);
+    font: inherit;
+    line-height: var(--wplus-line-height-normal);
+    outline: none;
+    resize: vertical;
+
+    &::placeholder { color: rgba(var(--wplus-color-field-placeholder), 1); opacity: 1; }
+    &:focus { border-color: rgba(var(--wplus-color-accent), 1); box-shadow: 0 0 0 3px rgba(var(--wplus-color-accent), 0.18); }
+    &[aria-invalid="true"] { border-color: rgba(var(--wplus-color-danger), 1); }
+}
+
+.wplus-poll-form .wplus-poll-form__question:not(#\9) {
+    min-height: 60px;
+    font-weight: var(--wplus-font-weight-medium);
+}
+
+.wplus-poll-form .wplus-poll-form__select:not(#\9) {
+    width: auto;
+    min-width: 12em;
+    resize: none;
+}
+
+.wplus-poll-form__counter {
+    position: absolute;
+    inset-inline-end: 8px;
+    bottom: 6px;
+    font-size: var(--wplus-font-size-xs);
+    color: rgba(var(--wplus-color-text-tertiary), 1);
+    pointer-events: none;
+}
+
+.wplus-poll-form__error {
+    font-size: var(--wplus-font-size-xs);
+    color: rgba(var(--wplus-color-danger), 1);
+}
+
+.wplus-poll-form__options {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.wplus-poll-form__option {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0 6px;
+
+    > .wplus-poll-form__error { flex-basis: 100%; }
+}
+
+.wplus-poll-form__answer {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    border: 1.5px solid rgba(var(--wplus-color-border-strong), 1);
+    &:not(#\9) { border-radius: var(--wplus-radius-circle); }
+    cursor: pointer;
+
+    &[aria-checked="true"] {
+        border-color: rgba(var(--wplus-color-success), 1);
+        background: rgba(var(--wplus-color-success), 1);
+        color: #fff;
+    }
+
+    &:focus-visible { outline: 2px solid rgba(var(--wplus-color-accent), 0.7); outline-offset: 1px; }
+}
+
+.wplus-poll-form__remove {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    &:not(#\9) { border-radius: var(--wplus-radius-circle); }
+    color: rgba(var(--wplus-color-icon), 1);
+    cursor: pointer;
+
+    &:hover { background: rgba(var(--wplus-color-bg-hover), 1); }
+    &:focus-visible { outline: 2px solid rgba(var(--wplus-color-accent), 0.7); }
+}
+
+.wplus-poll-form__settings {
+    display: flex;
+    flex-direction: column;
+    gap: var(--wplus-space-sm);
+    margin-top: var(--wplus-space-sm);
+    padding-top: var(--wplus-space-sm);
+    border-top: 1px solid rgba(var(--wplus-color-border-subtle), 1);
+}
+
+.wplus-poll-form__setting {
+    display: flex;
+    flex-direction: column;
+    gap: var(--wplus-space-xs);
+
+    > .wplus-poll-form__label { margin-top: 0; }
+}
+
+.wplus-poll-form__switch {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    cursor: pointer;
+    font-weight: var(--wplus-font-weight-medium);
+
+    > input {
+        position: absolute;
+        opacity: 0;
+        width: 1px;
+        height: 1px;
+        margin: 0;
+    }
+
+    &[data-disabled="1"] { opacity: 0.5; cursor: default; }
+}
+
+.wplus-poll-form__track {
+    position: relative;
+    flex: 0 0 auto;
+    width: 34px;
+    height: 20px;
+    &:not(#\9) { border-radius: var(--wplus-radius-pill); }
+    background: rgba(var(--wplus-color-border-strong), 1);
+    transition: background 0.15s ease;
+
+    &::after {
+        content: "";
+        position: absolute;
+        top: 2px;
+        inset-inline-start: 2px;
+        width: 16px;
+        height: 16px;
+        border-radius: 50%;
+        background: #fff;
+        transition: transform 0.15s ease;
+    }
+
+    input:checked + & { background: rgba(var(--wplus-color-accent), 1); }
+    input:checked + &::after { transform: translateX(14px); }
+    [dir="rtl"] input:checked + &::after { transform: translateX(-14px); }
+    input:focus-visible + & { outline: 2px solid rgba(var(--wplus-color-accent), 0.7); outline-offset: 2px; }
+
+    @media (prefers-reduced-motion: reduce) { transition: none; &::after { transition: none; } }
+}
+
+.wplus-poll-form__note {
+    margin: 0;
+    font-size: var(--wplus-font-size-xs);
+    color: rgba(var(--wplus-color-text-secondary), 1);
+
+    // Under a switch, in line with its words: the track and its gap.
+    .wplus-poll-form__switch ~ & { padding-inline-start: 44px; }
+}
+
+.wplus-poll-form__actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: var(--wplus-space-sm);
+    margin-top: var(--wplus-space-md);
+}
+
+// Who voted.
+
+.wplus-poll-voters {
+    --wplus-poll-pick: rgba(var(--wplus-color-accent), 1);
+    --wplus-poll-on-pick: rgba(var(--wplus-color-text-on-accent), 1);
+    display: flex;
+    flex-direction: column;
+    gap: var(--wplus-space-sm);
+    min-height: 240px;
+    color: rgba(var(--wplus-color-text-primary), 1);
+}
+
+.wplus-poll-voters__head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.wplus-poll-voters__title {
+    font-size: var(--wplus-font-size-lg);
+    font-weight: var(--wplus-font-weight-semibold);
+}
+
+.wplus-poll-voters__close {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    &:not(#\9) { border-radius: var(--wplus-radius-circle); }
+    color: rgba(var(--wplus-color-icon), 1);
+    cursor: pointer;
+
+    &:hover { background: rgba(var(--wplus-color-bg-hover), 1); }
+}
+
+.wplus-poll-voters__question {
+    font-size: var(--wplus-font-size-sm);
+    color: rgba(var(--wplus-color-text-secondary), 1);
+    overflow-wrap: anywhere;
+}
+
+.wplus-poll-voters__tabs {
+    display: flex;
+    gap: 6px;
+    overflow-x: auto;
+    padding-bottom: 2px;
+    scrollbar-width: thin;
+}
+
+.wplus-poll-voters__tab {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    max-width: 14em;
+    padding: 5px 10px;
+    border: 1px solid rgba(var(--wplus-color-border-subtle), 1);
+    &:not(#\9) { border-radius: var(--wplus-radius-pill); }
+    font-size: var(--wplus-font-size-sm);
+    cursor: pointer;
+
+    &:hover { background: rgba(var(--wplus-color-bg-hover), 1); }
+
+    &[data-active="1"] {
+        border-color: rgba(var(--wplus-color-accent), 1);
+        background: rgba(var(--wplus-color-accent-subtle), 1);
+        color: rgba(var(--wplus-color-accent-hover), 1);
+    }
+}
+
+.wplus-poll-voters__tab-text {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.wplus-poll-voters__tab-count {
+    font-weight: var(--wplus-font-weight-semibold);
+    font-variant-numeric: tabular-nums;
+}
+
+.wplus-poll-voters__list {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    overflow-y: auto;
+
+    > .wplus-poll__action { align-self: center; margin-top: var(--wplus-space-xs); }
+}
+
+.wplus-poll-voters__user {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 4px;
+    min-width: 0;
+}
+
+.wplus-poll-voters__name {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-weight: var(--wplus-font-weight-medium);
+    color: rgba(var(--wplus-color-text-primary), 1);
+
+    // A host's name may link to the profile: it keeps the list's ink, where a theme's link colour (its dark mode's
+    // near white, on the host's light dialog) left it unreadable.
+    a:not(#\9) {
+        color: inherit;
+        text-decoration: none;
+    }
+
+    a:not(#\9):hover { text-decoration: underline; }
+}
+
+.wplus-poll-voters__empty,
+.wplus-poll-voters__loading {
+    padding: var(--wplus-space-lg) 0;
+    text-align: center;
+    font-size: var(--wplus-font-size-sm);
+    color: rgba(var(--wplus-color-text-secondary), 1);
+}
+
+.wplus-poll-voters__loading svg { animation: wplus-poll-spin 0.8s linear infinite; }
+
+@keyframes wplus-poll-spin { to { transform: rotate(360deg); } }

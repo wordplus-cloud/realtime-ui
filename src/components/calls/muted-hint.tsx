@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { _x } from "../../inc/globals.ts";
-import Icon from "../../primitives/icon.tsx";
+import Icon from "../../primitives/icons.tsx";
 import { CallContext, type CallContextInterface } from "./context.ts";
 import type { CallLayout } from "./call-screen.tsx";
 import { mediaPreauthorized, mediaUpdatedSubject } from "../../inc/calls/permissions.ts";

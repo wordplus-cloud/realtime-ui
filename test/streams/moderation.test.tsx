@@ -17,7 +17,7 @@ const host = { identity: 'u:1', role: 'host' as const, name: 'Host', chat: 'writ
 const live = { id: 's', state: 'live' as const, started_at: Date.now() - 60_000, ended_at: null };
 // A track that marks the <video> it is shown in with its id.
 const track = ( id : string ) => ( { attach: ( video : HTMLVideoElement ) => { video.dataset.track = id; }, detach: () => {}, sid: 'TR_' + id, mediaStreamTrack: { id } } ) as unknown as NonNullable<Tile['camera']>;
-const shown = ( container : HTMLElement, where : string ) => [ ...container.querySelectorAll<HTMLVideoElement>( where + ' video' ) ].map( ( v ) => v.dataset.track + ( v.classList.contains( 'estream-video--contain' ) ? ' whole' : '' ) );
+const shown = ( container : HTMLElement, where : string ) => [ ...container.querySelectorAll<HTMLVideoElement>( where + ' video' ) ].map( ( v ) => v.dataset.track + ( v.classList.contains( 'wplus-live-stream-video--contain' ) ? ' whole' : '' ) );
 const person = ( identity : string, name : string, patch : Partial<Tile> = {} ) : Tile => ( {
     identity, name, role: identity === 'u:1' ? 'host' : 'guest', local: false, camera: track( identity ), screen: null, audio: [],
     micMuted: false, speaking: false, encoder: false, ...patch
@@ -25,7 +25,7 @@ const person = ( identity : string, name : string, patch : Partial<Tile> = {} ) 
 const message = ( id : string, text : string, from : Partial<ChatMessage['from']> = {} ) : ChatMessage => ( {
     id, text, at: 1, from: { id: 'u:7', name: 'Maya', avatar: null, role: 'viewer', ...from }
 } );
-const names = ( container : HTMLElement, where : string ) => [ ...container.querySelectorAll( where + ' .estream-tile' ) ].map( ( t ) => t.textContent );
+const names = ( container : HTMLElement, where : string ) => [ ...container.querySelectorAll( where + ' .wplus-live-stream-tile' ) ].map( ( t ) => t.textContent );
 
 describe( 'the layout the host chose', () => {
     const tiles = [ person( 'u:1', 'Host' ), person( 'u:5', 'Olena' ), person( 'u:7', 'Maya' ) ];
@@ -35,23 +35,23 @@ describe( 'the layout the host chose', () => {
         const { update, asClient } = watching();
         const { container } = render( <EasyStreamApp client={ asClient } /> );
 
-        expect( container.querySelector( '.estream-tiles--n3' ) ).toBeTruthy();
+        expect( container.querySelector( '.wplus-live-stream-tiles--n3' ) ).toBeTruthy();
 
         update( { layout: { mode: 'speaker', identity: null }, tiles: [ tiles[0]!, { ...tiles[1]!, speaking: true }, tiles[2]! ] } );
-        expect( names( container, '.estream-tiles__main' ) ).toEqual( [ 'Olena' ] );
-        expect( names( container, '.estream-tiles__strip' ) ).toEqual( [ 'Host', 'Maya' ] );
+        expect( names( container, '.wplus-live-stream-tiles__main' ) ).toEqual( [ 'Olena' ] );
+        expect( names( container, '.wplus-live-stream-tiles__strip' ) ).toEqual( [ 'Host', 'Maya' ] );
 
         // Nobody speaking: the last who spoke stays large.
         update( { tiles } );
-        expect( names( container, '.estream-tiles__main' ) ).toEqual( [ 'Olena' ] );
+        expect( names( container, '.wplus-live-stream-tiles__main' ) ).toEqual( [ 'Olena' ] );
 
         update( { layout: { mode: 'spotlight', identity: 'u:7' } } );
-        expect( container.querySelectorAll( '.estream-tile' ) ).toHaveLength( 1 );
-        expect( container.querySelector( '.estream-video--contain' ), 'shown whole' ).toBeTruthy();
+        expect( container.querySelectorAll( '.wplus-live-stream-tile' ) ).toHaveLength( 1 );
+        expect( container.querySelector( '.wplus-live-stream-video--contain' ), 'shown whole' ).toBeTruthy();
 
         // The one in the spotlight left the stage: the others are seen again.
         update( { tiles: tiles.slice( 0, 2 ) } );
-        expect( container.querySelectorAll( '.estream-tile' ) ).toHaveLength( 2 );
+        expect( container.querySelectorAll( '.wplus-live-stream-tile' ) ).toHaveLength( 2 );
     } );
 
     it( 'puts a shared screen large with the cameras beside it, across the stage with its sharer\'s camera in the corner, and alone with no camera on', () => {
@@ -59,33 +59,33 @@ describe( 'the layout the host chose', () => {
         const { update, asClient } = watching( { tiles: [ sharing, tiles[1]! ] } );
         const { container } = render( <EasyStreamApp client={ asClient } /> );
 
-        expect( container.querySelector( '.estream-tiles--share' ) ).toBeTruthy();
-        expect( shown( container, '.estream-tiles__main' ) ).toEqual( [ 'screen whole' ] );
-        expect( names( container, '.estream-tiles__strip' ) ).toEqual( [ 'Host', 'Olena' ] );
-        expect( shown( container, '.estream-tiles__strip' ) ).toEqual( [ 'u:1', 'u:5' ] );
+        expect( container.querySelector( '.wplus-live-stream-tiles--share' ) ).toBeTruthy();
+        expect( shown( container, '.wplus-live-stream-tiles__main' ) ).toEqual( [ 'screen whole' ] );
+        expect( names( container, '.wplus-live-stream-tiles__strip' ) ).toEqual( [ 'Host', 'Olena' ] );
+        expect( shown( container, '.wplus-live-stream-tiles__strip' ) ).toEqual( [ 'u:1', 'u:5' ] );
 
         // The host alone with the screen and the camera: the screen across the stage, shown whole, and the camera in
         // the bottom right corner over it, unnamed and with no ring while they speak, as there is nobody to tell apart.
         update( { tiles: [ { ...sharing, speaking: true } ] } );
-        expect( container.querySelector( '.estream-tiles__strip' ) ).toBeNull();
-        expect( container.querySelector( '.estream-tiles--n1' ) ).toBeTruthy();
-        expect( shown( container, '.estream-tiles--n1 > .estream-tile' ) ).toEqual( [ 'screen whole' ] );
-        expect( container.querySelector( '.estream-tiles__corner' )!.className ).toBe( 'estream-tiles__corner estream-tiles__corner--right' );
-        expect( shown( container, '.estream-tiles__corner' ) ).toEqual( [ 'u:1' ] );
-        expect( names( container, '.estream-tiles__corner' ) ).toEqual( [ '' ] );
-        expect( container.querySelector( '.estream-tile--speaking' ) ).toBeNull();
+        expect( container.querySelector( '.wplus-live-stream-tiles__strip' ) ).toBeNull();
+        expect( container.querySelector( '.wplus-live-stream-tiles--n1' ) ).toBeTruthy();
+        expect( shown( container, '.wplus-live-stream-tiles--n1 > .wplus-live-stream-tile' ) ).toEqual( [ 'screen whole' ] );
+        expect( container.querySelector( '.wplus-live-stream-tiles__corner' )!.className ).toBe( 'wplus-live-stream-tiles__corner wplus-live-stream-tiles__corner--right' );
+        expect( shown( container, '.wplus-live-stream-tiles__corner' ) ).toEqual( [ 'u:1' ] );
+        expect( names( container, '.wplus-live-stream-tiles__corner' ) ).toEqual( [ '' ] );
+        expect( container.querySelector( '.wplus-live-stream-tile--speaking' ) ).toBeNull();
 
         // Its microphone off still says so there.
         update( { tiles: [ { ...sharing, micMuted: true } ] } );
-        expect( container.querySelector( '.estream-tiles__corner [aria-label="Microphone off"]' ) ).toBeTruthy();
+        expect( container.querySelector( '.wplus-live-stream-tiles__corner [aria-label="Microphone off"]' ) ).toBeTruthy();
 
         // The host shares the screen only: no empty strip beside it and no corner, and it shows whole.
         update( { tiles: [ { ...sharing, camera: null } ] } );
-        expect( container.querySelector( '.estream-tiles__strip' ) ).toBeNull();
-        expect( container.querySelector( '.estream-tiles__corner' ) ).toBeNull();
-        expect( container.querySelector( '.estream-tiles--n1' ) ).toBeTruthy();
-        expect( container.querySelectorAll( '.estream-tile' ) ).toHaveLength( 1 );
-        expect( shown( container, '.estream-tiles--n1' ) ).toEqual( [ 'screen whole' ] );
+        expect( container.querySelector( '.wplus-live-stream-tiles__strip' ) ).toBeNull();
+        expect( container.querySelector( '.wplus-live-stream-tiles__corner' ) ).toBeNull();
+        expect( container.querySelector( '.wplus-live-stream-tiles--n1' ) ).toBeTruthy();
+        expect( container.querySelectorAll( '.wplus-live-stream-tile' ) ).toHaveLength( 1 );
+        expect( shown( container, '.wplus-live-stream-tiles--n1' ) ).toEqual( [ 'screen whole' ] );
     } );
 
     it( 'puts the sharer\'s camera in the left corner where the site\'s logo takes the right', () => {
@@ -93,8 +93,8 @@ describe( 'the layout the host chose', () => {
         const { asClient } = watching( { tiles: [ sharing ] } );
         const { container } = render( <EasyStreamApp client={ asClient } appearance={ { logo: 'https://site.example/logo.png', logoPosition: 'bottom-right' } } /> );
 
-        expect( container.querySelector( '.estream-tiles__corner' )!.className ).toBe( 'estream-tiles__corner estream-tiles__corner--left' );
-        expect( container.querySelector( '.estream-logo--bottom-right' ) ).toBeTruthy();
+        expect( container.querySelector( '.wplus-live-stream-tiles__corner' )!.className ).toBe( 'wplus-live-stream-tiles__corner wplus-live-stream-tiles__corner--left' );
+        expect( container.querySelector( '.wplus-live-stream-logo--bottom-right' ) ).toBeTruthy();
     } );
 
     it( 'keeps the host\'s own picture as they go live, from the preview\'s tile to the room\'s, which names their place in it', () => {
@@ -102,15 +102,15 @@ describe( 'the layout the host chose', () => {
         const own = person( 'u:1', 'Host', { local: true } );
         const { update, asClient } = fakeClient( { you: host, stream: live, media: 'off', tiles: [ own ] } );
         const { container } = render( <EasyStreamApp client={ asClient } /> );
-        const before = container.querySelector( '.estream-stage video' );
+        const before = container.querySelector( '.wplus-live-stream-stage video' );
         expect( before ).toBeTruthy();
 
         update( { media: 'live', tiles: [ { ...own, identity: 'u:1.0f1e2d3c' } ] } );
-        expect( container.querySelector( '.estream-stage video' ), 'the same <video>, not made again' ).toBe( before );
+        expect( container.querySelector( '.wplus-live-stream-stage video' ), 'the same <video>, not made again' ).toBe( before );
 
         // A guest beside the host: the host's picture still the same.
         update( { tiles: [ { ...own, identity: 'u:1.0f1e2d3c' }, tiles[1]! ] } );
-        expect( container.querySelectorAll( '.estream-stage video' )[0] ).toBe( before );
+        expect( container.querySelectorAll( '.wplus-live-stream-stage video' )[0] ).toBe( before );
     } );
 
     it( 'lets the host move the sharer\'s camera over the screen, dragged or with the arrow keys, where everyone sees it', async () => {
@@ -120,14 +120,14 @@ describe( 'the layout the host chose', () => {
         // nothing to move.
         const seen = watching( { tiles: [ sharing ], layout: { mode: 'grid', identity: null, corner: { x: 0.25, y: 0.5 } } } );
         const first = render( <EasyStreamApp client={ seen.asClient } /> );
-        const placed = first.container.querySelector<HTMLElement>( '.estream-tiles__corner' )!;
+        const placed = first.container.querySelector<HTMLElement>( '.wplus-live-stream-tiles__corner' )!;
         expect( [ placed.style.left, placed.style.top, placed.style.transform ] ).toEqual( [ '25%', '50%', 'translate(-25%, -50%)' ] );
         expect( [ placed.getAttribute( 'tabindex' ), placed.getAttribute( 'role' ), placed.className.includes( 'movable' ) ] ).toEqual( [ null, null, false ] );
         first.unmount();
 
         const { client, asClient } = fakeClient( { you: host, stream: live, media: 'live', tiles: [ { ...sharing, local: true } ] } );
         const { container } = render( <EasyStreamApp client={ asClient } /> );
-        const corner = container.querySelector<HTMLElement>( '.estream-tiles__corner' )!;
+        const corner = container.querySelector<HTMLElement>( '.wplus-live-stream-tiles__corner' )!;
         expect( corner.getAttribute( 'aria-label' ) ).toBe( 'Camera over the shared screen. Drag it, or move it with the arrow keys.' );
         expect( corner.style.left ).toBe( '' );
 
@@ -305,8 +305,8 @@ describe( 'the chat\'s moderators and its rules', () => {
 
         await act( async () => { fireEvent.click( screen.getByRole( 'button', { name: 'Who is here' } ) ); } );
         const here = screen.getByRole( 'list', { name: 'Who is here' } );
-        expect( [ ...here.querySelectorAll( '.estream-person__name' ) ].map( ( n ) => n.textContent ) ).toEqual( [ 'Host', 'Maya', 'Sam' ] );
-        expect( ( here.querySelector( 'img.estream-message__avatar' ) as HTMLImageElement ).src ).toBe( 'https://site.example/maya.png' );
+        expect( [ ...here.querySelectorAll( '.wplus-live-stream-person__name' ) ].map( ( n ) => n.textContent ) ).toEqual( [ 'Host', 'Maya', 'Sam' ] );
+        expect( ( here.querySelector( 'img.wplus-live-stream-message__avatar' ) as HTMLImageElement ).src ).toBe( 'https://site.example/maya.png' );
         expect( screen.getByText( 'and 3 visitors' ) ).toBeTruthy();
         expect( screen.queryByLabelText( 'Moderate Host' ) ).toBeNull();
 

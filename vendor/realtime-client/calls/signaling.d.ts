@@ -10,10 +10,22 @@ export declare class P2PSignaling {
     private queue;
     private closed;
     private readonly stopListening;
+    private readonly lag;
+    private readonly inflight;
+    private inflightSeq;
+    private lastAnswerAt;
+    private stalledSince;
+    private readonly roundTrips;
+    private testStallUntil;
     constructor(transport: CallTransport, callId: CallId, onMessage: (message: ServerMessage) => void);
     get connected(): boolean;
     get isClosed(): boolean;
+    stalledFor(now?: number): number;
+    roundTrip(): number;
+    stallForTest(ms: number): void;
+    private sendNow;
     private request;
+    private ordered;
     join(params: {
         epoch: number;
         last_id: string | null;

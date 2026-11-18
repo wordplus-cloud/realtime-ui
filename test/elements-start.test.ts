@@ -7,6 +7,7 @@ it( 'starts by itself on a page with its calls, once, and takes the settings a l
     const elements = await import( '../src/elements.tsx' );
 
     expect( customElements.get( 'call-button' ) ).toBeTruthy();
+    expect( customElements.get( 'group-call-button' ) ).toBeTruthy();
     expect( customElements.get( 'room-button' ) ).toBeTruthy();
     const holders = document.querySelectorAll( 'call-screen' );
     expect( holders ).toHaveLength( 1 );

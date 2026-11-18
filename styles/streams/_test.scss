@@ -1,0 +1,53 @@
+// ─── The test stream (test-stream.tsx) ────────────────────────────────────
+// In the studio while it runs, where the setup was: a card saying what a test
+// is, with the way to watch it, and after it ends the same card with how long
+// it ran. On the stream's page that shows it, a badge beside Live in the
+// picture's top bar, in words rather than capitals, saying only its host sees
+// it, as the preview's badge is drawn.
+
+.wplus-live-stream-test-panel {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+    margin: 0;
+    padding: 12px 14px;
+    border-radius: var(--wplus-live-stream-radius);
+    background: var(--wplus-live-stream-surface-2);
+    color: var(--wplus-live-stream-text);
+
+    &__title {
+        margin: 0;
+        font-weight: 650;
+    }
+
+    &__text {
+        margin: 0;
+        color: var(--wplus-live-stream-muted);
+        line-height: 1.45;
+    }
+
+    .wplus-live-stream-button {
+        margin-top: 4px;
+    }
+}
+
+// The setup under the running test's card: its "Preview: only you can see this" says again what the card says.
+.wplus-live-stream-test-panel + .wplus-live-stream-setup > .wplus-live-stream-controls__hint {
+    display: none;
+}
+
+.wplus-live-stream-badge--test {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    text-transform: none;
+    letter-spacing: 0;
+    font-weight: 600;
+    background: rgba(255, 255, 255, 0.18);
+    backdrop-filter: blur(6px);
+
+    .wplus-live-stream-icon {
+        flex: none;
+    }
+}

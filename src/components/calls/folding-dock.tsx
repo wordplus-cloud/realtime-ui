@@ -59,8 +59,19 @@ interface Props {
     // The More button, drawn while anything is folded: `sheet` is the open
     // sheet (null while closed), placed inside it, and `toggle` opens and
     // closes it. The button carries the class .wplus-call-more, by which a press
-    // on it, or in its sheet, is told from a press outside that closes it.
-    more      : ( props : { open : boolean; toggle : () => void; sheet : ReactNode } ) => ReactNode;
+    // on it, or in its sheet, is told from a press outside that closes it. A
+    // dock that draws its own menu instead (call-dock.tsx) takes the sheet's
+    // `rows`, the first `folded` of them the row's, and gives that menu the
+    // class .wplus-call-more-menu, which a press in counts as the button's.
+    more      : ( props : { open : boolean; toggle : () => void; close : () => void; sheet : ReactNode; rows : ReactElement[]; folded : number } ) => ReactNode;
+    // Controls in the sheet whatever the room, after the ones the row folded
+    // (call-dock.tsx, <DockMore>). With any, More is always there, but for
+    // one alone with nothing folded: a sheet of one row is that control's own
+    // button, drawn in More's place.
+    always?   : ReactElement[];
+    // More is there with nothing folded and nothing in `always`: its menu has
+    // something of its own (a group video call's layout).
+    keep?     : boolean;
     children  : ReactNode;
 }
 
@@ -92,16 +103,24 @@ type DockButton = ReactElement<{
     children?     : ReactNode;
     role?         : string;
     "aria-label"? : string;
+    tabIndex?     : number;
+    onKeyDown?    : ( e: React.KeyboardEvent<HTMLElement> ) => void;
+    "data-wplus-label"? : string;
+    "data-wplus-key"?   : string;
 }>;
 
 // An item is a <Tooltip content="Mute All"><span className="wplus-mute-all">,
 // whose tooltip's copy is the label the sheet spells out and whose span is the
-// button itself; or the span alone, labelled by its own aria-label.
+// button itself; or the span alone, labelled by its own aria-label. Where the
+// call's keys named the key in the tooltip, the label is the one before them
+// (call-keys.tsx), and the row shows the key apart.
 function itemParts( el: ReactElement ): { label: string; button: DockButton } {
     const props = el.props as { content?: unknown; children?: ReactNode };
 
     if ( typeof props.content === "string" && isValidElement( props.children ) ) {
-        return { label: props.content, button: props.children as DockButton };
+        const button = props.children as DockButton;
+        const plain = button.props[ "data-wplus-label" ];
+        return { label: typeof plain === "string" ? plain : props.content, button };
     }
 
     const own = ( el as DockButton ).props[ "aria-label" ];
@@ -135,9 +154,10 @@ function isWrapped( row: HTMLElement ): boolean {
     return kids[ kids.length - 1 ].offsetTop > kids[ 0 ].offsetTop;
 }
 
-export default function FoldingDock( { className, pinned = 0, more, children }: Props ) {
+export default function FoldingDock( { className, pinned = 0, more, always = [], keep = false, children }: Props ) {
     const items = flattenItems( children );
-    const signature = itemSignature( items );
+    // The sheet's own controls count as the row's contents: More comes and goes with them, which changes the room.
+    const signature = itemSignature( items ) + '/' + itemSignature( always );
 
     const rowRef = useRef<HTMLDivElement>( null );
 
@@ -154,7 +174,11 @@ export default function FoldingDock( { className, pinned = 0, more, children }: 
     const tail   = pinned > 0 ? items.slice( Math.max( 0, items.length - pinned ) ) : [];
     const hidden = Math.min( folded, head.length );
     const inline = head.slice( 0, head.length - hidden );
-    const sheet  = head.slice( head.length - hidden );
+    const sheet  = [ ...head.slice( head.length - hidden ), ...always ];
+    // More would open on one row and nothing of its own: that control in its
+    // place instead, as wide as More is, so the row measures the same. As soon
+    // as the row folds anything, More is back with both.
+    const lone   = hidden === 0 && ! keep && always.length === 1;
 
     // Keyed by position in the WHOLE row, so moving a button between the row
     // and the sheet is a move and not a remount.
@@ -249,8 +273,8 @@ export default function FoldingDock( { className, pinned = 0, more, children }: 
     // Nothing left to show: a sheet that emptied out (the window grew, the
     // moderator's buttons went away) must not stay open over the call.
     useEffect( () => {
-        if ( hidden === 0 ) setOpen( false );
-    }, [ hidden ] );
+        if ( ( sheet.length === 0 && ! keep ) || lone ) setOpen( false );
+    }, [ sheet.length, keep, lone ] );
 
     useEffect( () => {
         if ( ! open ) return;
@@ -261,9 +285,11 @@ export default function FoldingDock( { className, pinned = 0, more, children }: 
         // pointerdown would unmount a sheet row before its own click landed.
         // (A row's click then bubbles to the button and closes the sheet
         // itself, which is the "act, then put it away" the dock wants.)
+        // What was pressed, from the path: in a shadow root (the elements
+        // script's) the document is told the root's host.
         const onDown = ( e: PointerEvent ) => {
-            const target = e.target;
-            if ( target instanceof Element && target.closest( ".wplus-call-more" ) ) return;
+            const target = e.composedPath?.()[ 0 ] ?? e.target;
+            if ( target instanceof Element && target.closest( ".wplus-call-more, .wplus-call-more-menu" ) ) return;
             setOpen( false );
         };
         const onKey = ( e: KeyboardEvent ) => {
@@ -278,9 +304,8 @@ export default function FoldingDock( { className, pinned = 0, more, children }: 
         };
     }, [ open ] );
 
-    const rows = open
-        ? <div className="wplus-call-dock-sheet" role="menu">
-            { sheet.map( ( el, i ) => {
+    const sheetRows = open
+        ? sheet.map( ( el, i ) => {
                 const { label, button } = itemParts( el );
                 const cls = [ button.props.className, "wplus-call-dock-sheet__row" ]
                     .filter( Boolean ).join( " " );
@@ -288,24 +313,42 @@ export default function FoldingDock( { className, pinned = 0, more, children }: 
                 // The button itself becomes the row: it keeps its handler and
                 // its tone class, gains the label, and the stylesheet unrolls
                 // the circle into a line. The row says its label, so it wears
-                // no tooltip of its own.
+                // no tooltip of its own. It is the bare control, without what
+                // the tooltip gives one in the row (a place in the Tab order,
+                // Enter and Space as a real click, helpers/tooltip.tsx), so it
+                // takes those here: a key press is the user's gesture as a
+                // press is, which picture in picture asks for.
+                const own = button.props.onKeyDown;
+                const pressKey = ( e: React.KeyboardEvent<HTMLElement> ) => {
+                    own?.( e );
+                    if ( e.defaultPrevented || ( e.key !== "Enter" && e.key !== " " && e.key !== "Spacebar" ) ) return;
+                    if ( e.currentTarget !== e.target ) return;
+                    e.preventDefault();
+                    e.currentTarget.click();
+                };
+                const key = button.props[ "data-wplus-key" ];
                 return cloneElement(
                     button,
-                    { key: `wplus-dock-sheet-${ i }`, className: cls, role: "menuitem", "data-wplus-tip": undefined } as Partial<DockButton[ "props" ]>,
+                    { key: `wplus-dock-sheet-${ i }`, className: cls, role: "menuitem", tabIndex: 0, onKeyDown: pressKey, "data-wplus-tip": undefined } as Partial<DockButton[ "props" ]>,
                     ...React.Children.toArray( button.props.children ),
                     label
                         ? <span key="wplus-dock-label" className="wplus-call-dock-sheet__label">{ label }</span>
                         : null,
+                    key
+                        ? <span key="wplus-dock-key" className="wplus-call-key-hint" aria-hidden="true">{ key }</span>
+                        : null,
                 );
-            } ) }
-        </div>
-        : null;
+            } )
+        : [];
+    const rows = open ? <div className="wplus-call-dock-sheet" role="menu">{ sheetRows }</div> : null;
 
     return (
         <div ref={ rowRef } className={ className } data-folded={ hidden > 0 ? hidden : undefined }>
             { keyed( inline, 0 ) }
 
-            { hidden > 0 && more( { open, toggle: () => setOpen( ( v ) => ! v ), sheet: rows } ) }
+            { lone
+                ? cloneElement( always[ 0 ], { key: "wplus-dock-lone" } )
+                : ( sheet.length > 0 || keep ) && more( { open, toggle: () => setOpen( ( v ) => ! v ), close: () => setOpen( false ), sheet: rows, rows: sheetRows, folded: hidden } ) }
 
             { keyed( tail, head.length ) }
         </div>

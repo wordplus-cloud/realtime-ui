@@ -19,7 +19,9 @@ import { homedir } from 'node:os';
 
 const root = join( dirname( fileURLToPath( import.meta.url ) ), '..' );
 const LOCALES = { de: 'de', es: 'es', fr: 'fr', it: 'it', nl: 'nl', pl: 'pl', hr: 'hr', he: 'he' };
-const CACHES = join( homedir(), 'Projects/bm.com/wp-content/plugins/better-messages-dev/src/translations/results' );
+// The translation caches a new string may be taken from: TRANSLATION_CACHES names their folder, and with none set the
+// script translates nothing new and only keeps what the files have.
+const CACHES = process.env.TRANSLATION_CACHES ?? join( homedir(), '.translation-caches' );
 
 const files = ( dir ) => readdirSync( dir ).flatMap( ( name ) => statSync( join( dir, name ) ).isDirectory() ? files( join( dir, name ) ) : [ join( dir, name ) ] );
 const unquote = ( s ) => s.slice( 1, -1 ).replace( /\\(['"\\])/g, '$1' );
@@ -56,8 +58,18 @@ export function strings( which = () => true ) {
 // With the words an app's screens show in place of some of Better Messages' (src/languages/in-apps.json), translated
 // by hand as Better Messages never has them.
 const inApps = Object.values( JSON.parse( readFileSync( join( root, 'src', 'languages', 'in-apps.json' ), 'utf8' ) ) );
-const shared = [ ...new Set( [ ...strings( ( file ) => ! inStreams( file ) ), ...inApps ] ) ].sort();
+// The recording player's words go apart too, into src/languages/recording/{locale}.json, which only the player loads
+// (inc/recording-languages.ts): neither the call screens' script nor the streams' carries them.
+const RECORDING = join( root, 'src', 'components', 'recording' );
+const inRecording = ( file ) => file.startsWith( RECORDING + '/' ) || file === join( root, 'src', 'recording-elements.tsx' );
+// The polls' words go apart the same way, into src/languages/polls/{locale}.json, which only the polls' script loads
+// (components/polls/i18n.ts).
+const POLLS = join( root, 'src', 'components', 'polls' );
+const inPolls = ( file ) => file.startsWith( POLLS + '/' );
+const shared = [ ...new Set( [ ...strings( ( file ) => ! inStreams( file ) && ! inRecording( file ) && ! inPolls( file ) ), ...inApps ] ) ].sort();
 const ofStreams = strings( inStreams ).filter( ( key ) => ! shared.includes( key ) );
+const ofRecording = strings( inRecording ).filter( ( key ) => ! shared.includes( key ) );
+const ofPolls = strings( inPolls ).filter( ( key ) => ! shared.includes( key ) );
 const check = process.argv.includes( '--check' );
 let missing = 0;
 let stale = 0;
@@ -70,10 +82,14 @@ const formsOf = ( locale ) => FORMS[ locale ] ?? 2;
 const FILES = [
     { wanted: shared, path: ( locale ) => join( root, 'src', 'languages', locale + '.json' ) },
     { wanted: ofStreams, path: ( locale ) => join( root, 'src', 'languages', 'streams', locale + '.json' ) },
+    { wanted: ofRecording, path: ( locale ) => join( root, 'src', 'languages', 'recording', locale + '.json' ) },
+    { wanted: ofPolls, path: ( locale ) => join( root, 'src', 'languages', 'polls', locale + '.json' ) },
 ];
 const read = ( file ) => existsSync( file ) ? JSON.parse( readFileSync( file, 'utf8' ) ) : {};
 
 mkdirSync( join( root, 'src', 'languages', 'streams' ), { recursive: true } );
+mkdirSync( join( root, 'src', 'languages', 'recording' ), { recursive: true } );
+mkdirSync( join( root, 'src', 'languages', 'polls' ), { recursive: true } );
 
 for ( const [ locale, cacheName ] of Object.entries( LOCALES ) ) {
     // What either file has, so a string moving from one to the other keeps its translation.
@@ -112,5 +128,5 @@ for ( const [ locale, cacheName ] of Object.entries( LOCALES ) ) {
     }
 }
 
-console.log( `${ shared.length } strings, and the live streams' ${ ofStreams.length }` );
+console.log( `${ shared.length } strings, the live streams' ${ ofStreams.length } and the polls' ${ ofPolls.length }` );
 if ( check && ( missing || stale ) ) process.exit( 1 );

@@ -6,10 +6,13 @@ import {useClient, useStream} from "./context.tsx";
 import {useConfirm} from "./dialog.tsx";
 import {clock, count, relative, timeOfDay} from "./format.ts";
 import {Icon, type IconName} from "./icons.tsx";
-import {MenuButton, MenuChoice, MenuHeading, MenuItem} from "./menu.tsx";
-import {usePlayer, useNow} from "./player.tsx";
+import {MenuButton, MenuChoice, MenuHeading} from "./menu.tsx";
+import {pageUrl, usePlayer, useNow} from "./player.tsx";
 import {isBoolean, oneOf, readPref, writePref} from "./prefs.ts";
 import {errorText} from "./words.ts";
+import {RecordButton, RecordingChip, RecordSetting, useAutoRecord} from "./recording.tsx";
+import {BackgroundRow, EffectRows, effectsShown, Glyph, NoiseRow, useStudioEffects} from "./effects.tsx";
+import {TestControls, TestPanel, TestStatus, TestSummary, testEnded, testRunning, testsRun} from "./test-stream.tsx";
 
 // The host's studio, under the picture: choosing the source (camera or OBS), setting up the devices with
 // the microphone's level, going live with a 3-2-1, then one bar of controls and a line of what matters
@@ -97,7 +100,7 @@ export function MicLevel( props : { track : MediaStreamTrack | null, compact? : 
             // Loudness on a scale people read: quiet speech fills about a third, a raised voice most of it.
             const now = Math.min( 1, Math.sqrt( sum / samples.length ) * 4 );
             level = Math.max( now, level * 0.85 );
-            element.style.setProperty( '--estream-level', ( level * 100 ).toFixed( 1 ) + '%' );
+            element.style.setProperty( '--wplus-live-stream-level', ( level * 100 ).toFixed( 1 ) + '%' );
             frame = requestAnimationFrame( draw );
         };
         draw();
@@ -106,13 +109,13 @@ export function MicLevel( props : { track : MediaStreamTrack | null, compact? : 
             cancelAnimationFrame( frame );
             source.disconnect();
             void context.close().catch( () => {} );
-            element.style.setProperty( '--estream-level', '0%' );
+            element.style.setProperty( '--wplus-live-stream-level', '0%' );
         };
     }, [ props.track ] );
 
     return (
-        <span className={ 'estream-level' + ( props.compact ? ' estream-level--compact' : '' ) } aria-hidden="true">
-            <span ref={ bar } className="estream-level__bar" />
+        <span className={ 'wplus-live-stream-level' + ( props.compact ? ' wplus-live-stream-level--compact' : '' ) } aria-hidden="true">
+            <span ref={ bar } className="wplus-live-stream-level__bar" />
         </span>
     );
 }
@@ -244,7 +247,7 @@ function useSlowFrames( stats : MediaStats | null ) : number | null {
 // A figure or a state, with `tip` saying more (reached by the keyboard too).
 function Chip( props : { icon? : IconName, tone? : 'live' | 'good' | 'warn', children : ReactNode, tip? : string } ){
     return (
-        <span className={ 'estream-chip' + ( props.tone ? ' estream-chip--' + props.tone : '' ) } data-estream-tip={ props.tip } aria-description={ props.tip } tabIndex={ props.tip ? 0 : undefined }>
+        <span className={ 'wplus-live-stream-chip' + ( props.tone ? ' wplus-live-stream-chip--' + props.tone : '' ) } data-wplus-live-stream-tip={ props.tip } aria-description={ props.tip } tabIndex={ props.tip ? 0 : undefined }>
             { props.icon && <Icon name={ props.icon } /> }
             { props.children }
         </span>
@@ -281,10 +284,11 @@ export function StudioStatus( props : { stats : MediaStats | null, tally? : bool
     const health = sent && <Chip icon={ sent.kind === 'cpu' ? 'alert' : 'signal' } tone={ sent.kind === 'good' ? 'good' : 'warn' }>{ sent.text }</Chip>;
 
     return (
-        <div className="estream-studio__status">
+        <div className="wplus-live-stream-studio__status">
             <Chip tone="live" tip={ __( 'Time on air', 'wordplus-live-stream' ) }>
-                { _x( 'Live', 'a stream on air', 'wordplus-live-stream' ) } <span className="estream-chip__number">{ clock( now - started ) }</span>
+                { _x( 'Live', 'a stream on air', 'wordplus-live-stream' ) } <span className="wplus-live-stream-chip__number">{ clock( now - started ) }</span>
             </Chip>
+            <RecordingChip />
             { /* How many watch; "full" while the cloud still caps a stream and it is reached, the rest waiting for a place. No
                  "up to N viewers" otherwise: credits limit streams instead. */ }
             <Chip
@@ -295,7 +299,7 @@ export function StudioStatus( props : { stats : MediaStats | null, tally? : bool
                     : undefined }
             >
                 { sprintf( _nx( '%s watching', '%s watching', state.viewers, 'how many people watch', 'wordplus-live-stream' ), count( state.viewers ) ) }
-                { full && <span className="estream-chip__sub">{ _x( 'full', 'a stream with as many viewers as it takes', 'wordplus-live-stream' ) }</span> }
+                { full && <span className="wplus-live-stream-chip__sub">{ _x( 'full', 'a stream with as many viewers as it takes', 'wordplus-live-stream' ) }</span> }
             </Chip>
             { /* The most watching at once since going live, as the cloud keeps it: the same on every page, one opened
                  during the stream too, and always shown. */ }
@@ -313,7 +317,7 @@ export function StudioStatus( props : { stats : MediaStats | null, tally? : bool
                         ? __( 'New viewers cannot join', 'wordplus-live-stream' )
                         : sprintf( _nx( 'Viewers above %s cannot join', 'Viewers above %s cannot join', unmetered, 'the viewers at once a site streams to with no credits', 'wordplus-live-stream' ), count( unmetered ) ) }
                     { state.usage.buy_url && (
-                        <a className="estream-chip__link" href={ state.usage.buy_url } target="_blank" rel="noopener noreferrer">{ __( 'Buy credits', 'wordplus-live-stream' ) }</a>
+                        <a className="wplus-live-stream-chip__link" href={ state.usage.buy_url } target="_blank" rel="noopener noreferrer">{ __( 'Buy credits', 'wordplus-live-stream' ) }</a>
                     ) }
                 </Chip>
             ) }
@@ -328,7 +332,7 @@ export function StudioStatus( props : { stats : MediaStats | null, tally? : bool
             { /* Everything that goes out, layer by layer, over the picture (stats.tsx), as the player's menu and its i key
                  open it. Not in a settings page's preview, where nothing goes out. */ }
             { ! player.preview && (
-                <button type="button" className="estream-chip estream-chip--button" aria-pressed={ player.statsOpen } onClick={ player.toggleStats }>
+                <button type="button" className="wplus-live-stream-chip wplus-live-stream-chip--button" aria-pressed={ player.statsOpen } onClick={ player.toggleStats }>
                     <Icon name="stats" />
                     { player.statsOpen ? _x( 'Hide statistics', 'of the player', 'wordplus-live-stream' ) : __( 'Statistics', 'wordplus-live-stream' ) }
                 </button>
@@ -344,13 +348,13 @@ function Numbers( props : { stats : MediaStats } ){
     const { stats } = props;
 
     // Nobody has the picture on screen: the quality chosen, nothing of a pause (sentText).
-    if( stats.paused ) return <span className="estream-studio__numbers">{ sentText( stats, state ) }</span>;
-    if( ! stats.held || state.encoder ) return <span className="estream-studio__numbers">{ statsText( stats ) }</span>;
+    if( stats.paused ) return <span className="wplus-live-stream-studio__numbers">{ sentText( stats, state ) }</span>;
+    if( ! stats.held || state.encoder ) return <span className="wplus-live-stream-studio__numbers">{ statsText( stats ) }</span>;
 
     const chosen = qualityName( state.sendQuality );
     const tip = sprintf( _x( 'Viewers get %s when one watches in a big window or full screen.', 'the quality chosen, as 1080p', 'wordplus-live-stream' ), chosen );
     return (
-        <span className="estream-studio__numbers" data-estream-tip={ tip } aria-description={ tip } tabIndex={ 0 }>{ statsText( stats, chosen ) }</span>
+        <span className="wplus-live-stream-studio__numbers" data-wplus-live-stream-tip={ tip } aria-description={ tip } tabIndex={ 0 }>{ statsText( stats, chosen ) }</span>
     );
 }
 
@@ -375,14 +379,14 @@ function DeviceButton( props : {
         : ( props.on ? __( 'Mute the microphone (⌘/Ctrl+D)', 'wordplus-live-stream' ) : __( 'Unmute the microphone (⌘/Ctrl+D)', 'wordplus-live-stream' ) );
 
     return (
-        <div className={ 'estream-device' + ( props.on ? '' : ' estream-device--off' ) }>
-            <button type="button" className="estream-device__toggle" aria-pressed={ props.on } data-estream-tip={ tip } onClick={ props.onToggle }>
+        <div className={ 'wplus-live-stream-device' + ( props.on ? '' : ' wplus-live-stream-device--off' ) }>
+            <button type="button" className="wplus-live-stream-device__toggle" aria-pressed={ props.on } data-wplus-live-stream-tip={ tip } onClick={ props.onToggle }>
                 <Icon name={ icon } />
-                <span className="estream-label">{ name }</span>
+                <span className="wplus-live-stream-label">{ name }</span>
                 { ! camera && props.on && <MicLevel track={ props.level ?? null } compact /> }
             </button>
             { ( props.devices.length > 1 || props.onOriginal ) && (
-                <MenuButton icon="chevron-down" label={ camera ? __( 'Choose a camera', 'wordplus-live-stream' ) : __( 'Choose a microphone', 'wordplus-live-stream' ) } className="estream-device__menu" placement="up" align="start">
+                <MenuButton icon="chevron-down" label={ camera ? __( 'Choose a camera', 'wordplus-live-stream' ) : __( 'Choose a microphone', 'wordplus-live-stream' ) } className="wplus-live-stream-device__menu" placement="up" align="start">
                     { ( close ) => (
                         <>
                             { props.devices.length > 1 && (
@@ -419,10 +423,10 @@ function DeviceSelect( props : { label : string, kind : 'camera' | 'microphone' 
     if( props.devices.length === 0 ) return null;
 
     return (
-        <div className="estream-setup__row">
+        <div className="wplus-live-stream-setup__row">
             <label htmlFor={ id }>{ props.label }</label>
-            <div className="estream-setup__field">
-                <select id={ id } className="estream-input" value={ props.devices.some( ( d ) => d.id === props.value ) ? props.value : '' } onChange={ ( e ) => props.onChange( e.target.value ) }>
+            <div className="wplus-live-stream-setup__field">
+                <select id={ id } className="wplus-live-stream-input" value={ props.devices.some( ( d ) => d.id === props.value ) ? props.value : '' } onChange={ ( e ) => props.onChange( e.target.value ) }>
                     { ! props.devices.some( ( d ) => d.id === props.value ) && <option value="">{ __( 'Chosen by the system', 'wordplus-live-stream' ) }</option> }
                     { props.devices.map( ( d, i ) => <option key={ d.id } value={ d.id }>{ deviceName( d, i, props.kind ) }</option> ) }
                 </select>
@@ -453,11 +457,11 @@ function QualityChoice(){
     ];
 
     return (
-        <div className="estream-setup__row" role="radiogroup" aria-labelledby={ id + 'label' }>
-            <span id={ id + 'label' } className="estream-setup__label">{ __( 'Best quality', 'wordplus-live-stream' ) }</span>
-            <div className="estream-setup__field estream-quality">
+        <div className="wplus-live-stream-setup__row" role="radiogroup" aria-labelledby={ id + 'label' }>
+            <span id={ id + 'label' } className="wplus-live-stream-setup__label">{ __( 'Best quality', 'wordplus-live-stream' ) }</span>
+            <div className="wplus-live-stream-setup__field wplus-live-stream-quality">
                 { options.map( ( o ) => (
-                    <label key={ o.value } className={ 'estream-quality__option' + ( o.off ? ' estream-quality__option--off' : '' ) }>
+                    <label key={ o.value } className={ 'wplus-live-stream-quality__option' + ( o.off ? ' wplus-live-stream-quality__option--off' : '' ) }>
                         <input type="radio" name={ id } value={ o.value } checked={ state.sendQuality === o.value } disabled={ o.off } onChange={ () => choose( o.value ) } />
                         <span>
                             <strong>{ qualityName( o.value ) } · { o.name }</strong>
@@ -487,14 +491,14 @@ export function CopyField( props : { label : string, value : string, secret? : b
     };
 
     return (
-        <div className="estream-encoder__field">
+        <div className="wplus-live-stream-encoder__field">
             <label htmlFor={ id }>{ props.label }</label>
-            <div className="estream-controls__row">
-                <input id={ id } className="estream-input" type={ shown ? 'text' : 'password' } readOnly value={ props.value } onFocus={ ( e ) => e.currentTarget.select() } />
+            <div className="wplus-live-stream-controls__row">
+                <input id={ id } className="wplus-live-stream-input" type={ shown ? 'text' : 'password' } readOnly value={ props.value } onFocus={ ( e ) => e.currentTarget.select() } />
                 { props.secret && (
-                    <button type="button" className="estream-button estream-button--small" onClick={ () => setShown( ! shown ) }>{ shown ? __( 'Hide', 'wordplus-live-stream' ) : __( 'Show', 'wordplus-live-stream' ) }</button>
+                    <button type="button" className="wplus-live-stream-button wplus-live-stream-button--small" onClick={ () => setShown( ! shown ) }>{ shown ? __( 'Hide', 'wordplus-live-stream' ) : __( 'Show', 'wordplus-live-stream' ) }</button>
                 ) }
-                <button type="button" className="estream-button estream-button--small" onClick={ () => void copy() }>
+                <button type="button" className="wplus-live-stream-button wplus-live-stream-button--small" onClick={ () => void copy() }>
                     <Icon name={ copied ? 'check' : 'link' } />
                     { copied ? __( 'Copied', 'wordplus-live-stream' ) : __( 'Copy', 'wordplus-live-stream' ) }
                 </button>
@@ -518,7 +522,7 @@ export function CopyField( props : { label : string, value : string, secret? : b
 // one every 8.2 s), Advanced has, and its own Max B-frames too, 2 for AMD's encoder where Simple sends none for WHIP.
 // A browser skips what it cannot play of B-frames: an AMD stream with 2 arrived at about 22 frames a second, two
 // frames apart, and played smoothly at 0. So does an encoder that cannot keep up, and both are said (useSlowFrames).
-function EncoderPanel( props : { stats : MediaStats | null, over : boolean, run : ( work : () => Promise<Result> ) => Promise<void> } ){
+function EncoderPanel( props : { stats : MediaStats | null, over : boolean, run : ( work : () => Promise<Result> ) => Promise<void>, starting? : boolean } ){
     const client = useClient();
     const state = useStream();
     const confirm = useConfirm();
@@ -530,14 +534,14 @@ function EncoderPanel( props : { stats : MediaStats | null, over : boolean, run 
     if( ! encoder ) return null;
 
     return (
-        <div className="estream-encoder">
-            <div className="estream-encoder__head">
-                <p className={ 'estream-encoder__status' + ( receiving ? ' estream-encoder__status--on' : '' ) } role="status">
+        <div className="wplus-live-stream-encoder">
+            <div className="wplus-live-stream-encoder__head">
+                <p className={ 'wplus-live-stream-encoder__status' + ( receiving ? ' wplus-live-stream-encoder__status--on' : '' ) } role="status">
                     { receiving ? __( 'OBS is connected', 'wordplus-live-stream' ) : __( 'Waiting for OBS…', 'wordplus-live-stream' ) }
                 </p>
-                { stats && stats.height > 0 && <span className="estream-studio__numbers">{ statsText( stats ) }</span> }
+                { stats && stats.height > 0 && <span className="wplus-live-stream-studio__numbers">{ statsText( stats ) }</span> }
             </div>
-            <ol className="estream-encoder__steps">
+            <ol className="wplus-live-stream-encoder__steps">
                 <li>{ __( 'In OBS, open Settings → Stream and choose WHIP as the service.', 'wordplus-live-stream' ) }</li>
                 <li><CopyField label={ __( 'Server', 'wordplus-live-stream' ) } value={ encoder.url } /></li>
                 <li><CopyField label={ __( 'Bearer token', 'wordplus-live-stream' ) } value={ encoder.key } secret /></li>
@@ -551,7 +555,7 @@ function EncoderPanel( props : { stats : MediaStats | null, over : boolean, run 
                 <li>{ __( 'These settings are a starting point. Try them on your own stream and connection: watch it from another device, and change the bitrate, Total Layers or the preset until it plays smoothly.', 'wordplus-live-stream' ) }</li>
             </ol>
             { slow !== null && (
-                <p className="estream-controls__error" role="status">
+                <p className="wplus-live-stream-controls__error" role="status">
                     { sprintf(
                         _x( 'OBS sends %s frames a second, fewer than it should, and viewers see the picture stutter. In OBS, set Max B-frames to 0 under Settings → Output → Streaming, in the Advanced output mode, since browsers skip B-frames. If it is 0 already, the encoder cannot keep up: choose a faster preset or fewer Total Layers.', 'frames a second arriving from OBS (22)', 'wordplus-live-stream' ),
                         String( slow )
@@ -559,7 +563,7 @@ function EncoderPanel( props : { stats : MediaStats | null, over : boolean, run 
                 </p>
             ) }
             { keyframes !== null && (
-                <p className="estream-controls__error" role="status">
+                <p className="wplus-live-stream-controls__error" role="status">
                     { sprintf(
                         _x( 'OBS sends a keyframe every %s seconds, so viewers wait up to that long for the picture as they come in and when they come back to the page. In OBS, choose the Advanced output mode in Settings → Output and set Keyframe Interval to 1 s under Streaming.', 'seconds between the keyframes OBS sends (8)', 'wordplus-live-stream' ),
                         String( keyframes )
@@ -567,7 +571,7 @@ function EncoderPanel( props : { stats : MediaStats | null, over : boolean, run 
                 </p>
             ) }
             { props.over && stats && (
-                <p className="estream-controls__error" role="alert">
+                <p className="wplus-live-stream-controls__error" role="alert">
                     { sprintf(
                         _x( 'OBS sends %1$s, more than the %2$s a stream takes. In OBS, set Settings → Video → Output (Scaled) Resolution to %3$s.', 'the picture OBS sends (2560×1440), the best quality a stream takes (1080p), the size to set (1920×1080)', 'wordplus-live-stream' ),
                         stats.width + '×' + stats.height,
@@ -576,17 +580,20 @@ function EncoderPanel( props : { stats : MediaStats | null, over : boolean, run 
                     ) }
                 </p>
             ) }
-            <div className="estream-controls__row">
-                <button type="button" className="estream-button estream-button--small" onClick={ async () => {
-                    const yes = await confirm( {
-                        title: __( 'Make a new key?', 'wordplus-live-stream' ),
-                        message: __( 'OBS stops streaming until it has the new one. Do this if someone who should not have seen the key saw it.', 'wordplus-live-stream' ),
-                        confirm: __( 'Make a new key', 'wordplus-live-stream' ),
-                        danger: true
-                    } );
-                    if( yes ) void props.run( () => client.useEncoder( true ) );
-                } }>{ __( 'New key', 'wordplus-live-stream' ) }</button>
-            </div>
+            { /* Not in Go live's 3, 2, 1: a new key cuts OBS off as the stream goes live from it. */ }
+            { ! props.starting && (
+                <div className="wplus-live-stream-controls__row">
+                    <button type="button" className="wplus-live-stream-button wplus-live-stream-button--small" onClick={ async () => {
+                        const yes = await confirm( {
+                            title: __( 'Make a new key?', 'wordplus-live-stream' ),
+                            message: __( 'OBS stops streaming until it has the new one. Do this if someone who should not have seen the key saw it.', 'wordplus-live-stream' ),
+                            confirm: __( 'Make a new key', 'wordplus-live-stream' ),
+                            danger: true
+                        } );
+                        if( yes ) void props.run( () => client.useEncoder( true ) );
+                    } }>{ __( 'New key', 'wordplus-live-stream' ) }</button>
+                </div>
+            ) }
         </div>
     );
 }
@@ -597,13 +604,13 @@ function Sources( props : { busy : boolean, run : ( work : () => Promise<Result>
     const state = useStream();
 
     return (
-        <div className="estream-sources" role="group" aria-labelledby="estream-sources-title">
-            <h4 id="estream-sources-title" className="estream-sources__title">
+        <div className="wplus-live-stream-sources" role="group" aria-labelledby="wplus-live-stream-sources-title">
+            <h4 id="wplus-live-stream-sources-title" className="wplus-live-stream-sources__title">
                 { props.again ? __( 'Go live again', 'wordplus-live-stream' ) : __( 'How do you want to go live?', 'wordplus-live-stream' ) }
             </h4>
-            <button type="button" className="estream-source" disabled={ props.busy } onClick={ () => props.run( () => client.startPreview() ) }>
-                <span className="estream-source__icon"><Icon name="camera" /></span>
-                <span className="estream-source__text">
+            <button type="button" className="wplus-live-stream-source" disabled={ props.busy } onClick={ () => props.run( () => client.startPreview() ) }>
+                <span className="wplus-live-stream-source__icon"><Icon name="camera" /></span>
+                <span className="wplus-live-stream-source__text">
                     <strong>{ __( 'Turn on camera and microphone', 'wordplus-live-stream' ) }</strong>
                     <span>{ __( 'Go live from this browser, and share your screen.', 'wordplus-live-stream' ) }</span>
                 </span>
@@ -611,9 +618,9 @@ function Sources( props : { busy : boolean, run : ( work : () => Promise<Result>
             { /* The screen alone, the camera beside it later if wanted; only where the browser can share one. A
                 closed picker is no error. */ }
             { state.canShareScreen && (
-                <button type="button" className="estream-source" disabled={ props.busy } onClick={ () => props.run( async () => { await client.setScreenShare( true ); } ) }>
-                    <span className="estream-source__icon"><Icon name="screen" /></span>
-                    <span className="estream-source__text">
+                <button type="button" className="wplus-live-stream-source" disabled={ props.busy } onClick={ () => props.run( async () => { await client.setScreenShare( true ); } ) }>
+                    <span className="wplus-live-stream-source__icon"><Icon name="screen" /></span>
+                    <span className="wplus-live-stream-source__text">
                         <strong>{ __( 'Share your screen', 'wordplus-live-stream' ) }</strong>
                         <span>{ __( 'Slides, a demo or a video, with its sound. Turn the camera on beside it if you like.', 'wordplus-live-stream' ) }</span>
                     </span>
@@ -621,9 +628,9 @@ function Sources( props : { busy : boolean, run : ( work : () => Promise<Result>
             ) }
             { /* OBS sends to the cloud: none before the site is connected. */ }
             { state.status !== 'unconnected' && (
-                <button type="button" className="estream-source" disabled={ props.busy || state.status !== 'ready' } onClick={ () => props.run( () => client.useEncoder() ) }>
-                    <span className="estream-source__icon"><Icon name="broadcast" /></span>
-                    <span className="estream-source__text">
+                <button type="button" className="wplus-live-stream-source" disabled={ props.busy || state.status !== 'ready' } onClick={ () => props.run( () => client.useEncoder() ) }>
+                    <span className="wplus-live-stream-source__icon"><Icon name="broadcast" /></span>
+                    <span className="wplus-live-stream-source__text">
                         <strong>{ __( 'Stream from OBS', 'wordplus-live-stream' ) }</strong>
                         <span>{ __( 'Or any encoder that sends WHIP: scenes, overlays, several cameras.', 'wordplus-live-stream' ) }</span>
                     </span>
@@ -644,7 +651,7 @@ export function EncoderLost(){
     if( ! lost ) return null;
 
     return (
-        <p className="estream-controls__error" role="status">
+        <p className="wplus-live-stream-controls__error" role="status">
             { sprintf( _x( 'OBS stopped sending at %1$s. Unless it comes back, the stream ends by itself at %2$s.', 'two times of day', 'wordplus-live-stream' ), timeOfDay( lost ), timeOfDay( lost + ENCODER_GRACE_MS ) ) }
         </p>
     );
@@ -666,11 +673,11 @@ export function Summary( props : { messages? : boolean } ){
     ];
 
     return (
-        <div className="estream-summary">
-            <h4 className="estream-summary__title">{ __( 'Your last stream', 'wordplus-live-stream' ) }</h4>
-            <dl className="estream-summary__figures">
+        <div className="wplus-live-stream-summary">
+            <h4 className="wplus-live-stream-summary__title">{ __( 'Your last stream', 'wordplus-live-stream' ) }</h4>
+            <dl className="wplus-live-stream-summary__figures">
                 { figures.map( ( [ value, label ], i ) => (
-                    <div key={ i } className="estream-summary__figure">
+                    <div key={ i } className="wplus-live-stream-summary__figure">
                         <dt>{ label }</dt>
                         <dd>{ value }</dd>
                     </div>
@@ -690,7 +697,7 @@ function LayoutMenu(){
     };
 
     return (
-        <MenuButton icon={ layout.mode === 'spotlight' ? 'spotlight' : 'grid' } label={ __( 'Layout', 'wordplus-live-stream' ) } className="estream-studio__tool" placement="up" align="start">
+        <MenuButton icon={ layout.mode === 'spotlight' ? 'spotlight' : 'grid' } label={ __( 'Layout', 'wordplus-live-stream' ) } className="wplus-live-stream-studio__tool" placement="up" align="start">
             { ( close ) => (
                 <>
                     <MenuHeading>{ __( 'What everyone sees', 'wordplus-live-stream' ) }</MenuHeading>
@@ -721,25 +728,25 @@ export function Guests( props : { empty? : ReactNode } ){
     const initials = ( name : string ) => name.split( /\s+/ ).filter( Boolean ).slice( 0, 2 ).map( ( w ) => w[0]?.toUpperCase() ).join( '' ) || '?';
 
     return (
-        <div className="estream-queue">
+        <div className="wplus-live-stream-queue">
             { guests.length > 0 && (
                 <>
-                    <h4 className="estream-queue__title">{ __( 'On stage', 'wordplus-live-stream' ) }</h4>
+                    <h4 className="wplus-live-stream-queue__title">{ __( 'On stage', 'wordplus-live-stream' ) }</h4>
                     <ul>
                         { guests.map( ( g ) => (
                             <li key={ g.identity }>
-                                <span className="estream-queue__face" aria-hidden="true">{ initials( g.name ) }</span>
-                                <span className="estream-queue__name">
+                                <span className="wplus-live-stream-queue__face" aria-hidden="true">{ initials( g.name ) }</span>
+                                <span className="wplus-live-stream-queue__name">
                                     { g.name }
-                                    { g.micMuted && <span className="estream-queue__note"><Icon name="mic-off" />{ __( 'Microphone off', 'wordplus-live-stream' ) }</span> }
+                                    { g.micMuted && <span className="wplus-live-stream-queue__note"><Icon name="mic-off" />{ __( 'Microphone off', 'wordplus-live-stream' ) }</span> }
                                 </span>
                                 { ! g.micMuted && (
-                                    <button type="button" className="estream-button estream-button--small" onClick={ () => void client.muteGuest( g.identity ) }>
+                                    <button type="button" className="wplus-live-stream-button wplus-live-stream-button--small" onClick={ () => void client.muteGuest( g.identity ) }>
                                         <Icon name="mic-off" />
                                         { __( 'Mute', 'wordplus-live-stream' ) }
                                     </button>
                                 ) }
-                                <button type="button" className="estream-button estream-button--small" onClick={ () => void client.unstage( g.identity ) }>{ __( 'Remove from stage', 'wordplus-live-stream' ) }</button>
+                                <button type="button" className="wplus-live-stream-button wplus-live-stream-button--small" onClick={ () => void client.unstage( g.identity ) }>{ __( 'Remove from stage', 'wordplus-live-stream' ) }</button>
                             </li>
                         ) ) }
                     </ul>
@@ -747,19 +754,19 @@ export function Guests( props : { empty? : ReactNode } ){
             ) }
             { state.hands.length > 0 && (
                 <>
-                    <h4 className="estream-queue__title">
+                    <h4 className="wplus-live-stream-queue__title">
                         { __( 'Asking to join', 'wordplus-live-stream' ) }
-                        <span className="estream-queue__count">{ count( state.hands.length ) }</span>
+                        <span className="wplus-live-stream-queue__count">{ count( state.hands.length ) }</span>
                     </h4>
                     <ul>
                         { state.hands.map( ( h ) => (
                             <li key={ h.identity }>
-                                <span className="estream-queue__face" aria-hidden="true">{ initials( h.name ) }</span>
-                                <span className="estream-queue__name">
+                                <span className="wplus-live-stream-queue__face" aria-hidden="true">{ initials( h.name ) }</span>
+                                <span className="wplus-live-stream-queue__name">
                                     { h.name }
-                                    <span className="estream-queue__note">{ sprintf( _x( 'asked %s', 'a time, as "2 minutes ago"', 'wordplus-live-stream' ), relative( h.at, now ) ) }</span>
+                                    <span className="wplus-live-stream-queue__note">{ sprintf( _x( 'asked %s', 'a time, as "2 minutes ago"', 'wordplus-live-stream' ), relative( h.at, now ) ) }</span>
                                 </span>
-                                <button type="button" className="estream-button estream-button--small estream-button--primary" onClick={ () => void client.invite( h.identity ) }>{ __( 'Invite', 'wordplus-live-stream' ) }</button>
+                                <button type="button" className="wplus-live-stream-button wplus-live-stream-button--small wplus-live-stream-button--primary" onClick={ () => void client.invite( h.identity ) }>{ __( 'Invite', 'wordplus-live-stream' ) }</button>
                             </li>
                         ) ) }
                     </ul>
@@ -782,6 +789,10 @@ export function useStudio(){
     const [ countdownOn, setCountdownOn ] = useState( () => readPref( 'countdown', true, isBoolean ) );
     const [ summary, setSummary ] = useState( false );
     const counting = useRef<ReturnType<typeof setInterval> | null>( null );
+    // From Go live's press, through its 3, 2, 1, until going live is done or the countdown is cancelled: no other source
+    // is offered meanwhile, so nothing switches mid-start (asked on 2026-11-02: "I just clicked it during countdown and the
+    // stream was broken"; the engine refuses it too, its `switching`).
+    const [ starting, setStarting ] = useState( false );
 
     const live = state.stream?.state === 'live';
     const ended = state.stream?.state === 'ended';
@@ -789,8 +800,11 @@ export function useStudio(){
     const previewing = state.devices.camera || state.devices.microphone || state.screenSharing;
     const fromEncoder = state.encoder !== null;
     const encoderReady = state.tiles.some( ( t ) => t.encoder && t.camera );
-    // The camera and microphone's buttons: while previewing, and all the time live, both off included.
-    const devicesOpen = ( previewing || live ) && ! fromEncoder;
+    // Live from OBS that another window of the host's chose: this one offers no camera of its own into it.
+    const encoderLive = live && ! fromEncoder && state.tiles.some( ( t ) => t.encoder );
+    // The camera and microphone's buttons: while previewing, and all the time live, both off included; never into a
+    // stream going out from OBS.
+    const devicesOpen = ( previewing || live || testRunning( state ) !== null ) && ! fromEncoder && ! encoderLive;
     const devices = useDevices( client, previewing );
     // How the picture goes out while live: the camera's or screen's as sent, or OBS's as it arrives, which shows
     // before going live too.
@@ -806,6 +820,12 @@ export function useStudio(){
     const sends = sendsHere( state );
     useWakeLock( live && ! player.preview );
     useLeaveWarning( sends && ! player.preview );
+    // A stream that records every time it goes live starts its recording from the page that took it live.
+    useAutoRecord( sends && ! player.preview );
+    // The host's background and AI noise removal, on what this window sends, before going live too (effects.tsx), and
+    // whether the bar's Effects has them open while live.
+    const effects = useStudioEffects( client, { sends: devicesOpen && ! player.preview, camera: state.devices.camera, microphone: state.devices.microphone, originalSound: state.originalSound } );
+    const [ effectsOpen, setEffectsOpen ] = useState( false );
 
     // The devices, quality and sound chosen here before, for the next preview: Full HD where it may be sent, until
     // another quality is chosen.
@@ -863,9 +883,44 @@ export function useStudio(){
         void run( async () => ( await client.setOriginalSound( on ) ) === on ? undefined : { ok: false, error: 'devices' } );
     };
 
+    // Going live once the effects chosen are on, so the stream goes out with them from its first frame and the camera's
+    // check measures the picture as it goes out. Waiting for them, the bar says so (`preparing`) and offers Cancel: the
+    // first background on a computer takes 7 s or more as its GPU programs compile, the page frozen most of it, and a
+    // disabled Go live under "Not live" looked broken. A background that could not start, or that this device cannot
+    // run, keeps the stream from going out with the camera bare: the host chose it to hide what is behind them, and
+    // only None from them sends the camera as it is.
+    const [ preparing, setPreparing ] = useState( false );
+    const stopPreparing = useRef<( () => void ) | null>( null );
+    const start = async () : Promise<Result> => {
+        const waiting = effects.ready();
+        if( waiting ){
+            setPreparing( true );
+            const cancelled = await Promise.race( [
+                waiting.then( () => false ),
+                new Promise<boolean>( ( resolve ) => { stopPreparing.current = () => resolve( true ); } )
+            ] );
+            stopPreparing.current = null;
+            setPreparing( false );
+            if( cancelled ) return;
+        }
+        if( effects.bare() ) return { ok: false, error: 'background' };
+        return client.goLive();
+    };
+    const cancelPreparing = () => stopPreparing.current?.();
+
+    // Going live, `starting` until it is done, live or refused.
+    const goNow = () => void run( async () => {
+        try {
+            return await start();
+        } finally {
+            setStarting( false );
+        }
+    } );
+
     const goLive = () => {
+        setStarting( true );
         if( ! countdownOn ){
-            void run( () => client.goLive() );
+            goNow();
             return;
         }
 
@@ -880,7 +935,7 @@ export function useStudio(){
             if( counting.current ) clearInterval( counting.current );
             counting.current = null;
             player.setCountdown( null );
-            void run( () => client.goLive() );
+            goNow();
         }, 1000 );
     };
 
@@ -888,6 +943,7 @@ export function useStudio(){
         if( counting.current ) clearInterval( counting.current );
         counting.current = null;
         player.setCountdown( null );
+        setStarting( false );
     };
 
     const end = async () => {
@@ -906,87 +962,111 @@ export function useStudio(){
 
     return {
         client, state, player, live, ended, previewing, fromEncoder, encoderReady, encoderOver, devicesOpen, devices, sending, microphone, camera, coarse,
-        busy, error, countdownOn, setCountdownOn, summary, run, toggle, choose, chooseSound, goLive, cancelCountdown, end, elsewhere
+        busy, error, countdownOn, setCountdownOn, summary, run, toggle, choose, chooseSound, goLive, cancelCountdown, end, elsewhere,
+        effects, effectsOpen, setEffectsOpen, starting, encoderLive, preparing, cancelPreparing
     };
 }
 
 // What the studio shows for the moment: the source to choose, the devices to set up, OBS's panel, the end's summary,
-// or that it is live from another window.
-export function StudioBody( props : { studio : StudioControls } ){
+// or that it is live from another window. While a test stream runs, the way to watch it over the setup (test-stream.tsx):
+// on `watchUrl`, the stream's page ('' for none yet), or the page the player is on.
+export function StudioBody( props : { studio : StudioControls, watchUrl? : string } ){
     const { client, state, player, live, ended, previewing, fromEncoder, encoderOver, devices, sending, microphone, camera, coarse, busy, countdownOn,
-        setCountdownOn, summary, run, choose, chooseSound, elsewhere } = props.studio;
+        setCountdownOn, summary, run, choose, chooseSound, elsewhere, effects, effectsOpen, devicesOpen, starting } = props.studio;
     let body : ReactNode = null;
 
     if( elsewhere ){
         body = (
-            <p className="estream-studio__elsewhere" role="status">
+            <p className="wplus-live-stream-studio__elsewhere" role="status">
                 <Icon name="broadcast" />
                 { __( 'You are live from another window. Your camera and microphone go out from there, and this one shows the stream as everyone sees it.', 'wordplus-live-stream' ) }
             </p>
         );
     } else if( fromEncoder ){
-        body = <EncoderPanel stats={ sending } over={ encoderOver } run={ run } />;
+        body = <EncoderPanel stats={ sending } over={ encoderOver } run={ run } starting={ starting } />;
     } else if( ! previewing && ! live ){
         body = <Sources busy={ busy } run={ run } again={ ended } />;
     } else if( ! live ){
         body = (
-            <div className="estream-setup">
-                <p className="estream-controls__hint">{ __( 'Preview: only you can see this', 'wordplus-live-stream' ) }</p>
+            <div className="wplus-live-stream-setup">
+                <p className="wplus-live-stream-controls__hint">{ __( 'Preview: only you can see this', 'wordplus-live-stream' ) }</p>
                 <DeviceSelect label={ __( 'Camera', 'wordplus-live-stream' ) } kind="camera" devices={ devices.cameras } value={ deviceOf( camera ) } onChange={ ( id ) => choose( 'camera', id ) }>
                     { coarse && state.devices.camera && (
-                        <button type="button" className="estream-button" onClick={ () => void client.flipCamera() } aria-label={ __( 'Switch camera', 'wordplus-live-stream' ) } data-estream-tip={ __( 'Switch camera', 'wordplus-live-stream' ) }><Icon name="flip-camera" /></button>
+                        <button type="button" className="wplus-live-stream-button" onClick={ () => void client.flipCamera() } aria-label={ __( 'Switch camera', 'wordplus-live-stream' ) } data-wplus-live-stream-tip={ __( 'Switch camera', 'wordplus-live-stream' ) }><Icon name="flip-camera" /></button>
                     ) }
                 </DeviceSelect>
                 <DeviceSelect label={ __( 'Microphone', 'wordplus-live-stream' ) } kind="microphone" devices={ devices.microphones } value={ deviceOf( microphone ) } onChange={ ( id ) => choose( 'microphone', id ) }>
                     <MicLevel track={ microphone } />
                 </DeviceSelect>
-                <div className="estream-setup__row">
-                    <span className="estream-setup__label">{ _x( 'Sound', 'how the microphone is sent, in the studio', 'wordplus-live-stream' ) }</span>
-                    <div className="estream-setup__field estream-setup__field--stack">
-                        <label className="estream-switch">
+                <BackgroundRow effects={ effects } camera={ state.devices.camera } />
+                <div className="wplus-live-stream-setup__row">
+                    <span className="wplus-live-stream-setup__label">{ _x( 'Sound', 'how the microphone is sent, in the studio', 'wordplus-live-stream' ) }</span>
+                    <div className="wplus-live-stream-setup__field wplus-live-stream-setup__field--stack">
+                        <label className="wplus-live-stream-switch">
                             <input type="checkbox" role="switch" checked={ state.originalSound } onChange={ ( e ) => chooseSound( e.target.checked ) } />
-                            <span className="estream-switch__track" aria-hidden="true" />
+                            <span className="wplus-live-stream-switch__track" aria-hidden="true" />
                             { __( 'Original sound, for music', 'wordplus-live-stream' ) }
                         </label>
-                        <p className="estream-setup__note">{ __( 'The microphone as it hears, in stereo, with no echo or noise removal. Use headphones, so the speakers do not echo into it.', 'wordplus-live-stream' ) }</p>
+                        <p className="wplus-live-stream-setup__note">{ __( 'The microphone as it hears, in stereo, with no echo or noise removal. Use headphones, so the speakers do not echo into it.', 'wordplus-live-stream' ) }</p>
                     </div>
                 </div>
+                <NoiseRow effects={ effects } microphone={ state.devices.microphone } original={ state.originalSound } />
                 { typeof HTMLMediaElement !== 'undefined' && 'setSinkId' in HTMLMediaElement.prototype && (
                     <DeviceSelect label={ __( 'Speakers', 'wordplus-live-stream' ) } kind="speaker" devices={ devices.speakers } value={ player.speaker } onChange={ player.setSpeaker } />
                 ) }
                 <QualityChoice />
-                <div className="estream-setup__row">
-                    <span className="estream-setup__label">{ __( 'Countdown', 'wordplus-live-stream' ) }</span>
-                    <div className="estream-setup__field">
-                        <label className="estream-switch">
+                <div className="wplus-live-stream-setup__row">
+                    <span className="wplus-live-stream-setup__label">{ __( 'Countdown', 'wordplus-live-stream' ) }</span>
+                    <div className="wplus-live-stream-setup__field">
+                        <label className="wplus-live-stream-switch">
                             <input type="checkbox" role="switch" checked={ countdownOn } onChange={ ( e ) => { setCountdownOn( e.target.checked ); writePref( 'countdown', e.target.checked ); } } />
-                            <span className="estream-switch__track" aria-hidden="true" />
+                            <span className="wplus-live-stream-switch__track" aria-hidden="true" />
                             { __( 'Count down 3, 2, 1 before going live', 'wordplus-live-stream' ) }
                         </label>
                     </div>
                 </div>
+                <RecordSetting />
             </div>
         );
+    } else if( effectsOpen && devicesOpen && ! player.preview ){
+        // Live, the bar's Effects open: the background and AI noise removal, which go out at once.
+        body = <EffectRows effects={ effects } camera={ state.devices.camera } microphone={ state.devices.microphone } original={ state.originalSound } />;
     }
 
-    // Once a stream this page took live has ended, its figures above what comes next.
-    return summary && ended && ! elsewhere ? <><Summary />{ body }</> : body;
+    // A test stream running: the way to watch it, over the setup while anything is on (with everything off, alone).
+    if( testRunning( state ) && ! live ) body = <><TestPanel url={ props.watchUrl ?? pageUrl( player.url ) } />{ previewing ? body : null }</>;
+
+    // Once a stream this page took live has ended, its figures above what comes next; once a test has, how long it ran.
+    if( summary && ended && ! elsewhere ) return <><Summary />{ body }</>;
+    return testEnded( state ) && ! previewing ? <><TestSummary />{ body }</> : body;
+}
+
+// What going live waits for, in the bar: the background, AI noise removal, both, or an effect being changed.
+export function preparingText( loading : { camera : boolean, noise : boolean } ) : string {
+    if( loading.camera && loading.noise ) return __( 'Preparing your background and AI noise removal…', 'wordplus-live-stream' );
+    if( loading.camera ) return __( 'Preparing your background…', 'wordplus-live-stream' );
+    if( loading.noise ) return __( 'Preparing AI noise removal…', 'wordplus-live-stream' );
+    return __( 'Preparing to go live…', 'wordplus-live-stream' );
 }
 
 // One bar of controls: the devices, the screen, the layout, OBS, and going live or ending. Live from another
-// window, only what this one may do without sending: the layout, and ending.
+// window, only what this one may do without sending: the layout, and ending. A stream keeps the source it goes live with:
+// from Go live's press (`starting`, its 3, 2, 1 included) and while live, neither OBS nor the camera's way back is
+// offered, nor the camera and screen into a stream going out from OBS (`encoderLive`).
 export function StudioBar( props : { studio : StudioControls } ){
     const { client, state, player, live, previewing, fromEncoder, encoderReady, encoderOver, devicesOpen, devices, microphone, camera, busy,
-        run, toggle, choose, chooseSound, goLive, cancelCountdown, end, elsewhere } = props.studio;
+        run, toggle, choose, chooseSound, goLive, cancelCountdown, end, elsewhere, effects, effectsOpen, setEffectsOpen, starting, encoderLive, preparing, cancelPreparing } = props.studio;
     const countingDown = player.countdown !== null;
     const sends = ! elsewhere;
     // Set up before the site is connected to the cloud: everything but going live and OBS, and the way to connect it.
     const unconnected = state.status === 'unconnected';
+    // A test stream running there, its bar kept with everything turned off too, for its end and the devices.
+    const testing = testRunning( state ) !== null;
 
-    if( ! ( previewing || live || fromEncoder ) ) return null;
+    if( ! ( previewing || live || fromEncoder || testing ) ) return null;
 
     return (
-        <div className="estream-studio__bar">
+        <div className="wplus-live-stream-studio__bar">
             { devicesOpen && sends && (
                 <>
                     <DeviceButton kind="microphone" on={ state.devices.microphone } devices={ devices.microphones } current={ deviceOf( microphone ) } level={ microphone } onToggle={ () => toggle( 'microphone' ) } onChoose={ ( id ) => choose( 'microphone', id ) }
@@ -995,26 +1075,28 @@ export function StudioBar( props : { studio : StudioControls } ){
                 </>
             ) }
             { /* Its name as a tip too, for a narrow bar that shows only the icon, the same for sharing and stopping. */ }
-            { ( previewing || live ) && ! fromEncoder && sends && state.canShareScreen && (
-                <button type="button" className={ 'estream-button' + ( state.screenSharing ? ' estream-button--on' : '' ) } aria-pressed={ state.screenSharing }
-                    data-estream-tip={ state.screenSharing ? __( 'Stop sharing', 'wordplus-live-stream' ) : __( 'Share screen', 'wordplus-live-stream' ) } onClick={ () => void client.setScreenShare( ! state.screenSharing ) }>
+            { ( previewing || live || testing ) && ! fromEncoder && ! encoderLive && sends && state.canShareScreen && (
+                <button type="button" className={ 'wplus-live-stream-button' + ( state.screenSharing ? ' wplus-live-stream-button--on' : '' ) } aria-pressed={ state.screenSharing }
+                    data-wplus-live-stream-tip={ state.screenSharing ? __( 'Stop sharing', 'wordplus-live-stream' ) : __( 'Share screen', 'wordplus-live-stream' ) } onClick={ () => void client.setScreenShare( ! state.screenSharing ) }>
                     <Icon name="screen" />
-                    <span className="estream-label">{ state.screenSharing ? __( 'Stop sharing', 'wordplus-live-stream' ) : __( 'Share screen', 'wordplus-live-stream' ) }</span>
+                    <span className="wplus-live-stream-label">{ state.screenSharing ? __( 'Stop sharing', 'wordplus-live-stream' ) : __( 'Share screen', 'wordplus-live-stream' ) }</span>
+                </button>
+            ) }
+            { /* Live, the background and AI noise removal open under the bar, where the setup had them. */ }
+            { live && devicesOpen && sends && ! player.preview && effectsShown( effects, state.devices.camera, state.devices.microphone ) && (
+                <button type="button" className={ 'wplus-live-stream-button' + ( effectsOpen ? ' wplus-live-stream-button--on' : '' ) } aria-expanded={ effectsOpen }
+                    data-wplus-live-stream-tip={ __( 'Background and noise removal', 'wordplus-live-stream' ) } onClick={ () => setEffectsOpen( ! effectsOpen ) }>
+                    <Glyph name="sparkle" />
+                    <span className="wplus-live-stream-label">{ __( 'Effects', 'wordplus-live-stream' ) }</span>
                 </button>
             ) }
             { live && state.tiles.length > 1 && <LayoutMenu /> }
-            { live && ! fromEncoder && sends && (
-                <MenuButton icon="more" label={ __( 'More', 'wordplus-live-stream' ) } className="estream-studio__tool" placement="up" align="start">
-                    { ( close ) => (
-                        <MenuItem icon="broadcast" onSelect={ () => { close(); void run( () => client.useEncoder() ); } }>
-                            { __( 'Stream from OBS', 'wordplus-live-stream' ) }
-                        </MenuItem>
-                    ) }
-                </MenuButton>
-            ) }
-            { ! live && fromEncoder && (
+            { live && sends && <RecordButton /> }
+            { /* No Stream from OBS while live from the browser, and so no More menu, which held it alone (asked on
+                 2026-11-02: "When I press Go Live from browser the stream from OBS button must be hidden"). */ }
+            { ! live && fromEncoder && ! starting && (
                 // Back to the camera's preview, on again ("its reverting me back to main menu, not to camera screen").
-                <button type="button" className="estream-button" disabled={ busy } onClick={ () => {
+                <button type="button" className="wplus-live-stream-button" disabled={ busy } onClick={ () => {
                     client.leaveEncoder();
                     void run( () => client.startPreview() );
                 } }>
@@ -1022,34 +1104,47 @@ export function StudioBar( props : { studio : StudioControls } ){
                     { __( 'Use the camera instead', 'wordplus-live-stream' ) }
                 </button>
             ) }
-            { ! live && devicesOpen && ! unconnected && (
-                <button type="button" className="estream-button estream-button--quiet" disabled={ busy || state.status !== 'ready' } onClick={ () => run( () => client.useEncoder() ) }>
+            { ! live && devicesOpen && ! unconnected && ! starting && (
+                <button type="button" className="wplus-live-stream-button wplus-live-stream-button--quiet" disabled={ busy || state.status !== 'ready' } onClick={ () => run( () => client.useEncoder() ) }>
                     <Icon name="broadcast" />
                     { __( 'Stream from OBS', 'wordplus-live-stream' ) }
                 </button>
             ) }
 
-            { unconnected ? (
+            { unconnected && testsRun( client, state ) ? (
+                // A test stream the host alone watches, beside the way to connect the site.
+                <TestControls studio={ props.studio } />
+            ) : unconnected ? (
                 player.connectUrl ? (
-                    <a className="estream-button estream-button--primary estream-button--large estream-studio__go" href={ player.connectUrl }>
+                    <a className="wplus-live-stream-button wplus-live-stream-button--primary wplus-live-stream-button--large wplus-live-stream-studio__go" href={ player.connectUrl }>
                         <Icon name="broadcast" />
                         { __( 'Connect to go live', 'wordplus-live-stream' ) }
                     </a>
                 ) : (
-                    <button type="button" className="estream-button estream-button--primary estream-button--large estream-studio__go" disabled data-estream-tip={ __( 'Going live needs the site connected to WordPlus Cloud.', 'wordplus-live-stream' ) }>
+                    <button type="button" className="wplus-live-stream-button wplus-live-stream-button--primary wplus-live-stream-button--large wplus-live-stream-studio__go" disabled data-wplus-live-stream-tip={ __( 'Going live needs the site connected to WordPlus Cloud.', 'wordplus-live-stream' ) }>
                         <Icon name="broadcast" />
                         { __( 'Go live', 'wordplus-live-stream' ) }
                     </button>
                 )
             ) : live ? (
-                <button type="button" className="estream-button estream-button--danger-solid estream-studio__go" disabled={ busy } onClick={ () => void end() }>
+                <button type="button" className="wplus-live-stream-button wplus-live-stream-button--danger-solid wplus-live-stream-studio__go" disabled={ busy } onClick={ () => void end() }>
                     <Icon name="stop" />
                     { __( 'End stream', 'wordplus-live-stream' ) }
                 </button>
             ) : countingDown ? (
-                <button type="button" className="estream-button estream-studio__go" onClick={ cancelCountdown }>{ __( 'Cancel', 'wordplus-live-stream' ) }</button>
+                <button type="button" className="wplus-live-stream-button wplus-live-stream-studio__go" onClick={ cancelCountdown }>{ __( 'Cancel', 'wordplus-live-stream' ) }</button>
+            ) : preparing ? (
+                // Go live waiting for the background or the noise removal to be on: what it waits for, its spinner turning
+                // even while the page is busy (a transform), and the way to stop going live.
+                <>
+                    <button type="button" className="wplus-live-stream-button wplus-live-stream-studio__go" onClick={ cancelPreparing }>{ __( 'Cancel', 'wordplus-live-stream' ) }</button>
+                    <span className="wplus-live-stream-button wplus-live-stream-button--primary wplus-live-stream-button--large wplus-live-stream-studio__preparing" role="status">
+                        <span className="wplus-live-stream-spinner wplus-live-stream-spinner--small" aria-hidden="true" />
+                        { preparingText( effects.loading ) }
+                    </span>
+                </>
             ) : (
-                <button type="button" className="estream-button estream-button--primary estream-button--large estream-studio__go" disabled={ busy || state.status !== 'ready' || ( fromEncoder && ( ! encoderReady || encoderOver ) ) } onClick={ goLive }>
+                <button type="button" className="wplus-live-stream-button wplus-live-stream-button--primary wplus-live-stream-button--large wplus-live-stream-studio__go" disabled={ busy || state.status !== 'ready' || ( fromEncoder && ( ! encoderReady || encoderOver ) ) } onClick={ goLive }>
                     <Icon name="broadcast" />
                     { __( 'Go live', 'wordplus-live-stream' ) }
                 </button>
@@ -1062,15 +1157,15 @@ export function StudioBar( props : { studio : StudioControls } ){
 // host on a page with a studio of the site's (the WordPress plugin's) is offered it, with more room.
 export function Studio(){
     const studio = useStudio();
-    const { player, live, sending, error } = studio;
+    const { player, live, sending, error, state } = studio;
 
     return (
-        <section className="estream-studio estream-controls--studio" aria-label={ __( 'Studio', 'wordplus-live-stream' ) }>
-            <header className="estream-studio__head">
-                <h3 className="estream-studio__title">{ live ? __( 'You are live', 'wordplus-live-stream' ) : __( 'Studio', 'wordplus-live-stream' ) }</h3>
-                { live && <StudioStatus stats={ sending } /> }
+        <section className="wplus-live-stream-studio wplus-live-stream-controls--studio" aria-label={ __( 'Studio', 'wordplus-live-stream' ) }>
+            <header className="wplus-live-stream-studio__head">
+                <h3 className="wplus-live-stream-studio__title">{ live ? __( 'You are live', 'wordplus-live-stream' ) : testRunning( state ) ? __( 'Test stream', 'wordplus-live-stream' ) : __( 'Studio', 'wordplus-live-stream' ) }</h3>
+                { live ? <StudioStatus stats={ sending } /> : <TestStatus /> }
                 { player.studioUrl && ! player.preview && (
-                    <a className="estream-studio__open" href={ player.studioUrl }>{ __( 'Open the full studio', 'wordplus-live-stream' ) }</a>
+                    <a className="wplus-live-stream-studio__open" href={ player.studioUrl }>{ __( 'Open the full studio', 'wordplus-live-stream' ) }</a>
                 ) }
             </header>
 
@@ -1078,7 +1173,7 @@ export function Studio(){
             <StudioBody studio={ studio } />
             <StudioBar studio={ studio } />
 
-            { error && <p className="estream-controls__error" role="alert">{ error }</p> }
+            { error && <p className="wplus-live-stream-controls__error" role="alert">{ error }</p> }
 
             <Guests />
         </section>

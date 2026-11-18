@@ -15,6 +15,11 @@ export { cameraCodecFor, screenCodecFor, screenCodecOrder, roomCallCodec, roomCa
 // A camera's hardware encoder that drops frames, remembered so the next camera goes out in software
 export { droppedHardwareCodecs, rememberDroppedHardware, HARDWARE_DROPS_KEY } from "./room-publish.js";
 export { watchCameraEncoder, dropsFrames, cpuHeld, readingsFor, hardwareReading, readEncoder, layerEncoders } from "./encoder-watch.js";
+// A room's microphone under its ceiling on a slow upload, its picture giving way to the sound a step at a time, and the
+// upload it all goes out on judged for a jam
+export { watchRoomMic } from "./mic-ceiling.js";
+export { PictureSteps, stepCaps, stepFitting, lowerCaps, CAMERA_STEPS, SCREEN_STEPS, PICTURE_DOWN_MS, PICTURE_UP_MS, PICTURE_RELAPSE_MS, PICTURE_UP_MAX_MS, PICTURE_FIT } from "./picture-steps.js";
+export { UploadJam, jamReading, JAM_RTT_MS, JAM_UNANSWERED_MS, JAM_FOR_MS, JAM_CLEAR_RTT_MS, JAM_CLEAR_MS } from "./upload-jam.js";
 // A camera's codec measured before it goes out, and remembered (one record a codec), for the camera control's spinner too
 export { cameraCodecOrder, cameraCodecRecord, cameraCodecRecords, cameraFinding, rememberCameraCodec, droppedCameraCodecs, heavySoftwareCodecs, cameraCheckPassed, browserVersion, windowsDesktopChromium, legacyCamera, uncheckedBrowser, knownAdapter, CAMERA_CODECS_KEY, CAMERA_CODEC_KEEP_MS } from "./room-publish.js";
 // VP9 in software at 1080 lines once measured able there, else 720, and a call's step down to 720 (1.0.41)
@@ -37,6 +42,10 @@ export { checkNumbers } from "./camera-check.js";
 export { watchNumbers } from "./encoder-watch.js";
 export { lipSyncNumbers } from "./lip-sync.js";
 export { roomSettings, roomPolicy, applyViewSettings } from "./room-settings.js";
+// Whose media stopped reaching the media server in a room (Better Messages' stall-watch.ts, moved here), and how long the
+// tile of someone who left stays, marked as reconnecting (its call screen's awayFor)
+export { StallWatch } from "./stall-watch.js";
+export { awayFor, AWAY_MS, AWAY_LEFT_MS, BYE_KEEP_MS, BYE_TOPIC } from "./away.js";
 function transportOverride() {
     try {
         const value = window.localStorage.getItem('bm_call_transport');

@@ -24,17 +24,26 @@ export const CLEAN_MS = 5 * 60000;
 export const CLEAN_MAX_MS = 40 * 60000;
 // A look further from the one before than this is a gap (the page asleep, the room left), not time watched.
 const LOOK_GAP_MS = 5000;
+export const VIEWER_TIMING = Object.freeze({
+    windowMs: TROUBLE_WINDOW_MS,
+    freezes: TROUBLE_FREEZES,
+    frozenMs: TROUBLE_FROZEN_MS,
+    settleMs: SETTLE_MS,
+    cleanMs: CLEAN_MS,
+    cleanMaxMs: CLEAN_MAX_MS,
+});
 export class ViewerHold {
-    constructor(holds = VIEWER_HOLDS_MS) {
+    constructor(holds = VIEWER_HOLDS_MS, timing = VIEWER_TIMING) {
         this.holds = holds;
+        this.timing = timing;
         this.level = 0;
         this.window = [];
         this.lastAt = null;
         this.lastWatching = false;
         this.clean = 0;
-        this.cleanNeeded = CLEAN_MS;
         this.changedAt = -Infinity;
         this.downAt = -Infinity;
+        this.cleanNeeded = timing.cleanMs;
     }
     // The hold now, ms.
     get ms() {
@@ -47,21 +56,24 @@ export class ViewerHold {
         const watchedSince = this.lastWatching && before !== null && l.at - before <= LOOK_GAP_MS;
         this.lastAt = l.at;
         this.lastWatching = l.watching;
-        if (!l.watching || l.at - this.changedAt < SETTLE_MS)
+        const t = this.timing;
+        if (!l.watching || l.at - this.changedAt < t.settleMs)
             return null;
         if (watchedSince)
             this.clean += l.at - before;
-        this.window.push({ at: l.at, freezes: l.freezes, frozenMs: l.frozenMs, lost: l.lost, nacks: l.nacks });
-        this.window = this.window.filter((s) => l.at - s.at < TROUBLE_WINDOW_MS);
-        const sum = this.window.reduce((t, s) => ({ freezes: t.freezes + s.freezes, frozenMs: t.frozenMs + s.frozenMs, lost: t.lost + s.lost, nacks: t.nacks + s.nacks }), { freezes: 0, frozenMs: 0, lost: 0, nacks: 0 });
-        const trouble = (sum.freezes >= TROUBLE_FREEZES || sum.frozenMs >= TROUBLE_FROZEN_MS) && sum.lost + sum.nacks > 0;
+        this.window.push({ at: l.at, freezes: l.freezes, frozenMs: l.frozenMs, lost: l.lost, nacks: l.nacks, jitterMs: l.jitterMs ?? 0 });
+        this.window = this.window.filter((s) => l.at - s.at < t.windowMs);
+        const sum = this.window.reduce((a, s) => ({ freezes: a.freezes + s.freezes, frozenMs: a.frozenMs + s.frozenMs, lost: a.lost + s.lost, nacks: a.nacks + s.nacks }), { freezes: 0, frozenMs: 0, lost: 0, nacks: 0 });
+        const jitterMs = Math.max(0, ...this.window.map((s) => s.jitterMs));
+        const network = sum.lost + sum.nacks > 0 || (t.jitterMs !== undefined && jitterMs >= t.jitterMs);
+        const trouble = (sum.freezes >= t.freezes || sum.frozenMs >= t.frozenMs) && network;
         if (trouble) {
             this.clean = 0;
             if (this.level >= this.holds.length - 1)
                 return null;
-            if (l.at - this.downAt < CLEAN_MS)
-                this.cleanNeeded = Math.min(this.cleanNeeded * 2, CLEAN_MAX_MS);
-            return this.move(1, l.at, { ...sum });
+            if (l.at - this.downAt < t.cleanMs)
+                this.cleanNeeded = Math.min(this.cleanNeeded * 2, t.cleanMaxMs);
+            return this.move(1, l.at, t.jitterMs !== undefined ? { ...sum, jitterMs } : { ...sum });
         }
         if (this.level > 0 && this.clean >= this.cleanNeeded) {
             const cleanMs = this.clean;

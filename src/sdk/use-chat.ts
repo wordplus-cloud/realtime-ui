@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { DeliveryState } from "../components/chat/message-parts.tsx";
-import { personOf, useProfiles, useRoom, useTyping, type SdkEventMeta, type SdkHistoryEvent, type SdkRooms } from "./rooms.ts";
+import { personOf, useProfiles, useRealtime, useRoom, useTyping, type SdkEventMeta, type SdkHistoryEvent, type SdkRooms } from "./rooms.ts";
 
 // A conversation on one of an app's rooms, without its look: the engine under the chat (chat.tsx), and under an app's
 // own copy of it (`npx @wordplus/realtime-ui add chat`), so a fix here reaches both. What travels, by the room's events
@@ -94,7 +94,8 @@ export interface ChatMessage {
 }
 
 export interface UseChatOptions {
-    rt: SdkRooms | null | undefined;
+    /** The page's connection: <RealtimeProvider>'s when left out. */
+    rt?: SdkRooms | null;
     /** A room of the app's whose rule lets its members emit `message` (and `typing`, `reaction`, `read`). */
     room: string;
     events?: ChatEvents;
@@ -227,7 +228,8 @@ export function grouped( list: ChatMessage[] ) {
 }
 
 /** A conversation on `room`, joined while the screen using it is on, with what it does. */
-export function useChat( { rt, room, events, maxLength = 0, load, onSent }: UseChatOptions ): ChatState {
+export function useChat( { rt: given, room, events, maxLength = 0, load, onSent }: UseChatOptions ): ChatState {
+    const rt = useRealtime<SdkRooms>( given );
     const names: Required<ChatEvents> = { message: "message", typing: "typing", reaction: "reaction", read: "read", ...events };
     const view = useRoom( rt, room );
     const me = rt?.user ?? null;

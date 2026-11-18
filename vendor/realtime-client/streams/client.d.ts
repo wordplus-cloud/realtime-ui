@@ -1,4 +1,4 @@
-import type { createLocalScreenTracks, createLocalTracks, Room, RoomOptions, Track } from "@wordplus/rtc-client";
+import type { createLocalScreenTracks, createLocalTracks, LocalTrack, Room, RoomOptions, Track } from "@wordplus/rtc-client";
 import { type RealtimeClient, type RealtimeOptions } from "../index.js";
 import { type Banned, type ChatMessage, type Corner, type Hand, type Layout, type Person, type Quality, type Reaction, type Role, type StreamState, type Usage, type You } from "./protocol.js";
 import { type Media } from "./media.js";
@@ -55,6 +55,12 @@ export interface FloatingReaction {
     kind: Reaction;
     at: number;
 }
+export interface TestState {
+    started_at: number;
+    ended_at: number | null;
+    watching: number;
+    watch: boolean;
+}
 export interface EasyStreamState {
     status: 'joining' | 'ready' | 'error' | 'unconnected';
     error: string | null;
@@ -99,6 +105,8 @@ export interface EasyStreamState {
     stalled: boolean;
     tooSlow: boolean;
     offline: boolean;
+    test: TestState | null;
+    testElsewhere: boolean;
 }
 export type GrantSource = string | (() => Promise<string>);
 export interface EasyStreamOptions {
@@ -114,6 +122,7 @@ export interface EasyStreamOptions {
     offlineHost?: {
         name: string;
     };
+    stream?: string;
     fetch?: typeof fetch;
     realtime?: (options: RealtimeOptions) => RealtimeClient;
     Room?: new (options?: RoomOptions) => Room;
@@ -125,6 +134,7 @@ export interface EasyStreamOptions {
     cameraCheck?: typeof checkedCameraChoice;
 }
 export declare function streamCameraPolicy(policy: CodecPolicy | null | undefined): CodecPolicy | null;
+export declare function sourceTrack(track: LocalTrack): MediaStreamTrack;
 export type { CameraCodec };
 type CodecNavigator = {
     userAgent?: string;
@@ -184,6 +194,7 @@ export declare class EasyStreamClient {
     private connectingMedia;
     private localTracks;
     private findingEncoder;
+    private switching;
     private screenTracks;
     private deviceIds;
     private wantedQuality;
@@ -221,6 +232,14 @@ export declare class EasyStreamClient {
     private pixelDensity;
     private screenDensity;
     private onNetwork;
+    private testWords;
+    private testFeed;
+    private testSent;
+    private testOff;
+    private testTimer;
+    private onTestGone;
+    private testTracks;
+    private testSilent;
     constructor(options: EasyStreamOptions);
     wantVideo(): void;
     dropVideo(): void;
@@ -298,6 +317,7 @@ export declare class EasyStreamClient {
     private encoderOf;
     private watchingOnly;
     private ownHold;
+    private baseHold;
     private looked;
     private holdMoved;
     private traceEvent;
@@ -323,6 +343,7 @@ export declare class EasyStreamClient {
     setOriginalSound(on: boolean): Promise<boolean>;
     flipCamera(): Promise<void>;
     localMedia(kind: 'audio' | 'video'): MediaStreamTrack | null;
+    deviceTrack(kind: 'camera' | 'microphone'): LocalTrack | null;
     sendingStats(): Promise<MediaStats | null>;
     private lastDecoded;
     private keyframes;
@@ -335,6 +356,7 @@ export declare class EasyStreamClient {
     private chosenCodecs;
     private pickCodecs;
     private checkCamera;
+    private cameraProcessed;
     private publishUnpublished;
     startPreview(devices?: {
         camera?: boolean;
@@ -342,9 +364,24 @@ export declare class EasyStreamClient {
     }): Promise<void>;
     setSendQuality(quality: Quality): Promise<Quality>;
     goLive(): Promise<Ack>;
+    private goLiveNow;
     useEncoder(renew?: boolean): Promise<Ack>;
+    private useEncoderNow;
     leaveEncoder(): void;
     end(): Promise<Ack>;
+    startTest(): Promise<Ack>;
+    endTest(): void;
+    private sayTest;
+    private heardTest;
+    private feedTest;
+    private followTest;
+    private watchTest;
+    private fromTest;
+    private testGone;
+    private testTile;
+    private testTrack;
+    private closeTest;
+    private stopTestLook;
     setCamera(on: boolean): Promise<void>;
     setMicrophone(on: boolean): Promise<void>;
     private setDevice;

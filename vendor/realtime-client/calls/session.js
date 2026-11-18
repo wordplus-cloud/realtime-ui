@@ -1,8 +1,9 @@
 import { P2PPeer } from "./peer.js";
 import { P2PSignaling } from "./signaling.js";
 import { isSealedSignal, SignalCipher } from "./cipher.js";
-import { forgetBroken, markBroken, probeCodecCaps } from "./codecs.js";
-import { browserLabel, platformLabel } from "./platform.js";
+import { forgetBroken, hardwareFamilies, markBroken, probeCodecCaps } from "./codecs.js";
+import { appLabel, browserLabel, deviceKind, networkEstimate, networkType, platformLabel } from "./platform.js";
+import { VERSION } from "../version.js";
 import { callUserOf } from "./users.js";
 import { CallHealthWatch } from "./health.js";
 import { compareStreamIds } from "./types.js";
@@ -19,6 +20,33 @@ const VIDEO_SOURCES = ['camera', 'screen_share'];
 // a call's keys expire thirty minutes after its last message, so a joined
 // session checks in this often. bm_p2p_keepalive_ms shortens it for tests.
 const KEEPALIVE_MS = 60000;
+// While the direct path is not up, a session also checks in this often:
+// the relay answers `not_joined` to a socket other than the one it joined
+// on, and the session joins again, the relay replaying what it missed. A
+// connection that moved to another node, or came back, without the page
+// hearing of it left the relay sending the call's signals to a socket the
+// page no longer read, and nothing but this keepalive, once a minute, would
+// have said so: a callee gave its call up for the room with the offer sent
+// to its old socket (the e2e pool, 31 Oct 2026). A connected one pulses
+// every couple of seconds, which asks the same.
+const SETUP_ALIVE_MS = 5000;
+// An alive sent less than this ago makes the setup's clock skip its turn. The
+// whole of SETUP_ALIVE_MS skipped every other one: a timer that fires a
+// millisecond early by the clock found the last alive too recent, and the checks
+// came ten seconds apart.
+const SETUP_ALIVE_RECENT_MS = SETUP_ALIVE_MS - 1000;
+// How long a rejoin waits for the join on its way: as long as a connection that
+// moved keeps its old socket for the answers still due on it (hub.ts, retire).
+// A first join makes the call, so it takes the relay longer than a rejoin: sent
+// together, the rejoin was saved first, the first join then put the old socket
+// back, and that socket's close marked this side gone.
+const REJOIN_WAIT_MS = 3000;
+// How soon after the socket changed a session asks whether its rejoin took. The
+// old socket closes as the new one's join goes out, and the two reach the relay
+// about together: a close that read this side before the join was saved writes
+// it back as gone on the old socket, and until the next check the other side's
+// join hears no `ready` and what it sends waits in the relay.
+const REJOIN_CHECK_MS = 1000;
 // Often enough that a call which dies at four seconds has already said why,
 // rare enough that a whole call is a handful of requests.
 const TRACE_FLUSH_MS = 2000;
@@ -87,6 +115,22 @@ function iceTransportPolicy() {
         return 'all';
     }
 }
+// A test switch that stalls this page's socket for that many milliseconds
+// from the moment its first SDP goes, as a socket that stalls just after the
+// page's first signals got out does: bm_p2p_hold_sdp = milliseconds. Its
+// codecs are out, and its offer and everything after it wait (the stall of
+// P2PSignaling.stallForTest). The caller of 31 Oct 2026 got
+// its codecs out and then nothing for sixteen seconds; its offer arrived
+// after the call had gone to the room.
+function sdpHold() {
+    try {
+        const ms = Number(window.localStorage.getItem('bm_p2p_hold_sdp'));
+        return Number.isFinite(ms) && ms > 0 ? Math.min(ms, 60000) : 0;
+    }
+    catch (e) {
+        return 0;
+    }
+}
 function forcedFailure() {
     try {
         return window.localStorage.getItem('bm_p2p_force_fail') === '1';
@@ -116,12 +160,17 @@ export class P2PCallSession {
         this.iceServers = [];
         this.epoch = 0;
         this.lastId = null;
+        this.heardIds = new Set();
         this.pendingSignals = [];
         this.remoteState = { ...VISIBLE_DEFAULT };
         this.remoteStateKnown = false;
         this.quality = 'unknown';
         this.stateTimer = null;
         this.aliveTimer = null;
+        // When the last `alive` went, and the clock that sends one every
+        // SETUP_ALIVE_MS while the direct path is not up.
+        this.aliveAt = 0;
+        this.setupAliveTimer = null;
         this.viewTimer = null;
         this.sentView = null;
         this.viewPendingSince = 0;
@@ -152,6 +201,10 @@ export class P2PCallSession {
         // the relay's reply asks (quality.ts); the page's and machine's part from
         // their own events.
         this.health = new CallHealthWatch();
+        // The browser's estimate of its network as the call starts: its own
+        // downloads before the call, so no measure of the call's connection, and a
+        // report that followed it would say nothing new each time it moved.
+        this.netQuality = networkEstimate();
         this.qualityEvery = 0;
         this.qualityAt = 0;
         // The room token the join handed over up front, so a hand-off needs no
@@ -162,6 +215,10 @@ export class P2PCallSession {
         // restart could not reach the other side, the peer holds its escalation.
         this.joinedSocket = false;
         this.peerLost = false;
+        // The latest join, once the first has gone (resume).
+        this.joining = null;
+        // The bm_p2p_hold_sdp switch has held its one SDP (sdpHold).
+        this.sdpHeld = false;
         // When the TURN credentials run out, and the renewal due before then.
         this.iceExpiresAt = 0;
         this.renewTimer = null;
@@ -228,7 +285,7 @@ export class P2PCallSession {
             this.joinedSocket = false;
             this.reviewHold();
             if (this.transport.available && this.signaling.connected) {
-                void this.resume();
+                void this.resume(true);
             }
         });
         this.pageHideListener = () => {
@@ -248,7 +305,11 @@ export class P2PCallSession {
             return false;
         return this.join(false);
     }
-    async join(resume) {
+    join(resume) {
+        this.joining = this.joinNow(resume);
+        return this.joining;
+    }
+    async joinNow(resume) {
         if (this.ended)
             return false;
         let ack;
@@ -347,11 +408,25 @@ export class P2PCallSession {
         this.aliveTimer = window.setInterval(() => {
             void this.keepalive();
         }, keepaliveMs());
+        // From the join on, ringing included: a caller whose socket moved
+        // while the other side was being rung would hear its `ready` on the
+        // socket it left (SETUP_ALIVE_MS).
+        this.setupAliveTimer = window.setInterval(() => {
+            if (this.ended || this.handedOff || (this.peer && this.peer.isConnected))
+                return;
+            if (!this.joinedSocket || !this.signaling.connected || Date.now() - this.aliveAt < SETUP_ALIVE_RECENT_MS)
+                return;
+            void this.keepalive();
+        }, SETUP_ALIVE_MS);
     }
     stopKeepalive() {
         if (this.aliveTimer !== null) {
             window.clearInterval(this.aliveTimer);
             this.aliveTimer = null;
+        }
+        if (this.setupAliveTimer !== null) {
+            window.clearInterval(this.setupAliveTimer);
+            this.setupAliveTimer = null;
         }
     }
     // This side's counters to the relay while the direct path runs, and the
@@ -418,6 +493,7 @@ export class P2PCallSession {
     async keepalive() {
         if (this.ended || !this.signaling.connected)
             return;
+        this.aliveAt = Date.now();
         let ack;
         try {
             ack = await this.signaling.alive();
@@ -444,10 +520,26 @@ export class P2PCallSession {
             void this.resume();
         }
     }
-    async resume() {
+    // `check` when the socket changed (REJOIN_CHECK_MS).
+    async resume(check = false) {
         if (this.ended || !this.started)
             return;
-        await this.join(true);
+        // The first join has yet to go, once the browser has said what it can
+        // do: it goes on the socket there is then. A rejoin made meanwhile went
+        // ahead of it, told the other side no codecs, and could bring the first
+        // `ready` to a peer made without them.
+        if (!this.joining)
+            return;
+        await Promise.race([
+            this.joining.catch(() => false),
+            new Promise((resolve) => window.setTimeout(resolve, REJOIN_WAIT_MS))
+        ]);
+        if (this.ended)
+            return;
+        const joined = await this.join(true);
+        if (joined && check) {
+            window.setTimeout(() => { void this.keepalive(); }, REJOIN_CHECK_MS);
+        }
     }
     markPeerPresent() {
         if (this.peerPresent)
@@ -480,6 +572,19 @@ export class P2PCallSession {
                 if (this.peerLost) {
                     this.peerLost = false;
                     this.reviewHold();
+                }
+                // And it has joined, so `ready` is due, and this side may never
+                // hear it: the relay sends it to the socket each side's record
+                // names, and when one side's connection moved as the other
+                // joined, each could read the other as away and neither was
+                // told. Nothing else makes a peer, and nothing ever asks again:
+                // a caller stayed on Calling and the other side on an avatar,
+                // with both sides checking in fine (the live demos, 2026-11-06).
+                // A replay proves none of this, and until its join is answered
+                // this side doesn't know its role.
+                if (!this.peer && this.joinedSocket && Number(message.generation) === this.generation) {
+                    this.trace('the other side is heard with no ready from the relay, making the peer');
+                    this.onReady(message);
                 }
                 if (message.id && message.body) {
                     this.onSignal({
@@ -569,6 +674,7 @@ export class P2PCallSession {
             onStats: (stats) => this.onPeerStats(peer, stats),
             onFailed: (reason) => this.onPeerFailed(peer, reason),
             refreshIceServers: () => this.refreshIceServers(),
+            signalRoundTrip: () => this.signaling.roundTrip(),
             onPlaybackBlocked: (element) => this.onPlaybackBlocked(element),
             onViewChange: () => this.scheduleView(),
             onCodecBroken: (family, direction) => { void this.onCodecBroken(family, direction); },
@@ -709,6 +815,12 @@ export class P2PCallSession {
         const cipher = this.cipher;
         // Sealing is asynchronous; the chain keeps the signals in the order
         // they were produced, which negotiation depends on.
+        const hold = body.kind === 'sdp' && !this.sdpHeld ? sdpHold() : 0;
+        if (hold > 0) {
+            this.sdpHeld = true;
+            this.trace('test switch: this side\'s socket stalls for ' + hold + 'ms from its first sdp');
+            this.signaling.stallForTest(hold);
+        }
         this.outbound = this.outbound.then(async () => {
             const wire = cipher ? await cipher.seal(body) : body;
             if (this.ended || this.peer !== peer)
@@ -754,10 +866,17 @@ export class P2PCallSession {
         if (this.ended || !envelope.body || isSealedSignal(envelope.body))
             return;
         if (!replayed) {
-            if (this.lastId && compareStreamIds(envelope.id, this.lastId) <= 0) {
+            // By its own id, not by the newest heard: as a connection moves, one
+            // signal can reach the old socket, unheard, and the next the new one
+            // ahead of the rejoin's answer, whose replay brings both. Anything
+            // older than the newest was taken for a repeat, and that signal was
+            // never heard at all.
+            if (this.heardIds.has(envelope.id))
                 return;
+            this.heardIds.add(envelope.id);
+            if (!this.lastId || compareStreamIds(envelope.id, this.lastId) > 0) {
+                this.lastId = envelope.id;
             }
-            this.lastId = envelope.id;
         }
         if (envelope.generation < this.generation) {
             return;
@@ -766,6 +885,10 @@ export class P2PCallSession {
             this.pendingSignals.push(envelope);
             return;
         }
+        // Any word from the other side, whatever it says, is the other side
+        // still at work on the call: a negotiation it is making is not given
+        // up on while it keeps speaking (P2PPeer.heardFromPeer).
+        this.peer.heardFromPeer();
         if (envelope.body.kind === 'state') {
             this.remoteState = { ...VISIBLE_DEFAULT, ...envelope.body.state };
             this.remoteStateKnown = true;
@@ -945,6 +1068,11 @@ export class P2PCallSession {
         this.bytesSeen.sent = Math.max(this.bytesSeen.sent, stats.bytesSent);
         this.bytesSeen.recv = Math.max(this.bytesSeen.recv, stats.bytesReceived);
         const red = peer.redState();
+        const app = appLabel();
+        const device = deviceKind();
+        const network = networkType();
+        const hwEnc = hardwareFamilies(this.caps, 'enc');
+        const hwDec = hardwareFamilies(this.caps, 'dec');
         const report = {
             browser: browserLabel(),
             platform: platformLabel(),
@@ -953,6 +1081,16 @@ export class P2PCallSession {
             // record says what it was between without guessing at the
             // browser name.
             client: 'web',
+            // The rest of what a group call's client tells its node on a
+            // join: the product and this engine, each with its version, the
+            // device, the network, and what it does in hardware.
+            ...(app ? { app } : {}),
+            lib: 'realtime-client ' + VERSION,
+            ...(device ? { device } : {}),
+            ...(network ? { network } : {}),
+            ...(this.netQuality ? { netQuality: this.netQuality } : {}),
+            ...(hwEnc ? { hwEnc } : {}),
+            ...(hwDec ? { hwDec } : {}),
             path: (pair.local === 'relay' || pair.remote === 'relay') ? 'relay' : 'direct',
             // The pair `path` summarises: a relayed leg over TLS on 443 and
             // one over plain UDP read the same otherwise.
@@ -1084,8 +1222,12 @@ export class P2PCallSession {
         });
     }
     // Whether a restart could reach the other side now: this side joined on
-    // the socket it has, and the relay not having said the other side's is
-    // gone. The peer holds its escalation while either is not so.
+    // the socket it has, that socket answering, and the relay not having said
+    // the other side's is gone. The peer holds its escalation while any of
+    // them is not so. A socket that says it is connected and answers nothing
+    // is as good as down for an offer, which waits in it: a restart made into
+    // one arrived half a minute late, over a connection that had come back
+    // by itself meanwhile (a call of 31 Oct 2026).
     reviewHold() {
         const peer = this.peer;
         if (!peer || this.ended)
@@ -1093,8 +1235,12 @@ export class P2PCallSession {
         if (!this.signaling.connected) {
             this.joinedSocket = false;
         }
+        const stalled = this.joinedSocket ? this.signaling.stalledFor() : 0;
         if (!this.joinedSocket) {
             peer.setSignalingHeld(true, 'this side\'s realtime connection is down');
+        }
+        else if (stalled > 0) {
+            peer.setSignalingHeld(true, 'this side\'s realtime connection has answered nothing for ' + (stalled / 1000).toFixed(1) + 's');
         }
         else if (this.peerLost) {
             peer.setSignalingHeld(true, 'the relay says the other side\'s connection is down');

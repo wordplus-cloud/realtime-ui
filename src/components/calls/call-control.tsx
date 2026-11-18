@@ -1,6 +1,6 @@
 import React, { isValidElement, type ReactNode } from "react";
 import Tooltip from "../helpers/tooltip.tsx";
-import Icon, { type IconName } from "../../primitives/icon.tsx";
+import Icon, { type IconName } from "../../primitives/icons.tsx";
 
 export interface CallControlProps {
     /** What it does: its tooltip, its line in More, and what a screen reader says. */

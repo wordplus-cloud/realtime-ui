@@ -1,30 +1,35 @@
-import React, { useCallback, useContext, useEffect, useRef, useState } from "react";
+import React, { useContext, useEffect, useRef, useState } from "react";
 import {__, _x} from "../../inc/globals.ts";
 import { moderates } from "./moderation.ts";
-import DevicePanel, { JoinPrompt, useJoinPrompt } from "./device-panel.tsx";
+import DevicePanel, { ConfigureBadge, JoinPrompt, NoiseAutoNotice, useConfigureCall, useDevicesBlocked, useJoinPrompt } from "./device-panel.tsx";
+import TurnOnAskPrompt from "./ask-prompt.tsx";
 import { screenShareSupport, useConfigAvailable } from "../../inc/calls/permissions.ts";
 import {CallContext, CallContextInterface} from "./context.ts";
 import ConnectionStatus from "../parts/connection-status.tsx";
 import Tooltip from "../helpers/tooltip.tsx";
 import GroupAudioGrid from "./group-audio-grid.tsx";
 import { host } from "../../host.ts";
-import Icon, { IconName } from "../../primitives/icon.tsx";
-import CallDock from "./call-dock.tsx";
-import { AddPersonButton, AddPersonPanel } from "./add-person.tsx";
+import Icon, { IconName } from "../../primitives/icons.tsx";
+import CallDock, { DockMore } from "./call-dock.tsx";
+import { AddPersonPanel } from "./add-person.tsx";
 import usePendingActions from "../../inc/calls/pending.ts";
 import { Piece } from "../../pieces.tsx";
 import { CallViewContext, fullScreenItems } from "./call-view.tsx";
 import HostToasts from "./host-toasts.tsx";
 import {
-    ModerationPanelContext, PersonPanel, RoomPanel, hostControlsItem, lockedMicItem, roomModerated, useModeratorNotice,
-    type ModerationPanel,
+    ModerationPanelContext, PersonPanel, RoomPanel, hostControlsItem, lockedMicItem, roomModerated, useModerationPanel,
+    useModeratorNotice,
 } from "./moderation-panels.tsx";
+import { addPersonItem } from "./people-panel.tsx";
+import { RecordingLayerView, RecordingPill } from "./recording.tsx";
+import { BanDialog } from "./ban-dialog.tsx";
 
 /**
  * A group audio call, from the CallContext: its roster (GroupAudioGrid) and its dock. The dock holds the user's own
  * controls (microphone, locked while a moderator keeps it off, raised hand for someone who can't send, the settings
- * with the devices, leaving), Show Chat / Hide Chat where the call has a chat beside it, Add Person where the call can
- * add people, and a moderator's Host Controls, as in the video room (moderation-panels.tsx).
+ * with the devices, leaving), Participants with how many are in the call (people-panel.tsx), Show Chat / Hide Chat
+ * where the call has a chat beside it, Add Person where the call can add people, and a moderator's Host Controls, as in
+ * the video room (moderation-panels.tsx).
  */
 export default function GroupAudioCallLayout() {
     const {
@@ -53,6 +58,7 @@ export default function GroupAudioCallLayout() {
         disableCamera,
         enableMic,
         disableMic,
+        microphoneTurningOn,
         enableShareScreen,
         disableShareScreen,
         enableFullScreen,
@@ -61,6 +67,7 @@ export default function GroupAudioCallLayout() {
         fullScreenEnabled,
         setFullScreenEnabled,
         connectionState,
+        uploadJammed,
         canPublish,
         adminMode,
         callInfo,
@@ -78,7 +85,8 @@ export default function GroupAudioCallLayout() {
         moderation,
         chatShown,
         chatToggle,
-        callDurationRef
+        callDurationRef,
+        turnOnAsks
     } = useContext<CallContextInterface>( CallContext );
     const call = useContext<CallContextInterface>( CallContext );
     // Filling the window or the screen (call-view.tsx): the chat beside the call is out of reach then.
@@ -86,12 +94,13 @@ export default function GroupAudioCallLayout() {
     const expanded = view.windowed || fullScreenEnabled;
 
     const [ configOpen, setConfigOpen ] = useState( false );
-    // Opened from the prompt of the join's Test Microphone: the microphone's test runs from the start, once.
+    // Opened from the prompt of the join's Test Microphone, or an ask's (ask-prompt.tsx): the microphone's test runs
+    // from the start, once.
     const [ previewOnOpen, setPreviewOnOpen ] = useState( false );
     useEffect( () => { if ( ! configOpen ) setPreviewOnOpen( false ); }, [ configOpen ] );
+    const turnOnAsk = turnOnAsks?.received ?? null;
     const [ addOpen, setAddOpen ] = useState( false );
-    const [ panel, setPanel ] = useState<ModerationPanel>( null );
-    const closePanel = useCallback( () => setPanel( null ), [] );
+    const { panel, from, setPanel, close: closePanel } = useModerationPanel();
     const stageRef = useRef<HTMLDivElement>( null );
     const { notice, remind } = useModeratorNotice( myMicMuted );
     const status = statusMessage || notice;
@@ -103,10 +112,17 @@ export default function GroupAudioCallLayout() {
     const glyph = ( key: string, name: IconName ) => isPending( key )
         ? <Icon name="spinner" size={ 20 } className="wplus-svg-animate" />
         : <Icon name={ name } size={ 20 } />;
+    // The microphone spins as they do while it turns on (turning-on.ts).
+    const micGlyph = ( name: IconName ) => microphoneTurningOn
+        ? <Icon name="spinner" size={ 20 } className="wplus-svg-animate" />
+        : <Icon name={ name } size={ 20 } />;
     const controlsRef = useRef<HTMLDivElement>(null);
 
     const configAvailable = useConfigAvailable();
-    const [ joinPrompt, dismissJoinPrompt ] = useJoinPrompt( configOpen );
+    // A mark on Configure while the browser blocks the microphone of someone who may send it: the settings say why.
+    const devicesBlocked = useDevicesBlocked( false ) && canPublish;
+    const configure = useConfigureCall();
+    const [ joinPrompt, dismissJoinPrompt, holdJoinPrompt ] = useJoinPrompt( configOpen );
 
     const localParticipant = participants.has('me') ? participants.get('me') : null;
     // Someone who only listens has no tile of their own, and sends nothing to measure: connected, they read as good.
@@ -135,7 +151,7 @@ export default function GroupAudioCallLayout() {
         }
     }, [ myMicMuted ])
 
-    return (<ModerationPanelContext.Provider value={ { panel, setPanel } }>
+    return (<ModerationPanelContext.Provider value={ { panel, setPanel, from } }>
         <div ref={ stageRef } className="wplus-group-call-container wplus-call-container" style={{display: "block"}}>
         <GroupAudioGrid />
 
@@ -147,15 +163,29 @@ export default function GroupAudioCallLayout() {
         { adminMode && <HostToasts /> }
 
         {/* Joined with the microphone off, and Test Microphone (device-panel.tsx). */}
-        { joinPrompt && <JoinPrompt video={ false } preview={ () => { setPreviewOnOpen( true ); setConfigOpen( true ); } } dismiss={ dismissJoinPrompt } /> }
+        { turnOnAsk
+            ? <TurnOnAskPrompt video={ false } preview={ () => { setPreviewOnOpen( true ); setConfigOpen( true ); } } />
+            : joinPrompt && <JoinPrompt video={ false } preview={ () => { setPreviewOnOpen( true ); setConfigOpen( true ); } } dismiss={ dismissJoinPrompt } hold={ holdJoinPrompt } /> }
+
+        {/* The recording's notice and dialogs, and its pill in the bar, as in the video room. */}
+        <RecordingLayerView audio />
+        <BanDialog />
+
+        {/* AI Noise Removal turned on by the app's default, once a call (device-panel.tsx). */}
+        <NoiseAutoNotice />
 
             <div ref={controlsRef} className="wplus-group-call-controls-v2" part="call-controls">
                 { configOpen === true && <DevicePanel video={ false } start={ previewOnOpen ? 'microphone' : undefined } close={ () => setConfigOpen( false ) } /> }
                 { addOpen && <AddPersonPanel close={ () => setAddOpen( false ) } /> }
-                <ConnectionStatus state={connectionState} quality={quality}></ConnectionStatus>
+                <ConnectionStatus state={connectionState} quality={quality} jammed={ !! uploadJammed }></ConnectionStatus>
+                <RecordingPill />
 
                 <CallDock className="wplus-group-call-controls-buttons" pinned={ 1 }>
-                    {/* Show / hide the conversation — see the video room. */}
+                    {/* The lean dock, as in the video room: the chat beside the call and the device settings at its
+                        start, then the microphone, sharing, a hand for someone who can't send, Participants, the
+                        call's size, Host Controls, and Add Person in More whatever the room. */}
+
+                    {/* Show / hide the conversation, before the call is connected too — see the video room. */}
                     { ( chatToggle && ! expanded ) &&
                         <Tooltip content={ chatShown ? _x('Hide Chat', 'Call Controls', 'bp-better-messages') : _x('Show Chat', 'Call Controls', 'bp-better-messages') }>
                             <span onClick={ () => chatToggle( ( shown: boolean ) => ! shown ) } className="wplus-toggle-chat" data-active={ chatShown ? 1 : undefined }>
@@ -163,18 +193,18 @@ export default function GroupAudioCallLayout() {
                             </span>
                         </Tooltip>
                     }
+
+                    { ( connectionState === 'connected' && configAvailable ) &&
+                        <Tooltip content={ configure.label }>
+                            <span onClick={() => { setConfigOpen(!configOpen) }} className="wplus-configure-call" aria-label={ configure.label } aria-expanded={ configOpen } data-warning={ devicesBlocked ? 1 : undefined } data-noise={ configure.noise ? 1 : undefined }>
+                                <Icon name="settings" size={ 20 } />
+                                <ConfigureBadge noise={ configure.noise } />
+                            </span>
+                        </Tooltip>
+                    }
+
                     { connectionState === 'connected' &&
                         <>
-                            { configAvailable &&
-                                <Tooltip content={_x('Configure', 'Group Video Chat', 'bp-better-messages')}>
-                                    <span onClick={() => { setConfigOpen(!configOpen) }} className="wplus-configure-call">
-                                        <Icon name="settings" size={ 20 } />
-                                    </span>
-                                </Tooltip>
-                            }
-
-                            <AddPersonButton open={ addOpen } setOpen={ setAddOpen } />
-
                             { ( canPublish && ! myMicMuted ) &&
                                 <>
                                     { myMicrophoneTrack &&
@@ -187,18 +217,14 @@ export default function GroupAudioCallLayout() {
                                     }
                                     {! myMicrophoneTrack &&
                                         <Tooltip content={_x('Enable Microphone', 'Group Video Chat', 'bp-better-messages')}>
-                                            <span onClick={enableMic} className="wplus-enable-mic">
-                                                { ! iconsReverted && <Icon name="mic" size={ 20 } />}
-                                                { iconsReverted && <Icon name="micOff" size={ 20 } />}
+                                            <span onClick={enableMic} data-busy={ microphoneTurningOn ? 1 : undefined } className="wplus-enable-mic">
+                                                { micGlyph( iconsReverted ? 'micOff' : 'mic' ) }
                                             </span>
                                         </Tooltip>
                                     }
                                 </>
                             }
                             { ( canPublish && myMicMuted ) && lockedMicItem( remind ) }
-
-                            {/* Expand to the window, then the whole screen (call-view.tsx). */}
-                            { fullScreenItems( call, view ) }
 
                             { ( canPublish && screenShareSupport ) &&
                                 <>
@@ -237,8 +263,15 @@ export default function GroupAudioCallLayout() {
                                 }
                             </> }
 
+                            {/* No Participants: the roster is the list of everyone. Add Person, where the call can add
+                                people, is in More, as in a call between two. */}
+                            <DockMore>{ addPersonItem( call, addOpen, () => setAddOpen( ! addOpen ) ) }</DockMore>
+
+                            {/* Expand to the window, then the whole screen (call-view.tsx). */}
+                            { fullScreenItems( call, view ) }
+
                             {/* The room's rules in one panel — see the video room. */}
-                            { ( adminMode && roomModerated( moderation ) ) &&
+                            { ( adminMode && roomModerated( moderation, call.recording ) ) &&
                                 hostControlsItem( panel === 'room', roomMuted || roomLocked || callMode === 'broadcast', () => setPanel( panel === 'room' ? null : 'room' ) )
                             }
                         </>
@@ -253,7 +286,7 @@ export default function GroupAudioCallLayout() {
 
             {/* The moderator's menus, at the button that opened them (moderation-panels.tsx). */}
             { ( adminMode && panel === 'room' ) && <RoomPanel stage={ stageRef } close={ closePanel } /> }
-            { ( adminMode && panel !== null && panel !== 'room' ) && <PersonPanel key={ panel } stage={ stageRef } tileKey={ panel } type="audio" close={ closePanel } /> }
+            { ( adminMode && panel !== null && panel !== 'room' ) && <PersonPanel key={ panel + from } stage={ stageRef } tileKey={ panel } type="audio" from="tile" close={ closePanel } /> }
         </div>
     </ModerationPanelContext.Provider>
     )

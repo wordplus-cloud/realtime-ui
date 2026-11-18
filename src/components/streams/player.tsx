@@ -3,6 +3,7 @@ import type {Appearance, Shape} from "./appearance.ts";
 import {useClient, useStream} from "./context.tsx";
 import {isBoolean, isNumber, oneOf, readPref, writePref} from "./prefs.ts";
 import {scheduleOf, type StreamSession} from "./sessions.ts";
+import type {StreamRecording, StreamReplay} from "./recording.tsx";
 
 // What the player knows beyond the stream's state: the stream as the page describes it, and what the
 // viewer set here (sound, the chat hidden, full screen, picture-in-picture). The UI reads it with
@@ -39,6 +40,10 @@ export interface StreamMeta {
     room? : string;
     // The stream's own words, each in place of the player's (StreamTexts).
     texts? : StreamTexts;
+    // Its recording, where the page records streams (recording.tsx): Record in the studio, REC over the picture.
+    recording? : StreamRecording;
+    // A recording of it to play on its page once it has ended.
+    replay? : StreamReplay;
 }
 
 // What viewers read at each moment, a stream's own in place of the player's: before it starts (`soon`, and a line of its
@@ -221,7 +226,7 @@ const inWindow = () : boolean =>
 
 // What the player lifted over the page carries while it fills the window: its styles' hook, and where the player's own
 // tooltip goes then (tooltip.ts).
-export const WINDOW_ATTRIBUTE = 'data-estream-window';
+export const WINDOW_ATTRIBUTE = 'data-wplus-live-stream-window';
 
 const VOLUME_STEP = 0.1;
 
@@ -421,6 +426,8 @@ export function PlayerProvider( props : StreamMeta & { chat : boolean, root : Re
         connectUrl: props.connectUrl,
         room: props.room,
         texts: props.texts,
+        recording: props.recording,
+        replay: props.replay,
         volume,
         muted,
         volumeSettable: canSetVolume(),
@@ -451,7 +458,7 @@ export function PlayerProvider( props : StreamMeta & { chat : boolean, root : Re
         setSpeaker,
         countdown,
         setCountdown
-    } ), [ title, scheduled, sessions, next, props.url, props.loginUrl, props.cover, props.preview, props.placeLogo, props.appearance, props.studioUrl, props.connectUrl, props.room, props.texts, props.chat, props.chatBeside, layout, root, volume, muted, setVolume, setMuted,
+    } ), [ title, scheduled, sessions, next, props.url, props.loginUrl, props.cover, props.preview, props.placeLogo, props.appearance, props.studioUrl, props.connectUrl, props.room, props.texts, props.recording, props.replay, props.chat, props.chatBeside, layout, root, volume, muted, setVolume, setMuted,
         chatHidden, toggleChat, fullscreen, canFullscreen, toggleFullscreen, pip, canPip, togglePip, height, videoShape, statsOpen, toggleStats, keysOpen, speaker, setSpeaker, countdown ] );
 
     return <Context.Provider value={ player }>{ props.children }</Context.Provider>;
@@ -467,7 +474,7 @@ export function useShortcuts( player : Player ){
         const target = event.target as HTMLElement;
         if( target.closest( 'input, textarea, select, [contenteditable="true"], [role="menu"], [role="dialog"]' ) ) return;
 
-        const onPicture = target.classList.contains( 'estream-stage' );
+        const onPicture = target.classList.contains( 'wplus-live-stream-stage' );
         let handled = true;
 
         switch( event.key.toLowerCase() ){

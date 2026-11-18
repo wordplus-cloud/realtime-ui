@@ -20,7 +20,7 @@
 // `detail.control` the template's `data-control`), which bubbles to the document.
 import React, { useLayoutEffect, useRef, useState, type ComponentType, type ReactNode } from "react";
 import { createPortal } from "react-dom";
-import parse from "html-react-parser";
+import { markup } from "./inc/markup.tsx";
 import CallControl from "./components/calls/call-control.tsx";
 import type { IconName } from "./primitives/icon.tsx";
 import type { CallStatusProps, ChatMessageView, Drawn, MessageProps, OnlineRowProps, Pieces, RingCardProps } from "./pieces.tsx";
@@ -125,7 +125,7 @@ export function templatePieces( element: Element ): Pieces {
                 const name = template.dataset.control ?? "control-" + i;
                 const icon = template.dataset.icon;
                 return <CallControl key={ "page-" + name } label={ template.dataset.label ?? name }
-                                    icon={ icon ? icon as IconName : parse( template.innerHTML.trim() ) as ReactNode }
+                                    icon={ icon ? icon as IconName : markup( template.innerHTML.trim() ) }
                                     className={ "realtime-control-" + name }
                                     onClick={ () => element.dispatchEvent( new CustomEvent( "realtime-control", { bubbles: true, composed: true, detail: { control: name } } ) ) } />;
             } ),

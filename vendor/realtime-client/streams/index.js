@@ -7,6 +7,7 @@
  * the two differ, so a change to the protocol is made in both.
  */
 export { EasyStreamClient, cameraCodec, canShareScreen, personOf } from './client.js';
+export { TEST_CHANNEL, TEST_REGISTRY, TestFeed, openerTest } from './test.js';
 export { pageMedia } from './media.js';
 export { choosableLayers, chosenLayer } from './playback.js';
 export { avatarIn, expiresAt, issuerOf } from './grant.js';

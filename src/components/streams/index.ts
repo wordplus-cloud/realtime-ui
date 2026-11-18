@@ -1,6 +1,6 @@
 // Live streams: Easy Stream's player, studio, chat and stage, moved here whole on
 // 2026-10-13 (step 4), on the stream engine of @wordplus/realtime-client/streams, which their host gives them
-// (EasyStreamProvider). Their look is Easy Stream's: the `estream-` classes, the --estream-* properties, and the
+// (EasyStreamProvider). Their look is Easy Stream's: the `wplus-live-stream-` classes, the --wplus-live-stream-* properties, and the
 // appearance settings as props (appearance.ts). Their words are i18n.ts's, in the `wordplus-live-stream` text domain.
 export {EasyStreamApp, AllInOne, type EasyStreamAppProps} from "./app.tsx";
 export {EasyStreamParts, PART_NAMES, VIDEO_PARTS, type EasyStreamPartsProps, type Part, type PartName, type PartOptions} from "./parts.tsx";
@@ -15,9 +15,11 @@ export {ShortcutList} from "./shortcuts.tsx";
 export {Chat, BetterMessagesRoom, FullScreenRoom, RoomHomeContext, ROOM_ATTRIBUTE, type RoomHome} from "./chat.tsx";
 export {Info, type InfoShows} from "./info.tsx";
 export {ViewerControls, InviteDialog} from "./controls.tsx";
-export {Studio, StudioBody, StudioBar, StudioStatus, EncoderLost, Guests, useStudio, MicLevel, Summary, deviceName, deviceOf, sendingHealth, sentText, sendsHere, type StudioControls} from "./studio.tsx";
+export {Studio, StudioBody, StudioBar, StudioStatus, EncoderLost, Guests, useStudio, MicLevel, Summary, deviceName, deviceOf, preparingText, sendingHealth, sentText, sendsHere, type StudioControls} from "./studio.tsx";
 export {StudioPage, type StudioPageOptions} from "./studio-page.tsx";
+export {TestBadge, TestControls, TestPanel, TestStatus, TestSummary, openWatch, testEnded, testRunning, testsRun, useTest} from "./test-stream.tsx";
 export {RoomButton, RoomBanner, RoomStage, type RoomControls} from "./better-messages.tsx";
+export {configureStreamEffects, useStudioEffects, BackgroundChoice, NoiseChoice, BackgroundRow, NoiseRow, EffectRows, effectsShown, Glyph, type EffectGlyph, type StreamEffects, type StudioEffects} from "./effects.tsx";
 export {usePlayer, PlayerProvider, WithAppearance, useNow, useShortcuts, pageUrl, WINDOW_ATTRIBUTE, type StreamTexts} from "./player.tsx";
 export {ConfirmProvider, useConfirm, DialogBox} from "./dialog.tsx";
 export {VideoTrack, AudioTracks} from "./media.tsx";
@@ -33,3 +35,4 @@ export {readPref, writePref, isBoolean, isNumber, oneOf} from "./prefs.ts";
 export {sharedTooltips, sharedEmoji, sharedMenus, sharedPickers} from "./shared.ts";
 export {useTooltips} from "./tooltip.ts";
 export {errorText, reactionName} from "./words.ts";
+export {RecMark, RecordButton, RecordingChip, RecordSetting, ReplayButton, startMessage, useAutoRecord, useRecordingActions, type StreamRecording, type StreamReplay} from "./recording.tsx";

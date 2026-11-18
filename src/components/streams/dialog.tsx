@@ -26,18 +26,19 @@ interface Pending extends ConfirmOptions {
     resolve : ( yes : boolean ) => void;
 }
 
-export function DialogBox( props : { title : string, children? : ReactNode, actions : ReactNode, onCancel? : () => void, labelId : string } ){
+// `wide`: as wide as the screen allows, for a player with its transcript beside it.
+export function DialogBox( props : { title : string, children? : ReactNode, actions : ReactNode, onCancel? : () => void, labelId : string, wide? : boolean } ){
     const box = useRef<HTMLDivElement>( null );
 
     useEffect( () => {
         const before = document.activeElement as HTMLElement | null;
         // The last button is the one that does it; the first, a way out, takes focus.
-        box.current?.querySelector<HTMLElement>( '.estream-dialog__actions button' )?.focus();
+        box.current?.querySelector<HTMLElement>( '.wplus-live-stream-dialog__actions button' )?.focus();
         return () => before?.focus?.();
     }, [] );
 
     return (
-        <div className="estream-dialog" role="presentation" onKeyDown={ ( e ) => {
+        <div className="wplus-live-stream-dialog" role="presentation" onKeyDown={ ( e ) => {
             if( e.key === 'Escape' && props.onCancel ){
                 e.stopPropagation();
                 props.onCancel();
@@ -55,10 +56,10 @@ export function DialogBox( props : { title : string, children? : ReactNode, acti
                 first.focus();
             }
         } }>
-            <div ref={ box } className="estream-dialog__box" role="dialog" aria-modal="true" aria-labelledby={ props.labelId }>
+            <div ref={ box } className={ 'wplus-live-stream-dialog__box' + ( props.wide ? ' wplus-live-stream-dialog__box--wide' : '' ) } role="dialog" aria-modal="true" aria-labelledby={ props.labelId }>
                 <h2 id={ props.labelId }>{ props.title }</h2>
                 { props.children }
-                <div className="estream-dialog__actions">{ props.actions }</div>
+                <div className="wplus-live-stream-dialog__actions">{ props.actions }</div>
             </div>
         </div>
     );
@@ -91,13 +92,13 @@ export function ConfirmProvider( props : { children : ReactNode, layer? : Layer 
             { props.children }
             { pending && <Layer>
                 <DialogBox
-                    labelId="estream-confirm-title"
+                    labelId="wplus-live-stream-confirm-title"
                     title={ pending.title }
                     onCancel={ () => answer( false ) }
                     actions={ (
                         <>
-                            <button type="button" className="estream-button" onClick={ () => answer( false ) }>{ pending.cancel ?? __( 'Cancel', 'wordplus-live-stream' ) }</button>
-                            <button type="button" className={ 'estream-button ' + ( pending.danger ? 'estream-button--danger-solid' : 'estream-button--primary' ) } onClick={ () => answer( true ) }>{ pending.confirm }</button>
+                            <button type="button" className="wplus-live-stream-button" onClick={ () => answer( false ) }>{ pending.cancel ?? __( 'Cancel', 'wordplus-live-stream' ) }</button>
+                            <button type="button" className={ 'wplus-live-stream-button ' + ( pending.danger ? 'wplus-live-stream-button--danger-solid' : 'wplus-live-stream-button--primary' ) } onClick={ () => answer( true ) }>{ pending.confirm }</button>
                         </>
                     ) }
                 >

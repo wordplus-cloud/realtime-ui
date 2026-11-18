@@ -17,7 +17,8 @@ it( 'takes files in <chat-room upload>, as its attributes say, and none without 
     const elements = await import( '../src/elements.tsx' );
     expect( elements.start() ).toBe( true );
     const shadow = ( id: string ) => document.querySelector( `chat-room#${ id }` )!.shadowRoot!;
-    for ( let i = 0; i < 50 && ! shadow( 'with' ).querySelector( '.wplus-composer' ); i++ ) await settle();
+    // The paperclip comes once the room is joined, which can be after the composer is drawn.
+    for ( let i = 0; i < 50 && ! shadow( 'with' ).querySelector( '.wplus-composer__attach-wrap' ); i++ ) await settle();
 
     const input = shadow( 'with' ).querySelector( '.wplus-attachments-input' ) as HTMLInputElement;
     expect( input.getAttribute( 'accept' ) ).toBe( 'image/*,.pdf' );

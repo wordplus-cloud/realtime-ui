@@ -16,6 +16,7 @@ import {qualityChoices, shownQuality, Stage, type TileInfo} from "./stage.tsx";
 import {deviceName, deviceOf, sendingHealth, sentText, Summary, useStudio, type StudioControls} from "./studio.tsx";
 import {reactionName} from "./words.ts";
 import FoldingDock from "../calls/folding-dock.tsx";
+import {BackgroundRow, effectsShown, NoiseRow} from "./effects.tsx";
 
 // A stream in a Better Messages conversation, its chat room. Better Messages keeps places in a
 // conversation for another plugin to draw into, and lends it the call area as a stage (its thread slots); these parts
@@ -151,7 +152,7 @@ export function RoomButton( props : { room : RoomControls } ){
             ref={ tips }
             role="button"
             tabIndex={ 0 }
-            className={ 'wplus-btn wplus-icon-btn estream-bm-button' + ( live ? ' estream-bm-button--live' : '' ) }
+            className={ 'wplus-btn wplus-icon-btn wplus-live-stream-bm-button' + ( live ? ' wplus-live-stream-bm-button--live' : '' ) }
             data-active={ shown ? 1 : undefined }
             aria-label={ label }
             aria-pressed={ shown }
@@ -183,13 +184,13 @@ export function RoomBanner( props : { room : RoomControls } ){
         const counted = player.appearance.viewers !== false || host;
 
         return (
-            <div className="wplus-before-message-list estream-bm-banner">
-                <div className="wplus-group-call-in-progress estream-bm-banner__live">
+            <div className="wplus-before-message-list wplus-live-stream-bm-banner">
+                <div className="wplus-group-call-in-progress wplus-live-stream-bm-banner__live">
                     <span className="wplus-group-call-in-progress-info">
-                        <span className="estream-bm-banner__badge">{ _x( 'Live', 'a stream on air', 'wordplus-live-stream' ) }</span>
-                        <span className="estream-bm-banner__title">{ player.title || __( 'Live stream', 'wordplus-live-stream' ) }</span>
+                        <span className="wplus-live-stream-bm-banner__badge">{ _x( 'Live', 'a stream on air', 'wordplus-live-stream' ) }</span>
+                        <span className="wplus-live-stream-bm-banner__title">{ player.title || __( 'Live stream', 'wordplus-live-stream' ) }</span>
                         { counted && state.viewers > 0 && (
-                            <span className="estream-bm-banner__count">
+                            <span className="wplus-live-stream-bm-banner__count">
                                 { sprintf( _nx( '%s watching', '%s watching', state.viewers, 'how many people watch', 'wordplus-live-stream' ), count( state.viewers ) ) }
                             </span>
                         ) }
@@ -206,11 +207,11 @@ export function RoomBanner( props : { room : RoomControls } ){
 
     if( planned && ! shown ){
         return (
-            <div className="wplus-before-message-list estream-bm-banner">
-                <div className="wplus-group-call-in-progress estream-bm-banner__planned">
+            <div className="wplus-before-message-list wplus-live-stream-bm-banner">
+                <div className="wplus-group-call-in-progress wplus-live-stream-bm-banner__planned">
                     <span className="wplus-group-call-in-progress-info">
                         <BmIcon name="clock" size={ 16 } />
-                        <span className="estream-bm-banner__title">{ sprintf( _x( 'Live stream: starts %s', 'a date and time', 'wordplus-live-stream' ), dateTime( at! ) ) }</span>
+                        <span className="wplus-live-stream-bm-banner__title">{ sprintf( _x( 'Live stream: starts %s', 'a date and time', 'wordplus-live-stream' ), dateTime( at! ) ) }</span>
                     </span>
                     { host && (
                         <span className="wplus-group-call-in-progress-join">
@@ -302,7 +303,7 @@ function useSoundButton() : ReactElement {
     const off = player.muted || state.audioBlocked;
 
     return dockButton( {
-        tone: off ? 'wplus-enable-mic estream-bm-sound' : 'wplus-disable-mic estream-bm-sound',
+        tone: off ? 'wplus-enable-mic wplus-live-stream-bm-sound' : 'wplus-disable-mic wplus-live-stream-bm-sound',
         icon: off ? 'volumeOff' : 'volume',
         label: off ? __( 'Turn sound on', 'wordplus-live-stream' ) : __( 'Mute', 'wordplus-live-stream' ),
         onClick: () => {
@@ -345,10 +346,10 @@ function WatchSheet( props : { before? : ReactNode } ){
     };
 
     return (
-        <div className="wplus-call-settings estream-bm-watch">
+        <div className="wplus-call-settings wplus-live-stream-bm-watch">
             { props.before }
             { player.volumeSettable && (
-                <div className="wplus-call-setting estream-bm-volume">
+                <div className="wplus-call-setting wplus-live-stream-bm-volume">
                     <label htmlFor={ volumeId }>{ __( 'Volume', 'wordplus-live-stream' ) }</label>
                     <input
                         id={ volumeId }
@@ -358,7 +359,7 @@ function WatchSheet( props : { before? : ReactNode } ){
                         step={ 0.05 }
                         value={ level }
                         aria-valuetext={ Math.round( level * 100 ) + '%' }
-                        style={ { '--estream-level': level * 100 + '%' } as CSSProperties }
+                        style={ { '--wplus-live-stream-level': level * 100 + '%' } as CSSProperties }
                         onChange={ ( e ) => {
                             // Moving it is what a browser that blocked sound waits for.
                             if( state.audioBlocked ) void client.startAudio();
@@ -380,7 +381,7 @@ function WatchSheet( props : { before? : ReactNode } ){
                     </select>
                 </div>
             </div>
-            <button type="button" className="wplus-call-setting estream-bm-stats" aria-pressed={ player.statsOpen } onClick={ player.toggleStats }>
+            <button type="button" className="wplus-call-setting wplus-live-stream-bm-stats" aria-pressed={ player.statsOpen } onClick={ player.toggleStats }>
                 { player.statsOpen ? _x( 'Hide statistics', 'of the player', 'wordplus-live-stream' ) : __( 'Statistics', 'wordplus-live-stream' ) }
             </button>
         </div>
@@ -392,13 +393,13 @@ function ReactionSheet( props : { kinds : Reaction[] } ){
     const client = useClient();
 
     return (
-        <div className="wplus-call-settings estream-bm-reactions" role="group" aria-label={ __( 'Reactions', 'wordplus-live-stream' ) }>
+        <div className="wplus-call-settings wplus-live-stream-bm-reactions" role="group" aria-label={ __( 'Reactions', 'wordplus-live-stream' ) }>
             { props.kinds.map( ( kind ) => (
                 <span
                     key={ kind }
                     role="button"
                     tabIndex={ 0 }
-                    className="estream-bm-reaction"
+                    className="wplus-live-stream-bm-reaction"
                     aria-label={ reactionName( kind ) }
                     data-wplus-tip={ reactionName( kind ) }
                     onClick={ () => client.react( kind ) }
@@ -452,9 +453,10 @@ function deviceButtons( camera : boolean, microphone : boolean, toggle : ( devic
     );
 }
 
-// The devices, in the sheet Better Messages' calls open over the dock, and while live the stream's statistics.
+// The devices, in the sheet Better Messages' calls open over the dock, and while live the stream's statistics. Under
+// them the host's background and AI noise removal, where the site offers them (effects.tsx).
 function DeviceSheet( props : { studio : StudioControls } ){
-    const { devices, camera, microphone, choose, player } = props.studio;
+    const { devices, camera, microphone, choose, player, effects, state } = props.studio;
     const speakers = typeof HTMLMediaElement !== 'undefined' && 'setSinkId' in HTMLMediaElement.prototype;
     const field = ( label : string, kind : 'camera' | 'microphone' | 'speaker', list : typeof devices.cameras, value : string, onChange : ( id : string ) => void ) => (
         <div className="wplus-call-setting wplus-switch-device">
@@ -474,6 +476,12 @@ function DeviceSheet( props : { studio : StudioControls } ){
             { field( __( 'Camera', 'wordplus-live-stream' ), 'camera', devices.cameras, deviceOf( camera ), ( id ) => choose( 'camera', id ) ) }
             { field( __( 'Microphone', 'wordplus-live-stream' ), 'microphone', devices.microphones, deviceOf( microphone ), ( id ) => choose( 'microphone', id ) ) }
             { speakers && field( __( 'Speakers', 'wordplus-live-stream' ), 'speaker', devices.speakers, player.speaker, player.setSpeaker ) }
+            { effectsShown( effects, state.devices.camera, state.devices.microphone ) && (
+                <div className="wplus-live-stream-bm-effects">
+                    <BackgroundRow effects={ effects } camera={ state.devices.camera } />
+                    <NoiseRow effects={ effects } microphone={ state.devices.microphone } original={ state.originalSound } />
+                </div>
+            ) }
         </div>
     );
 }
@@ -494,11 +502,11 @@ function Watching(){
     const text = host ? watching + ', ' + sprintf( _x( 'peak %s', 'the most watching at once', 'wordplus-live-stream' ), count( peak ) ) : watching;
 
     return (
-        <span className="estream-bm-watching" role="img" aria-label={ text } data-wplus-tip={ text }>
+        <span className="wplus-live-stream-bm-watching" role="img" aria-label={ text } data-wplus-tip={ text }>
             <BmIcon name="eye" size={ 16 } />
             <span>{ count( state.viewers ) }</span>
             { host && (
-                <span className="estream-bm-watching__peak">
+                <span className="wplus-live-stream-bm-watching__peak">
                     <Icon name="peak" />
                     { count( peak ) }
                 </span>
@@ -535,9 +543,9 @@ function Statistics( props : { stats : MediaStats | null } ){
     const { tally } = state;
 
     return (
-        <div className="wplus-call-setting estream-bm-statistics">
+        <div className="wplus-call-setting wplus-live-stream-bm-statistics">
             <label>{ __( 'Statistics', 'wordplus-live-stream' ) }</label>
-            <dl className="estream-bm-figures">
+            <dl className="wplus-live-stream-bm-figures">
                 { stats && ( stats.height > 0 || stats.paused ) && (
                     <div>
                         <dt>{ __( 'Video', 'wordplus-live-stream' ) }</dt>
@@ -568,18 +576,18 @@ function StageFrame( props : { studio? : boolean, screen? : ReactNode, notice? :
     return (
         <div
             ref={ root }
-            className={ themeClass( { ...player.appearance, theme: 'dark' }, player.videoShape ) + ' estream-bm-stage' + ( player.fullscreen ? ' estream-theme--full' : '' ) }
+            className={ themeClass( { ...player.appearance, theme: 'dark' }, player.videoShape ) + ' wplus-live-stream-bm-stage' + ( player.fullscreen ? ' wplus-live-stream-theme--full' : '' ) }
             style={ themeStyle( { ...player.appearance, theme: 'dark' } ) }
             onKeyDown={ shortcuts }
         >
             <div className="wplus-group-call-container wplus-call-container">
-                <div className="estream-bm-stage__picture">
+                <div className="wplus-live-stream-bm-stage__picture">
                     <Stage bare studio={ props.studio } screen={ props.screen } tileInfo={ bmTileInfo } />
                 </div>
                 { props.notice && <div className="wplus-group-call-status" role="status">{ props.notice }</div> }
                 <div className="wplus-group-call-controls-v2">
                     { props.sheet }
-                    <div className="wplus-connection-control estream-bm-status">
+                    <div className="wplus-connection-control wplus-live-stream-bm-status">
                         { props.status }
                         <Watching />
                     </div>
@@ -629,7 +637,7 @@ function ViewerStage( props : { room : RoomControls } ){
             { chat }
             { remote && dockButton( { tone: 'wplus-configure-call', icon: 'settings', label: __( 'Settings', 'wordplus-live-stream' ), active: sheet === 'settings', onClick: () => toggle( 'settings' ) } ) }
             { remote && sound }
-            { reactions.length > 0 && dockButton( { tone: 'estream-bm-react', icon: 'reaction', label: __( 'Reactions', 'wordplus-live-stream' ), active: sheet === 'reactions', onClick: () => toggle( 'reactions' ) } ) }
+            { reactions.length > 0 && dockButton( { tone: 'wplus-live-stream-bm-react', icon: 'reaction', label: __( 'Reactions', 'wordplus-live-stream' ), active: sheet === 'reactions', onClick: () => toggle( 'reactions' ) } ) }
             { pip }
             { fullscreen }
             { leaving && leaveButton( props.room ) }
@@ -648,11 +656,11 @@ function HostIdle( props : { ended : boolean } ){
     return (
         <Screen icon="broadcast" title={ ended ? __( 'Your stream has ended', 'wordplus-live-stream' ) : __( 'Ready when you are', 'wordplus-live-stream' ) }>
             { ended && <Summary messages={ false } /> }
-            { at !== null && at > Date.now() && <span className="estream-screen__sub">{ sprintf( _x( 'Planned for %s', 'a date and time', 'wordplus-live-stream' ), dateTime( at ) ) }</span> }
-            <span className="estream-screen__sub">{ __( 'Turn on your camera or microphone below. Only you see the preview until you go live.', 'wordplus-live-stream' ) }</span>
+            { at !== null && at > Date.now() && <span className="wplus-live-stream-screen__sub">{ sprintf( _x( 'Planned for %s', 'a date and time', 'wordplus-live-stream' ), dateTime( at ) ) }</span> }
+            <span className="wplus-live-stream-screen__sub">{ __( 'Turn on your camera or microphone below. Only you see the preview until you go live.', 'wordplus-live-stream' ) }</span>
             { player.studioUrl && (
-                <span className="estream-screen__sub">
-                    <a className="estream-bm-stage__studio" href={ player.studioUrl }>{ __( 'Stream from OBS in the Studio', 'wordplus-live-stream' ) }</a>
+                <span className="wplus-live-stream-screen__sub">
+                    <a className="wplus-live-stream-bm-stage__studio" href={ player.studioUrl }>{ __( 'Stream from OBS in the Studio', 'wordplus-live-stream' ) }</a>
                 </span>
             ) }
         </Screen>
@@ -719,11 +727,11 @@ function HostStage( props : { room : RoomControls } ){
             ) }
             { fullscreen }
             { live ? dockButton( {
-                tone: 'wplus-exit-room estream-bm-end', icon: 'stop', label: __( 'End stream', 'wordplus-live-stream' ), disabled: busy, onClick: () => void end()
+                tone: 'wplus-exit-room wplus-live-stream-bm-end', icon: 'stop', label: __( 'End stream', 'wordplus-live-stream' ), disabled: busy, onClick: () => void end()
             } ) : countingDown ? dockButton( {
                 tone: 'wplus-exit-room', icon: 'x', label: __( 'Cancel', 'wordplus-live-stream' ), onClick: cancelCountdown
             } ) : dockButton( {
-                tone: 'wplus-answer estream-bm-go',
+                tone: 'wplus-answer wplus-live-stream-bm-go',
                 icon: 'live',
                 label: ready ? __( 'Go live', 'wordplus-live-stream' )
                     : state.canShareScreen ? __( 'Turn on your camera or microphone, or share your screen, to go live', 'wordplus-live-stream' )

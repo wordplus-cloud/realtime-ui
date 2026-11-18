@@ -8,6 +8,7 @@ import {Icon, type IconName} from "./icons.tsx";
 import {MenuButton, MenuItem} from "./menu.tsx";
 import {pageUrl, usePlayer, useNow} from "./player.tsx";
 import {errorText} from "./words.ts";
+import {ReplayButton} from "./recording.tsx";
 
 // What the stage shows when there is no picture: each moment of a stream has a screen of its own.
 
@@ -21,10 +22,10 @@ const KNOWN = new Set( [ 'not_licensed', 'not_configured', 'not_included', 'forb
 
 export function Screen( props : { icon? : IconName, busy? : boolean, title : ReactNode, children? : ReactNode, tone? : 'error' } ){
     return (
-        <div className={ 'estream-screen' + ( props.tone ? ' estream-screen--' + props.tone : '' ) }>
-            { props.busy ? <span className="estream-spinner" /> : props.icon ? <span className="estream-screen__icon"><Icon name={ props.icon } /></span> : null }
+        <div className={ 'wplus-live-stream-screen' + ( props.tone ? ' wplus-live-stream-screen--' + props.tone : '' ) }>
+            { props.busy ? <span className="wplus-live-stream-spinner" /> : props.icon ? <span className="wplus-live-stream-screen__icon"><Icon name={ props.icon } /></span> : null }
             { /* Said by screen readers as the moment changes (joining, waiting, ended), an error at once. */ }
-            <p className="estream-screen__title" role={ props.tone === 'error' ? 'alert' : 'status' }>{ props.title }</p>
+            <p className="wplus-live-stream-screen__title" role={ props.tone === 'error' ? 'alert' : 'status' }>{ props.title }</p>
             { props.children }
         </div>
     );
@@ -44,11 +45,11 @@ function Countdown( props : { at : number } ){
     const shown = left.days > 0 ? units : units.slice( 1 );
 
     return (
-        <div className="estream-countdown" role="timer" aria-live="off">
+        <div className="wplus-live-stream-countdown" role="timer" aria-live="off">
             { shown.map( ( u, i ) => (
-                <div key={ i } className="estream-countdown__unit">
-                    <span className="estream-countdown__number">{ String( u.n ).padStart( 2, '0' ) }</span>
-                    <span className="estream-countdown__label">{ u.label }</span>
+                <div key={ i } className="wplus-live-stream-countdown__unit">
+                    <span className="wplus-live-stream-countdown__number">{ String( u.n ).padStart( 2, '0' ) }</span>
+                    <span className="wplus-live-stream-countdown__label">{ u.label }</span>
                 </div>
             ) ) }
         </div>
@@ -62,7 +63,7 @@ function AddToCalendar( props : { start : number } ){
     const event = { title: name, start: props.start, url: page };
 
     return (
-        <MenuButton icon="calendar" label={ __( 'Add to calendar', 'wordplus-live-stream' ) } text={ __( 'Add to calendar', 'wordplus-live-stream' ) } className="estream-screen__menu" placement="down" align="start">
+        <MenuButton icon="calendar" label={ __( 'Add to calendar', 'wordplus-live-stream' ) } text={ __( 'Add to calendar', 'wordplus-live-stream' ) } className="wplus-live-stream-screen__menu" placement="down" align="start">
             { ( close ) => (
                 <>
                     <MenuItem onSelect={ () => { window.open( googleCalendarUrl( event ), '_blank', 'noopener' ); close(); } }>
@@ -89,14 +90,15 @@ function BeforeStart( props : { scheduled? : number | null } ){
 
     return (
         <Screen icon={ ahead ? 'clock' : 'broadcast' } title={ texts?.soon || __( 'The stream starts soon', 'wordplus-live-stream' ) }>
-            { texts?.soon_note && <span className="estream-screen__sub">{ texts.soon_note }</span> }
+            { texts?.soon_note && <span className="wplus-live-stream-screen__sub">{ texts.soon_note }</span> }
             { ahead && at - now < COUNTDOWN_MS && <Countdown at={ at } /> }
             { at !== null && (
-                <span className="estream-screen__sub">
+                <span className="wplus-live-stream-screen__sub">
                     { ahead ? sprintf( _x( 'Starts %s', 'a date and time', 'wordplus-live-stream' ), dateTime( at ) ) : __( 'Starting any moment now', 'wordplus-live-stream' ) }
                 </span>
             ) }
-            { ahead && <div className="estream-screen__actions"><AddToCalendar start={ at } /></div> }
+            { ahead && <div className="wplus-live-stream-screen__actions"><AddToCalendar start={ at } /></div> }
+            <ReplayButton />
         </Screen>
     );
 }
@@ -104,7 +106,7 @@ function BeforeStart( props : { scheduled? : number | null } ){
 // The next session, said under the thanks for the one that ended: its title where it has one, and when.
 function NextSession( props : { at : number, title? : string } ){
     return (
-        <span className="estream-screen__sub estream-screen__next">
+        <span className="wplus-live-stream-screen__sub wplus-live-stream-screen__next">
             { props.title
                 ? sprintf( _x( 'Next: %1$s, %2$s', 'the next time a stream goes live: its title, then its date and time', 'wordplus-live-stream' ), props.title, dateTime( props.at ) )
                 : sprintf( _x( 'Next: %s', 'the next time a stream goes live: its date and time', 'wordplus-live-stream' ), dateTime( props.at ) ) }
@@ -119,9 +121,10 @@ function Ended( props : { state : EasyStreamState } ){
 
     return (
         <Screen icon="broadcast" title={ texts?.ended || __( 'This stream has ended', 'wordplus-live-stream' ) }>
-            { ran > 0 && <span className="estream-screen__sub">{ sprintf( _x( 'It ran for %s', 'how long a stream lasted, as 1:02:15', 'wordplus-live-stream' ), clock( ran ) ) }</span> }
-            <span className="estream-screen__sub">{ texts?.thanks || __( 'Thanks for watching', 'wordplus-live-stream' ) }</span>
+            { ran > 0 && <span className="wplus-live-stream-screen__sub">{ sprintf( _x( 'It ran for %s', 'how long a stream lasted, as 1:02:15', 'wordplus-live-stream' ), clock( ran ) ) }</span> }
+            <span className="wplus-live-stream-screen__sub">{ texts?.thanks || __( 'Thanks for watching', 'wordplus-live-stream' ) }</span>
             { next && <NextSession at={ next.at } title={ next.title } /> }
+            <ReplayButton />
         </Screen>
     );
 }
@@ -138,7 +141,7 @@ function Full( props : { seconds : number } ){
 
     return (
         <Screen busy title={ texts?.full || __( 'The stream is full. Joining as soon as a place frees up…', 'wordplus-live-stream' ) }>
-            { props.seconds > 0 && <span className="estream-screen__sub">{ sprintf( _nx( 'About %s second', 'About %s seconds', props.seconds, 'how long until a place frees up', 'wordplus-live-stream' ), count( props.seconds ) ) }</span> }
+            { props.seconds > 0 && <span className="wplus-live-stream-screen__sub">{ sprintf( _nx( 'About %s second', 'About %s seconds', props.seconds, 'how long until a place frees up', 'wordplus-live-stream' ), count( props.seconds ) ) }</span> }
         </Screen>
     );
 }
@@ -155,33 +158,48 @@ function StudioIdle( props : { state : EasyStreamState, scheduled? : number | nu
 
         return (
             <Screen icon="broadcast" title={ __( 'Your stream has ended', 'wordplus-live-stream' ) }>
-                { ran > 0 && <span className="estream-screen__sub">{ sprintf( _x( 'It ran for %s', 'how long a stream lasted, as 1:02:15', 'wordplus-live-stream' ), clock( ran ) ) }</span> }
+                { ran > 0 && <span className="wplus-live-stream-screen__sub">{ sprintf( _x( 'It ran for %s', 'how long a stream lasted, as 1:02:15', 'wordplus-live-stream' ), clock( ran ) ) }</span> }
                 { next && <NextSession at={ next.at } title={ next.title } /> }
-                <span className="estream-screen__sub">{ __( 'To go live again, turn on your camera or stream from OBS, below.', 'wordplus-live-stream' ) }</span>
+                <span className="wplus-live-stream-screen__sub">{ __( 'To go live again, turn on your camera or stream from OBS, below.', 'wordplus-live-stream' ) }</span>
             </Screen>
         );
     }
 
     return (
         <Screen icon="broadcast" title={ __( 'Ready when you are', 'wordplus-live-stream' ) }>
-            { at !== null && <span className="estream-screen__sub">{ sprintf( _x( 'Planned for %s', 'a date and time', 'wordplus-live-stream' ), dateTime( at ) ) }</span> }
-            <span className="estream-screen__sub">{ __( 'Turn on your camera, or stream from OBS, below. Only you see the preview until you go live.', 'wordplus-live-stream' ) }</span>
+            { at !== null && <span className="wplus-live-stream-screen__sub">{ sprintf( _x( 'Planned for %s', 'a date and time', 'wordplus-live-stream' ), dateTime( at ) ) }</span> }
+            <span className="wplus-live-stream-screen__sub">{ __( 'Turn on your camera, or stream from OBS, below. Only you see the preview until you go live.', 'wordplus-live-stream' ) }</span>
         </Screen>
     );
 }
 
 // A host's picture on a site whose streams the cloud doesn't take yet (the client's offlineHost): in the studio the
-// preview works, and going live waits for the site to be connected, with the way there for those who may.
-function Unconnected( props : { studio : boolean } ){
+// preview works, and a test stream the host alone watches (`tests`, test-stream.tsx), and going live waits for the site
+// to be connected, with the way there for those who may. The stream's page says how to watch a test on it.
+function Unconnected( props : { studio : boolean, tests : boolean, elsewhere : boolean } ){
     const { connectUrl } = usePlayer();
+
+    // A test of this stream running in another tab that this page cannot reach (the client's testElsewhere): not
+    // opened from the studio, or kept apart from it by a security setting of the site.
+    if( ! props.studio && props.elsewhere ){
+        return (
+            <Screen icon="broadcast" title={ __( 'Your test stream is on in another tab', 'wordplus-live-stream' ) }>
+                <span className="wplus-live-stream-screen__sub">{ __( 'This page cannot show it. To watch it here, go back to the studio and choose Watch it as viewers do, which opens this page from there.', 'wordplus-live-stream' ) }</span>
+                <span className="wplus-live-stream-screen__sub">{ __( 'If this page opened from the studio and still shows this, a security setting of the site keeps the two tabs apart, such as a Cross-Origin-Opener-Policy header.', 'wordplus-live-stream' ) }</span>
+            </Screen>
+        );
+    }
 
     return (
         <Screen icon="broadcast" title={ __( 'Not connected to WordPlus Cloud yet', 'wordplus-live-stream' ) }>
-            { props.studio && <span className="estream-screen__sub">{ __( 'Try your camera, microphone and screen below. Only you see the preview.', 'wordplus-live-stream' ) }</span> }
-            <span className="estream-screen__sub">{ __( 'Going live needs the site connected to WordPlus Cloud.', 'wordplus-live-stream' ) }</span>
+            { props.studio && ( props.tests
+                ? <span className="wplus-live-stream-screen__sub">{ __( 'Try your camera, microphone and screen below, then start a test stream and watch it on its page as your viewers will. Only you can see it.', 'wordplus-live-stream' ) }</span>
+                : <span className="wplus-live-stream-screen__sub">{ __( 'Try your camera, microphone and screen below. Only you see the preview.', 'wordplus-live-stream' ) }</span> ) }
+            { ! props.studio && props.tests && <span className="wplus-live-stream-screen__sub">{ __( 'To watch a test stream here, start it in the studio and choose Watch it as viewers do.', 'wordplus-live-stream' ) }</span> }
+            <span className="wplus-live-stream-screen__sub">{ __( 'Going live needs the site connected to WordPlus Cloud.', 'wordplus-live-stream' ) }</span>
             { connectUrl && (
-                <div className="estream-screen__actions">
-                    <a className="estream-button estream-button--primary" href={ connectUrl }>{ __( 'Connect to go live', 'wordplus-live-stream' ) }</a>
+                <div className="wplus-live-stream-screen__actions">
+                    <a className="wplus-live-stream-button wplus-live-stream-button--primary" href={ connectUrl }>{ __( 'Connect to go live', 'wordplus-live-stream' ) }</a>
                 </div>
             ) }
         </Screen>
@@ -196,14 +214,14 @@ function Failed( props : { error : string | null } ){
     return (
         <Screen icon="alert" tone="error" title={ errorText( props.error ) }>
             { code === 'expired' ? (
-                <div className="estream-screen__actions">
-                    <button type="button" className="estream-button" onClick={ () => window.location.reload() }>
+                <div className="wplus-live-stream-screen__actions">
+                    <button type="button" className="wplus-live-stream-button" onClick={ () => window.location.reload() }>
                         <Icon name="retry" />{ __( 'Reload the page', 'wordplus-live-stream' ) }
                     </button>
                 </div>
             ) : retry ? (
-                <div className="estream-screen__actions">
-                    <button type="button" className="estream-button" onClick={ () => void client.start() }>
+                <div className="wplus-live-stream-screen__actions">
+                    <button type="button" className="wplus-live-stream-button" onClick={ () => void client.start() }>
                         <Icon name="retry" />{ code === 'kicked' ? __( 'Join again', 'wordplus-live-stream' ) : __( 'Try again', 'wordplus-live-stream' ) }
                     </button>
                 </div>
@@ -220,7 +238,7 @@ export function screenFor( state : EasyStreamState, scheduled? : number | null, 
     if( state.status === 'error' && state.error === 'no_hours' ) return <Full seconds={ 0 } />;
     if( state.status === 'error' ) return <Failed error={ state.error } />;
     // A host setting up before the site is connected: their preview once it is on, what they can do until then.
-    if( state.status === 'unconnected' ) return state.tiles.length > 0 ? null : <Unconnected studio={ studio } />;
+    if( state.status === 'unconnected' ) return state.tiles.length > 0 ? null : <Unconnected studio={ studio } tests={ 'test' in state } elsewhere={ state.testElsewhere === true } />;
     if( state.status === 'joining' || ! state.stream ) return <Screen busy title={ __( 'Joining…', 'wordplus-live-stream' ) } />;
     if( state.tiles.length > 0 ) return null;
 
@@ -242,7 +260,7 @@ export function screenFor( state : EasyStreamState, scheduled? : number | null, 
     if( live && state.error === 'media_unreachable' && state.media === 'off' ){
         return (
             <Screen icon="signal" tone="error" title={ errorText( 'media_unreachable' ) }>
-                <span className="estream-screen__sub">{ __( 'Trying again…', 'wordplus-live-stream' ) }</span>
+                <span className="wplus-live-stream-screen__sub">{ __( 'Trying again…', 'wordplus-live-stream' ) }</span>
             </Screen>
         );
     }
@@ -255,7 +273,7 @@ export function screenFor( state : EasyStreamState, scheduled? : number | null, 
     if( live && studio && state.you?.role === 'host' ){
         return (
             <Screen icon="broadcast" title={ __( 'You are live, but nothing is going out', 'wordplus-live-stream' ) }>
-                <span className="estream-screen__sub">{ __( 'Turn on your camera or microphone, or share your screen, below. Viewers see that the picture of the host is on its way.', 'wordplus-live-stream' ) }</span>
+                <span className="wplus-live-stream-screen__sub">{ __( 'Turn on your camera or microphone, or share your screen, below. Viewers see that the picture of the host is on its way.', 'wordplus-live-stream' ) }</span>
             </Screen>
         );
     }

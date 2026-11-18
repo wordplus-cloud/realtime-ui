@@ -1,18 +1,25 @@
-/**
- * A live stream on the app's calls: `calls.stream( name )` asks the app's route
- * for Easy Stream's grant, as `group()` asks for a group call's, joins, and the stream's chat rides the page's one
- * connection, as its rooms do. Easy Stream's engine (`../streams`) runs it; this is the SDK's shape of it, the same object
- * for every role. What a role may not do rejects with the cloud's code (`not_host`, `read_only`, `no_stage` …).
- *
- * The app's users are named by their ids, as its grants name them (`sub`); the cloud's own names for them (`u:<id>`, a
- * place in the room `u:<id>.<8 hex>`) stay inside.
- */
-import { type Listener } from '../channel.js';
+import { type RealtimeErrorEvent } from '../errors.js';
+import type { DeviceLists, DeviceOptions } from './devices.js';
 import type { ChatMessage, Hand, Layout, Reaction, Role, StreamState as StreamInfo, You } from '../streams/protocol.js';
 import type { LayerQuality, PictureLayer, PlaybackStats } from '../streams/playback-types.js';
 export type { LayerQuality, PictureLayer, PlaybackStats };
 export type StreamState = 'idle' | 'live' | 'ended';
 export type StreamEvent = 'state' | 'viewers' | 'tiles' | 'message' | 'hands' | 'invited' | 'stage' | 'waiting' | 'error' | 'change';
+/** What a stream's events give their listeners. */
+export interface StreamEvents {
+    state: [state: StreamState];
+    viewers: [viewers: number];
+    tiles: [tiles: StreamTile[]];
+    message: [message: ChatMessage];
+    hands: [hands: StreamHand[]];
+    invited: [];
+    stage: [onStage: boolean];
+    waiting: [wait: {
+        until: number | null;
+    }];
+    error: [error: RealtimeErrorEvent];
+    change: [snapshot: StreamSnapshot];
+}
 /** A hand raised to come on stage, as its hosts see it: the user by the app's id, their name, and since when (ms). */
 export interface StreamHand {
     user: string;
@@ -76,7 +83,7 @@ type Answer = Promise<{
     ok: boolean;
     error?: string;
 }>;
-/** The engine as this file uses it (../streams/client.ts, EasyStreamClient). @internal */
+/** The engine as this file uses it (../streams/client.ts, EasyStreamClient). */
 export interface StreamEngine {
     getState(): StreamSnapshot;
     subscribe(listener: () => void): () => void;
@@ -98,6 +105,8 @@ export interface StreamEngine {
         camera?: boolean;
         microphone?: boolean;
     }): Promise<unknown>;
+    listDevices(): Promise<DeviceLists>;
+    useDevice(kind: 'camera' | 'microphone', deviceId: string): Promise<boolean>;
     setCamera(on: boolean): Promise<unknown>;
     setMicrophone(on: boolean): Promise<unknown>;
     setScreenShare(on: boolean): Promise<boolean>;
@@ -120,7 +129,7 @@ export declare class Stream {
     private readonly unsubscribe;
     /**
      * Easy Stream's engine under the stream, which @wordplus/realtime-ui's stream views (its StreamView and the
-     * `<live-stream>` element) draw as Easy Stream does. @internal
+     * `<live-stream>` element) draw as Easy Stream does.
      */
     readonly engine: StreamEngine;
     /** @internal */
@@ -135,7 +144,7 @@ export declare class Stream {
     get tiles(): StreamTile[];
     /** The chat's last messages, oldest first. */
     get messages(): ChatMessage[];
-    /** Whether this page waits for a place: the stream is full, and the join goes on by itself. */
+    /** Whether this page waits to take the picture: the join goes on by itself once it may. */
     get waiting(): boolean;
     /** The hands raised to come on stage, the oldest first: its hosts see them, a viewer none but their own (`handRaised`). */
     get hands(): StreamHand[];
@@ -147,10 +156,10 @@ export declare class Stream {
     /**
      * `state` (StreamState), `viewers` (n), `tiles` (StreamTile[]), `message` (ChatMessage, each one new), `hands`
      * (StreamHand[], for its hosts), `invited` (a host asks this user on stage: `joinStage()`), `stage` (whether this page
-     * is on stage now), `waiting` ({ until }: full), `error` ({ code }), `change` (any of it).
+     * is on stage now), `waiting` ({ until }: the join goes on by itself then), `error` ({ code }), `change` (any of it).
      */
-    on(event: StreamEvent, fn: Listener): this;
-    off(event?: StreamEvent, fn?: Listener): this;
+    on<K extends keyof StreamEvents>(event: K, fn: (...args: StreamEvents[K]) => void): this;
+    off<K extends keyof StreamEvents>(event?: K, fn?: (...args: StreamEvents[K]) => void): this;
     /**
      * Shows the stream in `video`: the stage's main picture, as it changes, and its sound. Answers a function that
      * stops showing it there.
@@ -203,8 +212,15 @@ export declare class Stream {
         camera?: boolean;
         microphone?: boolean;
     }): Promise<void>;
-    setCamera(on: boolean): Promise<void>;
-    setMicrophone(on: boolean): Promise<void>;
+    /**
+     * The browser's camera on the stage, or off with false: the device named, the one last named, or the browser's own
+     * choice, and named while on, it moves there.
+     */
+    setCamera(on: boolean, options?: DeviceOptions): Promise<void>;
+    /** The browser's microphone, as `setCamera()` has its camera. */
+    setMicrophone(on: boolean, options?: DeviceOptions): Promise<void>;
+    /** The cameras, microphones and speakers this browser has. Their names are empty until the browser gave the site one. */
+    devices(): Promise<DeviceLists>;
     /** Shares a screen in place of the camera, or stops; whether it is shared now. */
     setScreenShare(on: boolean): Promise<boolean>;
     goLive(): Promise<void>;
@@ -219,6 +235,9 @@ export declare class Stream {
         url: string;
         key: string;
     }>;
+    /** Out of the stream now, free to come back, as `remove()` is on a room and a group call. */
+    remove(user: string | number): Promise<void>;
+    /** The same as `remove()`. */
     kick(user: string | number): Promise<void>;
     ban(user: string | number): Promise<void>;
     /** Leaves the stream: its picture, what this page sends, and its chat. */

@@ -1,0 +1,75 @@
+{
+  "//": [
+    "The catalog of backgrounds WordPlus Cloud serves for the call effects (scripts/build.mjs, dist/backgrounds), in the",
+    "order a site's settings show them. Each picture is <id>.webp beside <id>-thumb.webp in this folder. name is its",
+    "English name, names its name in each locale of the WordPlus SDK's languages, by WordPress's locale. default: picked",
+    "for a site that never chose, as its effects are downloaded. A picture added here reaches every site once the",
+    "catalog is uploaded, with no plugin's update."
+  ],
+  "backgrounds": [
+    {
+      "id": "office",
+      "name": "Office",
+      "default": true,
+      "names": {
+        "ar": "مكتب", "bg_BG": "Офис", "cs_CZ": "Kancelář", "da_DK": "Kontor", "de_DE": "Büro", "el": "Γραφείο",
+        "es_ES": "Oficina", "et": "Kontor", "fa_IR": "دفتر کار", "fi": "Toimisto", "fr_FR": "Bureau", "he_IL": "משרד",
+        "hr": "Ured", "hu_HU": "Iroda", "it_IT": "Ufficio", "ja": "オフィス", "lt_LT": "Biuras", "lv": "Birojs",
+        "nl_NL": "Kantoor", "pl_PL": "Biuro", "pt_BR": "Escritório", "pt_PT": "Escritório", "ro_RO": "Birou",
+        "ru_RU": "Офис", "sk_SK": "Kancelária", "sv_SE": "Kontor", "tr_TR": "Ofis", "uk": "Офіс", "vi": "Văn phòng",
+        "zh_CN": "办公室"
+      }
+    },
+    {
+      "id": "living",
+      "name": "Living Room",
+      "default": true,
+      "names": {
+        "ar": "غرفة المعيشة", "bg_BG": "Всекидневна", "cs_CZ": "Obývací pokoj", "da_DK": "Stue", "de_DE": "Wohnzimmer",
+        "el": "Σαλόνι", "es_ES": "Sala de estar", "et": "Elutuba", "fa_IR": "اتاق نشیمن", "fi": "Olohuone",
+        "fr_FR": "Salon", "he_IL": "סלון", "hr": "Dnevni boravak", "hu_HU": "Nappali", "it_IT": "Soggiorno",
+        "ja": "リビングルーム", "lt_LT": "Svetainė", "lv": "Viesistaba", "nl_NL": "Woonkamer", "pl_PL": "Salon",
+        "pt_BR": "Sala de estar", "pt_PT": "Sala de estar", "ro_RO": "Sufragerie", "ru_RU": "Гостиная",
+        "sk_SK": "Obývačka", "sv_SE": "Vardagsrum", "tr_TR": "Oturma Odası", "uk": "Вітальня", "vi": "Phòng khách",
+        "zh_CN": "客厅"
+      }
+    },
+    {
+      "id": "library",
+      "name": "Library",
+      "default": true,
+      "names": {
+        "ar": "مكتبة", "bg_BG": "Библиотека", "cs_CZ": "Knihovna", "da_DK": "Bibliotek", "de_DE": "Bibliothek",
+        "el": "Βιβλιοθήκη", "es_ES": "Biblioteca", "et": "Raamatukogu", "fa_IR": "کتابخانه", "fi": "Kirjasto",
+        "fr_FR": "Bibliothèque", "he_IL": "ספרייה", "hr": "Knjižnica", "hu_HU": "Könyvtár", "it_IT": "Biblioteca",
+        "ja": "図書館", "lt_LT": "Biblioteka", "lv": "Bibliotēka", "nl_NL": "Bibliotheek", "pl_PL": "Biblioteka",
+        "pt_BR": "Biblioteca", "pt_PT": "Biblioteca", "ro_RO": "Bibliotecă", "ru_RU": "Библиотека", "sk_SK": "Knižnica",
+        "sv_SE": "Bibliotek", "tr_TR": "Kütüphane", "uk": "Бібліотека", "vi": "Thư viện", "zh_CN": "图书馆"
+      }
+    },
+    {
+      "id": "nature",
+      "name": "Lake",
+      "default": true,
+      "names": {
+        "ar": "بحيرة", "bg_BG": "Езеро", "cs_CZ": "Jezero", "da_DK": "Sø", "de_DE": "See", "el": "Λίμνη",
+        "es_ES": "Lago", "et": "Järv", "fa_IR": "دریاچه", "fi": "Järvi", "fr_FR": "Lac", "he_IL": "אגם", "hr": "Jezero",
+        "hu_HU": "Tó", "it_IT": "Lago", "ja": "湖", "lt_LT": "Ežeras", "lv": "Ezers", "nl_NL": "Meer", "pl_PL": "Jezioro",
+        "pt_BR": "Lago", "pt_PT": "Lago", "ro_RO": "Lac", "ru_RU": "Озеро", "sk_SK": "Jazero", "sv_SE": "Sjö",
+        "tr_TR": "Göl", "uk": "Озеро", "vi": "Hồ", "zh_CN": "湖泊"
+      }
+    },
+    {
+      "id": "loft",
+      "name": "Loft",
+      "default": true,
+      "names": {
+        "ar": "لوفت", "bg_BG": "Лофт", "cs_CZ": "Loft", "da_DK": "Loft", "de_DE": "Loft", "el": "Λοφτ", "es_ES": "Loft",
+        "et": "Loft", "fa_IR": "لافت", "fi": "Loft", "fr_FR": "Loft", "he_IL": "לופט", "hr": "Loft", "hu_HU": "Loft",
+        "it_IT": "Loft", "ja": "ロフト", "lt_LT": "Loftas", "lv": "Lofts", "nl_NL": "Loft", "pl_PL": "Loft",
+        "pt_BR": "Loft", "pt_PT": "Loft", "ro_RO": "Loft", "ru_RU": "Лофт", "sk_SK": "Loft", "sv_SE": "Loft",
+        "tr_TR": "Loft", "uk": "Лофт", "vi": "Gác xép", "zh_CN": "阁楼"
+      }
+    }
+  ]
+}

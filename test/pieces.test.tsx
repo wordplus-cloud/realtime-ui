@@ -83,7 +83,7 @@ describe( 'a call\'s pieces', () => {
         const call = inCall();
         const { container } = screen( call, 'private', {
             controls: ( buttons, given ) => [
-                ...buttons.filter( ( b ) => ( b.props as { content?: string } ).content !== 'Configure' ),
+                ...buttons.filter( ( b ) => ( b.props as { content?: string } ).content !== 'Device Settings' ),
                 <CallControl key="raise" icon="raisehand" label={ given.action === 'call_in_progress' ? 'Raise hand' : '?' } onClick={ raise } className="my-raise" />,
             ],
         } );
@@ -91,6 +91,9 @@ describe( 'a call\'s pieces', () => {
         const dock = container.querySelector( '.wplus-call-buttons' )!;
         const classes = [ ...dock.children ].map( ( c ) => ( c.querySelector( '[class]' ) ?? c ).className );
         expect( classes.at( -1 ) ).toContain( 'wplus-cancel' );
+        // The app's button ends the row, before hanging up: More, which would hold picture in picture alone where the
+        // browser has it, holds nothing here and isn't drawn.
+        expect( dock.querySelector( '.wplus-call-more' ) ).toBeNull();
         expect( classes.at( -2 ) ).toContain( 'my-raise' );
         expect( dock.querySelector( '.wplus-configure-call' ) ).toBeNull();
 

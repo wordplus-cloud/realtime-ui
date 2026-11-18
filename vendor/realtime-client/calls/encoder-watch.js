@@ -17,7 +17,9 @@ import { rememberCameraCodec, rememberDroppedHardware, settingNumber, CAMERA_TUN
  * - the camera goes out in H.264 or H.265, a layer it sends in hardware;
  * - its source gives at least HARDWARE_DROP_MIN_CAPTURED frames a second;
  * - the browser says nothing limits a layer it sends (no CPU, no bandwidth);
- * - and the hardware takes at most HARDWARE_DROP_MAX_ENCODE_MS a frame, so it isn't a slow machine;
+ * - and the hardware keeps up with its source: it takes no longer a frame than HARDWARE_DROP_MAX_ENCODE_MS, or than
+ *   HARDWARE_KEEP_UP_SHARE of the time between two of its source's frames where that is longer (hardwareSlowMs()), so
+ *   it isn't a slow machine;
  * when the layer that keeps the most encodes HARDWARE_DROP_SHARE or less of the frames its source gave in all: the whole
  * camera's taken off. A software encoder short of bits drops its own layer's frames alone (the lab's VP8 under heavy
  * grain: 720p at 2 of 15, its 360p and 180p at 15), and a dim room's camera gives fewer frames, which every layer sends.
@@ -30,8 +32,16 @@ export const HARDWARE_DROP_READINGS = 6;
 // 0.6 a second of 15, every run), which counted would find a camera that drops a little later on
 export const HARDWARE_DROP_WARMUP = 2;
 export const HARDWARE_DROP_SHARE = 0.7;
-export const HARDWARE_DROP_MIN_CAPTURED = 10;
+// A camera in a dim room gives fewer frames, and the floor was 10: an AMD PC whose camera gave 9-10 a second in the
+// dark sent 2-4 of them on every layer for 11 minutes before six readings in a row got over it (2026-11-09). At 5 a
+// second, 30 s is still 150 frames to judge.
+export const HARDWARE_DROP_MIN_CAPTURED = 5;
+// A frame's encoding at most this long counts as keeping up, whatever the source's pace; past it, only while it takes
+// no more than HARDWARE_KEEP_UP_SHARE of the time between the source's frames. The same AMD PC's 1080p took 24-26 ms
+// a frame in hardware, a quarter of the 100 ms its 10 fps camera gave it, and a fixed 25 ms left half its readings
+// out as a slow machine's.
 export const HARDWARE_DROP_MAX_ENCODE_MS = 25;
+export const HARDWARE_KEEP_UP_SHARE = 0.8;
 // a hardware layer the reading counts sends at least HARDWARE_DROP_MIN_SENT of a target of HARDWARE_DROP_MIN_TARGET or
 // more: an encoder cut off by a path that went down encodes nothing, sends nothing and reports no target (libwebrtc
 // leaves a zero one out), and names no limitation either (the P2P engine's call 50038, peer.ts), so a Wi-Fi gap of 9 s
@@ -78,6 +88,14 @@ export function cpuHeld(readings, count = CPU_HELD_READINGS, share = CPU_HELD_SH
 /** How many readings readMs apart make `seconds` (the policy's dropWatchS, cpuWatchS): one at least. */
 export const readingsFor = (seconds, readMs = HARDWARE_DROP_READ_MS) => Math.max(1, Math.round(seconds * 1000 / readMs));
 /**
+ * The longest a hardware encoder may take a frame and still be keeping up with a source giving `captured` frames a
+ * second: the node's maxEncodeMs (25 by default), or HARDWARE_KEEP_UP_SHARE of the time between two frames where that
+ * is longer (27 ms at 30 a second, 53 at 15, 80 at 10).
+ */
+export function hardwareSlowMs(captured, n = watchNumbers()) {
+    return captured > 0 ? Math.max(n.maxEncodeMs, HARDWARE_KEEP_UP_SHARE * 1000 / captured) : n.maxEncodeMs;
+}
+/**
  * A reading of a hardware encoder that isn't held back by anything the browser names (above): the frames a second of
  * the layer it sends that keeps the most, and its source's; null for any other.
  */
@@ -93,8 +111,9 @@ export function hardwareReading(r, n = watchNumbers()) {
     if (!sent.some((l) => l.hardware && l.target !== null && l.target >= n.minTarget
         && l.sentBps >= l.target * n.minSent))
         return null;
+    const slowMs = hardwareSlowMs(r.captured, n);
     if (sent.some((l) => (l.limit !== 'none' && l.limit !== '')
-        || (l.hardware && l.encodeMs !== null && l.encodeMs > n.maxEncodeMs)))
+        || (l.hardware && l.encodeMs !== null && l.encodeMs > slowMs)))
         return null;
     return { best: Math.max(0, ...sent.map((l) => l.fps)), captured: r.captured };
 }

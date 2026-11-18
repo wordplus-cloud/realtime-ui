@@ -2,7 +2,9 @@ import React, { createContext, useContext, useEffect, useLayoutEffect, type Muta
 import { _x } from "../../inc/globals.ts";
 import { CallContext, type CallContextInterface } from "./context.ts";
 import Tooltip from "../helpers/tooltip.tsx";
-import Icon from "../../primitives/icon.tsx";
+import Icon from "../../primitives/icons.tsx";
+import type { PipControl } from "./group-pip.tsx";
+import { DockMore } from "./call-dock.tsx";
 
 /**
  * How big the call is drawn: in its place on the page, filling the browser window (`windowed`), or the whole screen
@@ -10,9 +12,16 @@ import Icon from "../../primitives/icon.tsx";
  * chat is big enough without leaving the browser, and from there Full Screen takes the whole screen; leaving the whole
  * screen (the browser's Escape among the ways) comes back to the window, and Collapse or Escape to the page. The window
  * needs nothing from the browser, so a page without full screen (Safari on an iPhone) expands too. The call screen
- * keeps `windowed` (call-screen.tsx); the layouts draw the controls (`fullScreenItems`).
+ * keeps `windowed` (call-screen.tsx); the layouts draw the controls (`fullScreenItems`). `pip`, a group call's window
+ * over the others (group-pip.tsx), where the browser has one to offer.
  */
-export const CallViewContext = createContext<{ windowed: boolean, setWindowed: ( on: boolean ) => void }>( {
+export interface CallView {
+    windowed: boolean,
+    setWindowed: ( on: boolean ) => void,
+    pip?: PipControl | null,
+}
+
+export const CallViewContext = createContext<CallView>( {
     windowed: false,
     setWindowed: () => {},
 } );
@@ -88,9 +97,21 @@ export function useWindowedPage( windowed: boolean, collapse: () => void ) {
 /**
  * The dock's size controls, as items the dock lays out and folds like its others (call-dock.tsx reads each label from
  * its tooltip): Expand on the page; Collapse and, where the browser has it, Full Screen in the window; Exit Full Screen
- * on the whole screen, which leaves the window too.
+ * on the whole screen, which leaves the window too. A group call's Picture in Picture, where it has one, is in More: a
+ * control used now and then, which the lean dock keeps out of the row (asked on 2026-10-30).
  */
-export function fullScreenItems( call: CallContextInterface, view: { windowed: boolean, setWindowed: ( on: boolean ) => void } ) {
+export function fullScreenItems( call: CallContextInterface, view: CallView ) {
+    const pip = view.pip &&
+        <Tooltip content={_x('Picture in Picture', 'Call Controls', 'bp-better-messages')}>
+            <span onClick={ view.pip.toggle } className="wplus-pic-in-pic" data-active={ view.pip.open ? 1 : undefined }>
+                <Icon name="pip" size={ 20 } />
+            </span>
+        </Tooltip>;
+
+    return <>{ pip && <DockMore>{ pip }</DockMore> }{ sizeItems( call, view ) }</>;
+}
+
+function sizeItems( call: CallContextInterface, view: CallView ) {
     if ( call.fullScreenEnabled ) {
         return <Tooltip content={_x('Exit Full Screen Mode', 'Group Video Chat', 'bp-better-messages')}>
             <span onClick={ () => { call.disableFullScreen(); view.setWindowed( false ); } } className="wplus-fs-disable">

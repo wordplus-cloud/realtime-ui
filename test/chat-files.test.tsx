@@ -3,6 +3,7 @@ import { act, cleanup, fireEvent, render } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Chat } from '../src/react.tsx';
 import { configureUi } from '../src/index.ts';
+import { DropStrip, StagedFiles, useFileDrop, useStagedFiles, type ChatFile, type ChatUploader } from '../src/chat.ts';
 import { fakeRoom, fakeRooms } from './fake-rooms.ts';
 
 // Files in an app's chat (Chat's `upload`, src/sdk/chat-files.tsx): picked, pasted or dropped, each goes up to the app's
@@ -262,5 +263,92 @@ describe( 'files in the chat', () => {
         const { container } = render( <Chat rt={ rt } room="chat:34:42" load={ load } /> );
         await settle();
         expect( container.querySelector( '[data-message-id="k1"] .wplus-image-grid img' )?.getAttribute( 'alt' ) ).toBe( 'scan.png' );
+    } );
+} );
+
+// An app that draws its own composer with the kit's parts and keeps its own engine (Live Support's visitor panel and
+// inbox): the files kept by the hooks the kit's Chat keeps its own with, its uploader its own.
+describe( 'files kept by an app of its own', () => {
+    /** An uploader of the app's: each call kept, answered by hand. */
+    function ownUploader() {
+        const calls: Array<{ file: File; progress: ( done: number ) => void; signal: AbortSignal; done: ( file: ChatFile ) => void; fail: ( error: Error ) => void }> = [];
+        const upload: ChatUploader = ( file, progress, signal ) => new Promise<ChatFile>( ( done, fail ) => {
+            calls.push( { file, progress, signal, done, fail } );
+        } );
+        return { calls, upload };
+    }
+
+    let held: ReturnType<typeof useStagedFiles> | null = null;
+    function Composer( { upload, maxFiles }: { upload: ChatUploader; maxFiles?: number } ) {
+        const files = useStagedFiles( upload, { maxFiles } );
+        const { dragging, dropping } = useFileDrop( files.add, files.can );
+        held = files;
+        return (
+            <div className="app-chat" { ...dropping }>
+                <StagedFiles staged={ files.staged } onRemove={ files.remove } onOpen={ () => {} } />
+                { dragging && <DropStrip over /> }
+            </div>
+        );
+    }
+    const status = ( container: HTMLElement ) => [ ...container.querySelectorAll( '.wplus-staged-chip' ) ].map( ( chip ) => chip.getAttribute( 'data-status' ) + ' ' + chip.querySelector( '.wplus-staged-chip__status' )?.textContent );
+
+    it( 'takes each file up with the app\'s uploader, shows how far, and holds the message until all are up', async () => {
+        const { calls, upload } = ownUploader();
+        const { container } = render( <Composer upload={ upload } /> );
+        await act( async () => { held!.add( [ photo( 'mug.jpg' ), new File( [ 'pdf' ], 'terms.pdf', { type: 'application/pdf' } ) ] ); } );
+
+        expect( calls.map( ( call ) => call.file.name ) ).toEqual( [ 'mug.jpg', 'terms.pdf' ] );
+        expect( held!.uploading ).toBe( true );
+        await act( async () => { calls[ 0 ].progress( 0.4 ); } );
+        expect( status( container ) ).toEqual( [ 'uploading Uploading… 40%', 'uploading Uploading… 0%' ] );
+
+        const kept = { id: '7', url: '/files/7', name: 'mug.jpg', type: 'image/jpeg', size: 2048 };
+        await act( async () => { calls[ 0 ].done( kept ); calls[ 1 ].done( { id: '8', url: '/files/8', name: 'terms.pdf', type: 'application/pdf', size: 3 } ); } );
+        expect( held!.uploading ).toBe( false );
+        expect( held!.ready().map( ( file ) => file.id ) ).toEqual( [ '7', '8' ] );
+        expect( status( container ) ).toEqual( [ 'done Ready', 'done Ready' ] );
+
+        // Sent: they leave the composer.
+        await act( async () => { held!.sent(); } );
+        expect( container.querySelectorAll( '.wplus-staged-chip' ) ).toHaveLength( 0 );
+    } );
+
+    it( 'shows the words the app refused a file with, keeps it out of the message, and stops one removed on its way', async () => {
+        const { calls, upload } = ownUploader();
+        const { container } = render( <Composer upload={ upload } /> );
+        await act( async () => { held!.add( [ new File( [ 'x' ], 'setup.exe' ), photo( 'mug.jpg' ) ] ); } );
+        await act( async () => { calls[ 0 ].fail( new Error( 'setup.exe cannot be sent.' ) ); } );
+        expect( status( container ) ).toEqual( [ 'error setup.exe cannot be sent.', 'uploading Uploading… 0%' ] );
+
+        const mug = held!.staged[ 1 ].key;
+        await act( async () => { held!.remove( mug ); } );
+        expect( calls[ 1 ].signal.aborted ).toBe( true );
+        expect( held!.ready() ).toEqual( [] );
+        // The refused one stays until it is taken out, after a message too.
+        await act( async () => { held!.sent(); } );
+        expect( status( container ) ).toEqual( [ 'error setup.exe cannot be sent.' ] );
+    } );
+
+    it( 'keeps to the most files a message takes', async () => {
+        const { calls, upload } = ownUploader();
+        render( <Composer upload={ upload } maxFiles={ 2 } /> );
+        await act( async () => { held!.add( [ photo( 'a.jpg' ), photo( 'b.jpg' ), photo( 'c.jpg' ) ] ); } );
+        expect( calls.map( ( call ) => call.file.name ) ).toEqual( [ 'a.jpg', 'b.jpg' ] );
+    } );
+
+    it( 'shows the strip while files are dragged over the app\'s chat, and takes those dropped', async () => {
+        const { calls, upload } = ownUploader();
+        const { container } = render( <Composer upload={ upload } /> );
+        const chat = container.querySelector( '.app-chat' )!;
+        const carrying = ( files: File[] = [] ) => ( { dataTransfer: { types: [ 'Files' ], files, dropEffect: '' } } );
+
+        // Text dragged over is not files.
+        fireEvent.dragEnter( chat, { dataTransfer: { types: [ 'text/plain' ], files: [] } } );
+        expect( container.querySelector( '.wplus-attachments-dropzone' ) ).toBeNull();
+        fireEvent.dragEnter( chat, carrying() );
+        expect( container.querySelector( '.wplus-attachments-dropzone' ) ).not.toBeNull();
+        await act( async () => { fireEvent.drop( chat, carrying( [ photo( 'dropped.jpg' ) ] ) ); } );
+        expect( container.querySelector( '.wplus-attachments-dropzone' ) ).toBeNull();
+        expect( calls.map( ( call ) => call.file.name ) ).toEqual( [ 'dropped.jpg' ] );
     } );
 } );

@@ -1,0 +1,879 @@
+// The recording player (components/recording): the picture or an audio call's sound with controls of its own, and the
+// transcript beside it from 880px of the player's own width (BESIDE), else only in full screen. The control row's widths
+// are the ones controls.ts plans the row with (ROW), so it is one line at every width: change them together. Its
+// colours are its own properties, set on the player, which a host may set again: --wplus-recording-accent (the
+// speaking ring's colour, the progress), -bg, -surface, -text, -muted, -border.
+
+.wplus-recording-player {
+    --wplus-recording-accent: var(--wplus-accent, #3b82f6);
+    --wplus-recording-bg: #0f1115;
+    --wplus-recording-surface: #ffffff;
+    --wplus-recording-text: #1f2328;
+    --wplus-recording-muted: #6b7280;
+    --wplus-recording-border: rgba(0, 0, 0, 0.1);
+    --wplus-recording-found: rgba(250, 204, 21, 0.45);
+
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    box-sizing: border-box;
+    width: 100%;
+    min-width: 0;
+    color: var(--wplus-recording-text);
+    font-size: 14px;
+    line-height: 1.45;
+    outline: none;
+
+    *,
+    *::before,
+    *::after {
+        box-sizing: border-box;
+    }
+
+    &[data-wide] {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(280px, 32%);
+        align-items: stretch;
+        gap: 12px;
+    }
+
+    // Under the picture (full screen on a narrow screen, or sound where there is no full screen): a few lines tall, its
+    // length scrolling inside.
+    &:not([data-wide]) > .wplus-recording-transcript {
+        min-height: 200px;
+        max-height: min(55vh, 420px);
+        margin-top: 12px;
+    }
+
+    // Full screen: the picture on black, in the middle of the screen, and the transcript beside it square, in the host's
+    // dark scheme (data.theme, --wplus-recording-dark-*), else the player's own dark.
+    &:fullscreen {
+        --wplus-recording-surface: var(--wplus-recording-dark-surface, #16181d);
+        --wplus-recording-text: var(--wplus-recording-dark-text, #e7e9ee);
+        --wplus-recording-muted: var(--wplus-recording-dark-muted, #9aa1ad);
+        --wplus-recording-border: var(--wplus-recording-dark-border, rgba(255, 255, 255, 0.1));
+        --wplus-recording-accent: var(--wplus-recording-dark-accent, var(--wplus-accent, #3b82f6));
+        --wplus-recording-current: var(--wplus-recording-dark-current, color-mix(in srgb, var(--wplus-recording-accent) 22%, transparent));
+        --wplus-recording-found: rgba(250, 204, 21, 0.3);
+
+        background: #000;
+
+        &[data-wide] {
+            gap: 0;
+        }
+
+        .wplus-recording-stage {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            border-radius: 0;
+        }
+
+        .wplus-recording-stage video {
+            height: 100%;
+            max-height: none;
+        }
+
+        .wplus-recording-audio-face {
+            width: 100%;
+        }
+
+        .wplus-recording-transcript {
+            max-height: 100vh;
+            margin: 0;
+            border-radius: 0;
+        }
+
+        &[data-wide] > .wplus-recording-transcript {
+            border-inline-start: 1px solid var(--wplus-recording-border);
+        }
+
+        // On a narrow screen the picture takes what the transcript under it leaves.
+        &:not([data-wide]) {
+            .wplus-recording-stage {
+                flex: 1 1 auto;
+                min-height: 0;
+                height: auto;
+            }
+
+            > .wplus-recording-transcript {
+                flex: none;
+                min-height: 0;
+                max-height: 40vh;
+                border-top: 1px solid var(--wplus-recording-border);
+            }
+        }
+    }
+
+    // While it plays with nothing moving: the row away, and the pointer over the picture.
+    &[data-idle] {
+        .wplus-recording-controls {
+            opacity: 0;
+            transform: translateY(6px);
+            pointer-events: none;
+        }
+
+        .wplus-recording-stage {
+            cursor: none;
+        }
+
+        .wplus-recording-caption {
+            transform: none;
+        }
+    }
+}
+
+@media (prefers-color-scheme: dark) {
+    .wplus-recording-player {
+        --wplus-recording-surface: #1b1e24;
+        --wplus-recording-text: #e7e9ee;
+        --wplus-recording-muted: #9aa1ad;
+        --wplus-recording-border: rgba(255, 255, 255, 0.1);
+        --wplus-recording-found: rgba(250, 204, 21, 0.3);
+    }
+}
+
+// ─── The picture ─────────────────────────────────────────────
+// Nothing dark under the picture, neither the stage's background nor the video's own: either bled through the rounded
+// corners' soft edge as a dark arc where the picture is light (a light recording, or a light corner of one). A
+// recording is 16:9 as its place, so there are no bars to fill. Sound, with no picture, has the dark, and full screen
+// its black.
+
+.wplus-recording-stage {
+    position: relative;
+    overflow: hidden;
+    border-radius: 12px;
+    color: #fff;
+
+    video {
+        display: block;
+        width: 100%;
+        height: 100%;
+        max-height: 80vh;
+        aspect-ratio: 16 / 9;
+        object-fit: contain;
+        background: transparent;
+        cursor: pointer;
+    }
+
+    // Drawn by the browser only in the iPhone's own full screen: the player draws them itself everywhere else.
+    video::cue {
+        background: rgba(0, 0, 0, 0.72);
+        color: #fff;
+        font-size: 1.05em;
+        line-height: 1.35;
+    }
+
+    // Sound with its speaker and title, or the row alone where there is no room for them, as tall as a host's sound
+    // poster (72px), so playing keeps the place's size.
+    &[data-audio] {
+        min-height: 72px;
+        background: var(--wplus-recording-bg);
+
+        &[data-face] {
+            min-height: 180px;
+        }
+    }
+}
+
+.wplus-recording-audio-face {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    min-height: 140px;
+    padding: 24px 16px 64px;
+    color: rgba(255, 255, 255, 0.75);
+    text-align: center;
+}
+
+.wplus-recording-audio-title {
+    max-width: 100%;
+    overflow: hidden;
+    color: #fff;
+    font-weight: 600;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.wplus-recording-big-play {
+    position: absolute;
+    inset-block-start: 50%;
+    inset-inline-start: 50%;
+    display: grid;
+    place-items: center;
+    width: 64px;
+    height: 64px;
+    margin: -44px 0 0 -32px;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: rgba(0, 0, 0, 0.6);
+    color: #fff;
+    cursor: pointer;
+    transition: transform 0.15s ease;
+
+    &:hover {
+        transform: scale(1.06);
+    }
+
+    &:focus-visible {
+        outline: 2px solid #fff;
+        outline-offset: 3px;
+    }
+}
+
+.wplus-recording-waiting {
+    position: absolute;
+    inset-block-start: 50%;
+    inset-inline-start: 50%;
+    margin: -34px 0 0 -14px;
+    color: #fff;
+    pointer-events: none;
+}
+
+.wplus-recording-waiting svg {
+    animation: wplus-recording-spin 0.9s linear infinite;
+}
+
+@keyframes wplus-recording-spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+.wplus-recording-failed {
+    position: absolute;
+    inset: 0 0 52px;
+    display: grid;
+    place-items: center;
+    margin: 0;
+    padding: 16px;
+    color: #fff;
+    text-align: center;
+}
+
+// One line: what doesn't fit is in the settings (controls.ts), never wrapped.
+// The captions, as the player draws them: centred over the picture, above the control row while it shows
+// (--wplus-recording-row-height, measured), and sliding down to its place as it goes, with no jump.
+.wplus-recording-caption {
+    position: absolute;
+    z-index: 2;
+    inset-inline: 0;
+    bottom: 12px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    padding: 0 6%;
+    text-align: center;
+    pointer-events: none;
+    transform: translateY(calc(-1 * var(--wplus-recording-row-height, 48px)));
+    transition: transform 0.25s ease;
+
+    > span {
+        max-width: 100%;
+        padding: 0.12em 0.5em;
+        border-radius: 4px;
+        background: rgba(0, 0, 0, 0.72);
+        color: #fff;
+        line-height: 1.3;
+        overflow-wrap: anywhere;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        transition: none;
+    }
+}
+
+.wplus-recording-controls {
+    position: absolute;
+    z-index: 3;
+    inset-inline: 0;
+    bottom: 0;
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: 4px;
+    min-height: 48px;
+    padding: 6px 8px;
+    background: linear-gradient(to top, rgba(0, 0, 0, 0.78), rgba(0, 0, 0, 0));
+    color: #fff;
+    transition: opacity 0.25s ease, transform 0.25s ease;
+
+    @media (prefers-reduced-motion: reduce) {
+        transition: none;
+    }
+
+    [data-audio] > & {
+        background: rgba(255, 255, 255, 0.06);
+    }
+
+    // The row alone: the whole of the sound's place.
+    [data-audio]:not([data-face]) > & {
+        top: 0;
+    }
+
+    [data-touch] & {
+        gap: 0;
+        min-height: 52px;
+        padding: 4px;
+    }
+}
+
+.wplus-recording-icon-button {
+    display: inline-grid;
+    flex: none;
+    place-items: center;
+    width: 36px;
+    height: 36px;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    border-radius: 8px;
+    background: transparent;
+    color: inherit;
+    text-decoration: none;
+    cursor: pointer;
+
+    &:hover {
+        background: rgba(255, 255, 255, 0.14);
+    }
+
+    &[aria-pressed="true"] {
+        background: rgba(255, 255, 255, 0.22);
+    }
+
+    &:focus-visible {
+        outline: 2px solid currentColor;
+        outline-offset: 1px;
+    }
+
+    // A finger's target on a touch screen.
+    [data-touch] & {
+        width: 44px;
+        height: 44px;
+    }
+}
+
+.wplus-recording-text-button {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    gap: 6px;
+    min-height: 32px;
+    margin: 0;
+    padding: 0 10px;
+    border: 0;
+    border-radius: 8px;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+
+    &:hover {
+        background: rgba(127, 127, 127, 0.16);
+    }
+
+    &:focus-visible {
+        outline: 2px solid currentColor;
+        outline-offset: 1px;
+    }
+}
+
+.wplus-recording-speed {
+    width: 48px;
+    min-height: 36px;
+    padding: 0;
+    justify-content: center;
+    font-variant-numeric: tabular-nums;
+
+    [data-touch] & {
+        min-height: 44px;
+    }
+}
+
+// Its width is set where it is drawn, from the recording's length (timeWidth).
+.wplus-recording-time {
+    flex: none;
+    overflow: hidden;
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+    text-align: center;
+    white-space: nowrap;
+}
+
+.wplus-recording-seek {
+    --wplus-recording-progress: 0%;
+
+    flex: 1 1 auto;
+    min-width: 96px;
+    height: 20px;
+    margin: 0;
+    background: transparent;
+    cursor: pointer;
+    appearance: none;
+
+    &::-webkit-slider-runnable-track {
+        height: 4px;
+        border-radius: 2px;
+        background: linear-gradient(to right, var(--wplus-recording-accent) var(--wplus-recording-progress), rgba(255, 255, 255, 0.3) var(--wplus-recording-progress));
+    }
+
+    &::-webkit-slider-thumb {
+        width: 12px;
+        height: 12px;
+        margin-top: -4px;
+        border-radius: 50%;
+        background: #fff;
+        appearance: none;
+    }
+
+    &::-moz-range-track {
+        height: 4px;
+        border-radius: 2px;
+        background: rgba(255, 255, 255, 0.3);
+    }
+
+    &::-moz-range-progress {
+        height: 4px;
+        border-radius: 2px;
+        background: var(--wplus-recording-accent);
+    }
+
+    &::-moz-range-thumb {
+        width: 12px;
+        height: 12px;
+        border: 0;
+        border-radius: 50%;
+        background: #fff;
+    }
+
+    &:focus-visible {
+        outline: 2px solid #fff;
+        outline-offset: 2px;
+    }
+}
+
+// Its own arrow, with room after it: the browser's sat against the edge.
+.wplus-recording-quality {
+    flex: none;
+    width: 72px;
+    height: 30px;
+    padding: 0 24px 0 10px;
+    border: 0;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.14) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%23fff' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat right 10px center;
+    color: #fff;
+    font: inherit;
+    font-size: 12px;
+    appearance: none;
+    -webkit-appearance: none;
+    cursor: pointer;
+
+    [dir="rtl"] & {
+        padding: 0 10px 0 24px;
+        background-position: left 10px center;
+    }
+
+    option {
+        color: #000;
+    }
+}
+
+// ─── The sound ──────────────────────────────────────────────
+// The speaker mutes. Where the page may set the volume and a pointer hovers, hovering or focusing it opens a slider:
+// in the row when the row has room for it (data-inline), else over the row above the speaker.
+
+.wplus-recording-volume {
+    position: relative;
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+}
+
+.wplus-recording-volume-slider {
+    display: inline-flex;
+    align-items: center;
+
+    // In the row: no room taken until it opens.
+    [data-inline] > & {
+        width: 0;
+        overflow: hidden;
+        transition: width 0.15s ease;
+    }
+
+    [data-inline][data-open] > & {
+        width: 72px;
+    }
+
+    // Over the row, above the speaker.
+    .wplus-recording-volume:not([data-inline]) > & {
+        position: absolute;
+        bottom: 100%;
+        inset-inline-start: 50%;
+        display: none;
+        padding: 10px 12px;
+        border-radius: 8px;
+        background: rgba(15, 17, 21, 0.92);
+        transform: translateX(-50%);
+    }
+
+    .wplus-recording-volume:not([data-inline])[data-open] > & {
+        display: inline-flex;
+    }
+
+    input {
+        --wplus-recording-progress: 100%;
+
+        width: 64px;
+        height: 20px;
+        margin: 0 4px;
+        background: transparent;
+        cursor: pointer;
+        appearance: none;
+
+        .wplus-recording-volume:not([data-inline]) & {
+            width: 96px;
+        }
+
+        &::-webkit-slider-runnable-track {
+            height: 4px;
+            border-radius: 2px;
+            background: linear-gradient(to right, #fff var(--wplus-recording-progress), rgba(255, 255, 255, 0.3) var(--wplus-recording-progress));
+        }
+
+        &::-webkit-slider-thumb {
+            width: 12px;
+            height: 12px;
+            margin-top: -4px;
+            border-radius: 50%;
+            background: #fff;
+            appearance: none;
+        }
+
+        &::-moz-range-track {
+            height: 4px;
+            border-radius: 2px;
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        &::-moz-range-progress {
+            height: 4px;
+            border-radius: 2px;
+            background: #fff;
+        }
+
+        &::-moz-range-thumb {
+            width: 12px;
+            height: 12px;
+            border: 0;
+            border-radius: 50%;
+            background: #fff;
+        }
+
+        // A ring on the thumb: an outline is cut off by the row's slider, which opens from nothing.
+        &:focus-visible {
+            outline: none;
+
+            &::-webkit-slider-thumb {
+                box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.55);
+            }
+
+            &::-moz-range-thumb {
+                box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.55);
+            }
+        }
+    }
+}
+
+// ─── The settings ───────────────────────────────────────────
+// What the row has no room for, over the picture at its end, scrolling inside a short picture.
+
+.wplus-recording-menu {
+    position: absolute;
+    inset-inline-end: 8px;
+    bottom: 54px;
+    z-index: 4;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 200px;
+    max-width: calc(100% - 16px);
+    max-height: calc(100% - 62px);
+    padding: 6px;
+    overflow-y: auto;
+    border-radius: 10px;
+    background: rgba(15, 17, 21, 0.94);
+    color: #fff;
+    overscroll-behavior: contain;
+
+    [data-touch] & {
+        bottom: 58px;
+        max-height: calc(100% - 66px);
+    }
+
+    // On a touch screen, under the picture, as wide as it.
+    &[data-below] {
+        position: static;
+        max-width: none;
+        max-height: none;
+        margin-top: 8px;
+        overflow: visible;
+
+        [data-wide] > & {
+            grid-column: 1;
+        }
+    }
+}
+
+.wplus-recording-menu-row {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 6px;
+}
+
+.wplus-recording-menu-label {
+    color: rgba(255, 255, 255, 0.7);
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.wplus-recording-menu-choices {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+
+    button {
+        min-width: 44px;
+        min-height: 32px;
+        padding: 0 10px;
+        border: 0;
+        border-radius: 6px;
+        background: rgba(255, 255, 255, 0.08);
+        color: inherit;
+        font: inherit;
+        font-size: 13px;
+        font-variant-numeric: tabular-nums;
+        cursor: pointer;
+
+        &:hover {
+            background: rgba(255, 255, 255, 0.16);
+        }
+
+        &[aria-pressed="true"] {
+            background: var(--wplus-recording-accent);
+        }
+
+        &:focus-visible {
+            outline: 2px solid #fff;
+            outline-offset: 1px;
+        }
+
+        [data-touch] & {
+            min-height: 44px;
+        }
+    }
+}
+
+.wplus-recording-menu-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    min-height: 36px;
+    margin: 0;
+    padding: 0 10px;
+    border: 0;
+    border-radius: 6px;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    text-align: start;
+    text-decoration: none;
+    cursor: pointer;
+
+    &:hover {
+        background: rgba(255, 255, 255, 0.12);
+    }
+
+    &[aria-pressed="true"] {
+        background: rgba(255, 255, 255, 0.22);
+    }
+
+    &:focus-visible {
+        outline: 2px solid #fff;
+        outline-offset: -2px;
+    }
+
+    [data-touch] & {
+        min-height: 44px;
+    }
+}
+
+// ─── The transcript ─────────────────────────────────────────
+
+.wplus-recording-transcript {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    min-height: 0;
+    max-height: min(70vh, 560px);
+    overflow: hidden;
+    border: 0;
+    border-radius: 12px;
+    background: var(--wplus-recording-surface);
+
+    // Beside the picture: as tall as the picture is, its own length scrolling inside (size containment keeps its lines
+    // from setting the row's height).
+    [data-wide] > & {
+        max-height: none;
+        min-height: 240px;
+        contain: size;
+    }
+}
+
+.wplus-recording-transcript-search {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 10px;
+    border-bottom: 1px solid var(--wplus-recording-border);
+    color: var(--wplus-recording-muted);
+
+    input {
+        flex: 1 1 auto;
+        min-width: 0;
+        height: 32px;
+        padding: 0 4px;
+        border: 0;
+        background: transparent;
+        color: var(--wplus-recording-text);
+        font: inherit;
+        outline: none;
+    }
+
+    .wplus-recording-icon-button {
+        width: 28px;
+        height: 28px;
+        color: var(--wplus-recording-text);
+
+        &:hover {
+            background: rgba(127, 127, 127, 0.16);
+        }
+    }
+}
+
+.wplus-recording-transcript-count {
+    flex: none;
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+.wplus-recording-transcript-lines {
+    position: relative;
+    flex: 1 1 auto;
+    min-height: 0;
+    margin: 0;
+    padding: 4px;
+    overflow-y: auto;
+    list-style: none;
+    overscroll-behavior: contain;
+
+    li {
+        margin: 0;
+    }
+}
+
+.wplus-recording-line {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    width: 100%;
+    margin: 0;
+    padding: 8px 10px;
+    border: 0;
+    border-radius: 8px;
+    background: transparent;
+    color: var(--wplus-recording-text);
+    font: inherit;
+    text-align: start;
+    cursor: pointer;
+
+    &:hover {
+        background: rgba(127, 127, 127, 0.1);
+    }
+
+    &:focus-visible {
+        outline: 2px solid var(--wplus-recording-accent);
+        outline-offset: -2px;
+    }
+
+    [data-current] > & {
+        background: var(--wplus-recording-current, color-mix(in srgb, var(--wplus-recording-accent) 12%, transparent));
+    }
+
+    mark {
+        border-radius: 2px;
+        background: var(--wplus-recording-found);
+        color: inherit;
+    }
+}
+
+.wplus-recording-line-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+}
+
+.wplus-recording-speaker {
+    --wplus-recording-hue: 210;
+
+    display: inline-grid;
+    flex: none;
+    place-items: center;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: hsl(var(--wplus-recording-hue) 60% 46%);
+    color: #fff;
+    font-size: 10px;
+    font-weight: 700;
+    line-height: 1;
+}
+
+.wplus-recording-line-name {
+    min-width: 0;
+    overflow: hidden;
+    font-weight: 600;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.wplus-recording-line-time {
+    flex: none;
+    margin-inline-start: auto;
+    color: var(--wplus-recording-muted);
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+}
+
+.wplus-recording-line-text {
+    padding-inline-start: 30px;
+    overflow-wrap: anywhere;
+}
+
+.wplus-recording-transcript-actions {
+    display: flex;
+    gap: 4px;
+    padding: 6px 8px;
+    border-top: 1px solid var(--wplus-recording-border);
+    color: var(--wplus-recording-text);
+}

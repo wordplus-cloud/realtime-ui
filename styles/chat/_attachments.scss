@@ -503,6 +503,16 @@
     }
 }
 
+// Files with a caption: the caption wraps to the width of the files, so its
+// bubble and the photo above it meet edge to edge. A caption longer than the
+// photo's 320px stood out past it. The photo keeps its own size, the one it
+// has with no caption: stretched to a long caption instead, as Better Messages
+// does it, it took the picture's own width (a photo's 1200px) and spread
+// across the lane under a caption of two words too.
+.wplus-msg-body[data-has-files="1"][data-has-text="1"] .wplus-msg-bubble {
+    contain: inline-size;
+}
+
 // ─── Large ─────────────────────────────────────────────────────────────
 
 .realtime-viewer {

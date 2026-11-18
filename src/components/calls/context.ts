@@ -61,6 +61,11 @@ export interface CallParticipant {
     // their microphone is off; `all` their sound too. Their last frame is blurred, so it doesn't pass for live, and the
     // tile says "Video interrupted", or "Reconnecting..." as for a tile away for a moment (stalled.tsx)
     stalled?       : 'video' | 'all' | null,
+    // their camera or screen is sent, whether this page receives it or not: a big call receives only the cameras and
+    // screens of the tiles drawn (showTiles), and a tile off the screen still has a picture to take its place in the
+    // grid. Missing: as `video` and `screen` say
+    videoPublished?: boolean,
+    screenPublished?: boolean,
 }
 
 export type CallAction = 'outgoing_call' | 'incoming_call' | 'call_in_progress' | 'connecting';
@@ -103,6 +108,8 @@ export interface CallContextInterface {
     adminMode: boolean,
     canPublish: boolean,
     statusMessage: string,
+    /** The person's own upload is jammed (the calls engine's upload-jam judge): a warning mark where the call says its connection, with the words in a tip (upload-jam.tsx). */
+    uploadJammed?: boolean,
     participants: Map<string, CallParticipant>,
     participantsRef: MutableRefObject<Map<string, CallParticipant>>,
     action: CallAction | null,
@@ -143,6 +150,12 @@ export interface CallContextInterface {
      */
     cameraChecking?: boolean,
     /**
+     * The camera turning on, from a press until the call has its track: with a background chosen that waits for the
+     * effect to start too. The call screen says so itself of the presses it hands on (turning-on.ts), and the control
+     * spins; a host may say so of a camera it turns on by itself. Missing: only those presses.
+     */
+    cameraTurningOn?: boolean,
+    /**
      * The longest a tile says "Optimizing video quality..." from when the camera's move began, ms: the node's (its codec
      * policy's tune.failsafeS, the realtime client's cameraTune()). Missing: 10 s (optimizing.tsx, OPTIMIZING_MAX_MS).
      */
@@ -150,6 +163,8 @@ export interface CallContextInterface {
 
     enableMic: () => Promise<void>,
     disableMic: () => Promise<void>,
+    /** The microphone turning on, as `cameraTurningOn` the camera: with the noise removal chosen, until it starts. */
+    microphoneTurningOn?: boolean,
 
     enableFullScreen: () => void,
     disableFullScreen: () => void,
@@ -205,6 +220,13 @@ export interface CallContextInterface {
     devicesOnJoin?: boolean,
 
     /**
+     * The user's own choice about that notice, kept where the app keeps the user's settings: `shown` false and it is not
+     * said to them, however `devicesOnJoin` is; `dontShowAgain` keeps that choice, from the notice's Do Not Show Again,
+     * which it has only where this is given. The app gives the way back (a setting of the user's).
+     */
+    joinNotice?: { shown: boolean, dontShowAgain: () => void },
+
+    /**
      * Tell the user who talks with their microphone muted that they are muted, with Unmute (muted-hint.tsx). It keeps a
      * microphone open while muted to hear them, measured on the device and never sent, so the browser shows the
      * microphone in use all through the call. Missing or false: muting lets go of the microphone and says nothing.
@@ -212,15 +234,173 @@ export interface CallContextInterface {
     mutedHint?: boolean,
 
     /**
+     * A group call opens its picture-in-picture window by itself as the user leaves the tab, where the browser offers
+     * that (Chrome's and Edge's automatic picture-in-picture for a page that uses the camera or the microphone, which the
+     * user can turn off there). Missing or false: it opens only from the dock's More.
+     */
+    autoPictureInPicture?: boolean,
+
+    /**
      * Ends a group call for everyone in it, the moderator too: Host Controls offers it where it is set and the call
      * takes `end_call` (moderation-panels.tsx), and asks once more before it runs. Missing: no such row.
      */
     endForEveryone?: () => Promise<unknown>,
 
+    /**
+     * Removes someone from a group call and keeps them out of its calls for a while: a person's menu offers Remove and
+     * Ban from Calls… beside Remove from Call where it is set (moderation-panels.tsx). Whoever runs the call asks for how
+     * long in a dialog of its own, and, where the call has a chat it keeps, whether from the chat too, then refuses them
+     * the call's join until then. Missing: Remove from Call alone.
+     */
+    banFromCalls?: ( participant: CallParticipant ) => void,
+
+    /**
+     * The ban's dialog, where the call screen asks for how long itself (ban-dialog.tsx), as an app's call does: whom, the
+     * longest a ban may be in minutes, the ban, and Cancel. Better Messages asks in its own dialog and sets none.
+     * Missing: no dialog is drawn.
+     */
+    banning?: { participant: CallParticipant, most: number, ban: ( minutes: number ) => Promise<unknown>, cancel: () => void } | null,
+
+    /**
+     * Spotlight for everyone: whom a moderator put on the main tiles for everyone in a group video call, by identity, in
+     * the order they were spotlighted, up to four (spotlight.tsx), as the room's state says it (Better Messages: the
+     * room's metadata; an SDK call: its group's `spotlight`). A moderator spotlights with `spotlight_participant` and
+     * takes someone out with `unspotlight_participant`, everyone where it names nobody. Missing: nobody.
+     */
+    spotlight?: readonly string[],
+
+    /**
+     * Which tiles a screen draws now, by tile key (`me` too), so whoever runs the call receives only their cameras and
+     * screens, as a big call needs on the device: `source` names the screen ('grid', 'pip'), the keys
+     * of each kept apart and taken together. Called again as the page, the layout or the people change, and with none as
+     * the screen goes. Every sound is received whatever is drawn. Missing: everything is received.
+     */
+    showTiles?: ( source: string, keys: readonly string[] ) => void,
+
+    /**
+     * Whoever runs the call puts the effects the device settings offer on what it sends: a blurred or replaced
+     * background on the camera, the noise removed from the microphone (inc/calls/effects.ts, useTrackEffects for the
+     * room client's tracks, TrackEffect for a browser's own). The settings offer each only where this is set, the host
+     * serves the effects (UiHost.effectsUrl) and the browser can run it. Missing: no effects.
+     */
+    effects?: boolean,
+
+    /**
+     * The call's recording (calls/recording.tsx): Host Controls offers Record to whoever `can`, and the REC mark on the
+     * dock shows while it runs, to whoever `can` (they stop it from there) and, where the host's admin chose `show`, to
+     * everyone. Missing: nothing about recording shows, as in a call between two people.
+     */
+    recording?: CallRecording,
+
+    /**
+     * A moderator asking someone to turn on their camera or microphone, and that person's answer (ask-prompt.tsx): a
+     * person's menu offers Ask to Turn On Camera and Ask to Turn On Microphone while theirs is off, sent with the
+     * `moderate` acts `ask_camera` and `ask_microphone`, and the person is shown the ask over their dock until they
+     * answer. While both are off on a video call it offers one row for both in their place, sent with the act
+     * `ask_camera_microphone`, where the call takes that act too (`moderation`). Missing: neither.
+     */
+    turnOnAsks?: TurnOnAsks,
+
     // The conversation beside the call, for the dock's Show Chat / Hide Chat. No toggle where the call has no chat
     // beside it to show, as for an app's call screen.
     chatShown?: boolean,
     chatToggle?: Dispatch<SetStateAction<boolean>> | null
+}
+
+/**
+ * A moderator's ask that the user turn on a device: `by` is the moderator's identity in the call. An ask for both
+ * devices comes as two, one for each under the same id: the prompt shows them as one card while both are off, and
+ * answers and puts them away a device at a time. The answers carry that id, so the moderator hears them as one where
+ * they agree. One moderator's two asks for the two devices show as one card too.
+ */
+export interface TurnOnAsk {
+    id: string,
+    device: 'camera' | 'microphone',
+    by: string,
+}
+
+/**
+ * What became of an ask: turned on, not now, the browser blocks the device, there is none, or another app holds it.
+ * Nothing more of the person's device is told.
+ */
+export type TurnOnAnswerKind = 'on' | 'not_now' | 'blocked' | 'no_device' | 'busy';
+
+/** An answer to one of the user's asks: `from` is the identity of whoever was asked. */
+export interface TurnOnAnswer {
+    id: string,
+    from: string,
+    device: 'camera' | 'microphone',
+    answer: TurnOnAnswerKind,
+}
+
+export interface TurnOnAsks {
+    /** The ask the user was sent last, until they turn the device on or say not now. */
+    received: TurnOnAsk | null,
+    /**
+     * Every ask the user has not answered yet, the oldest first, `received` the newest of them: two moderators may ask,
+     * and each hears the answer to their own. An answer for a device goes to each ask for it, and an ask for the other
+     * device shows once those are put away. Missing: `received` alone.
+     */
+    pending?: readonly TurnOnAsk[],
+    /** The answers the user's own asks got, the newest last. */
+    answers: readonly TurnOnAnswer[],
+    /** The user's answer to an ask, sent to whoever asked: a stuck device's too, while the ask stays for Try Again. */
+    answer: ( ask: TurnOnAsk, answer: TurnOnAnswerKind ) => void,
+    /**
+     * The ask put away, answered: the app takes it out of `pending`, and `received` is the newest left. Found by its
+     * id and device, as the two of an ask for both share the id.
+     */
+    dismiss: ( ask: TurnOnAsk ) => void,
+}
+
+/**
+ * A group call's recording, as whoever runs the call knows it: the WordPlus SDK's recordings on a WordPress site, the
+ * app's server's `realtime.recordings` for an app. `since` is when it started, in seconds.
+ */
+export interface CallRecording {
+    state: 'off' | 'starting' | 'on' | 'stopping',
+    /** The recording's own id, which an answer to its notice or its question is kept by. */
+    id?: number | string,
+    since?: number,
+    /** Whether the user may start and stop it. */
+    can: boolean,
+    /**
+     * How everyone else in the call is told it is recorded, as it starts and as they join: REC beside the call controls
+     * alone (`indicator`), not at all with its moderators alone seeing REC (`moderators`), a notice (by default), a
+     * question to stay or leave, or the same question with their microphone and camera kept off until they agree.
+     */
+    tell?: 'indicator' | 'moderators' | 'notice' | 'ask' | 'muted',
+    /**
+     * The user's own choice about the notice, kept where the app keeps the user's settings: `shown` false and they see
+     * REC alone; `dontShowAgain` keeps that choice, from the notice's Do Not Show Again, which it has only where this is
+     * given. The question to stay or leave is consent, and is asked whatever this says.
+     */
+    notice?: { shown: boolean, dontShowAgain: () => void },
+    /** Who started it, by name. */
+    by?: string,
+    /** Whether the user started it: they are told and asked nothing. */
+    mine?: boolean,
+    /** The admin's settings, which the start's confirm lists. */
+    settings?: RecordingSummary,
+    start: () => Promise<unknown>,
+    stop: () => Promise<unknown>,
+}
+
+/** What a recording is made with and who may watch it, as the start's confirm lists it. */
+export interface RecordingSummary {
+    /** The height of the video, 720 or 1080. */
+    size?: number,
+    /** `speaker`, `gallery` or `speaker_only`. */
+    layout?: string,
+    /** An audio call's: `call` (listed as the call shows it) or `gallery`. */
+    audioLayout?: string,
+    transcript?: boolean,
+    /** `auto`, or the language of everyone's speech, as a code. */
+    language?: string,
+    /** Who may watch it afterwards: `admins` where it goes only to the site's own list. */
+    watch?: 'moderators' | 'people' | 'everyone' | 'admins',
+    /** Days it is kept, 0 until deleted. */
+    keepDays?: number,
 }
 
 /** Someone the user may add to a call. */

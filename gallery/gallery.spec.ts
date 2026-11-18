@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test';
 
 // Every shot of the gallery, in each look: light and dark, left to right and right to left (Hebrew). A phone sees
 // the light, left-to-right page only: its width is what it checks.
-const SHOTS = [ 'ring', 'private-call', 'group-video', 'group-audio', 'presence', 'online', 'messages', 'hover-actions', 'composer', 'empty' ];
+const SHOTS = [ 'ring', 'private-call', 'group-video', 'group-audio', 'presence', 'online', 'messages', 'photos', 'hover-actions', 'composer', 'empty' ];
 const LOOKS = [
     { name: 'light', query: 'theme=light&dir=ltr' },
     { name: 'dark', query: 'theme=dark&dir=ltr' },
@@ -27,3 +27,17 @@ for ( const look of LOOKS ) {
         }
     } );
 }
+
+// A photo's caption wraps to the photo: its bubble starts and ends where the photo does, a long caption's too, which
+// stood out past the photo's 320px.
+test( 'a caption is as wide as its photo', async ( { page } ) => {
+    await page.goto( '/?theme=light&dir=ltr' );
+    const bodies = page.locator( '[data-shot="photos"] .gallery-captioned' );
+    await bodies.first().waitFor();
+    for ( const body of await bodies.all() ) {
+        const photo = ( await body.locator( '.wplus-image-grid' ).boundingBox() )!;
+        const caption = ( await body.locator( '.wplus-msg-bubble' ).boundingBox() )!;
+        expect( caption.x ).toBeCloseTo( photo.x, 0 );
+        expect( caption.width ).toBeCloseTo( photo.width, 0 );
+    }
+} );

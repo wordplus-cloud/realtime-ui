@@ -37,16 +37,16 @@ describe( 'the studio', () => {
         // A switch in a row of its own, as the devices and the quality.
         const checkbox = screen.getByRole( 'switch', { name: 'Count down 3, 2, 1 before going live' } ) as HTMLInputElement;
         expect( checkbox.checked ).toBe( true );
-        expect( checkbox.closest( '.estream-setup__row' )?.textContent ).toContain( 'Countdown' );
+        expect( checkbox.closest( '.wplus-live-stream-setup__row' )?.textContent ).toContain( 'Countdown' );
 
         fireEvent.click( screen.getByText( 'Go live' ) );
-        expect( document.querySelector( '.estream-going__number' )?.textContent ).toBe( '3' );
+        expect( document.querySelector( '.wplus-live-stream-going__number' )?.textContent ).toBe( '3' );
         act( () => { vi.advanceTimersByTime( 1000 ); } );
-        expect( document.querySelector( '.estream-going__number' )?.textContent ).toBe( '2' );
+        expect( document.querySelector( '.wplus-live-stream-going__number' )?.textContent ).toBe( '2' );
         expect( client.goLive ).not.toHaveBeenCalled();
         act( () => { vi.advanceTimersByTime( 2000 ); } );
         expect( client.goLive ).toHaveBeenCalledTimes( 1 );
-        expect( document.querySelector( '.estream-going' ) ).toBeNull();
+        expect( document.querySelector( '.wplus-live-stream-going' ) ).toBeNull();
     } );
 
     it( 'lets the host stop the countdown, or go live at once without it, remembering that', async () => {
@@ -147,36 +147,35 @@ describe( 'the studio', () => {
 
         // A cap from the cloud isn't said on the count until it is reached ("up to 50 viewers is not actual"); then "full".
         act( () => { update( { audience: 50 } ); } );
-        expect( document.querySelector( '.estream-studio__status' )?.textContent ).not.toMatch( /up to/i );
+        expect( document.querySelector( '.wplus-live-stream-studio__status' )?.textContent ).not.toMatch( /up to/i );
         expect( byTip( 'The most watching at once since you went live' ).textContent ).toBe( 'Peak 30' );
         act( () => { update( { audience: 12 } ); } );
         const full = byTip( 'The stream is full: it takes 12 viewers, and the next ones wait for a place.' );
         expect( full.textContent ).toBe( '12 watchingfull' );
-        expect( full.className ).toContain( 'estream-chip--warn' );
+        expect( full.className ).toContain( 'wplus-live-stream-chip--warn' );
         act( () => { update( { audience: null } ); } );
         expect( screen.getByText( '720p · 30 fps · 2.4 Mbps' ) ).toBeTruthy();
-        expect( screen.getByRole( 'button', { name: 'Share screen' } ).getAttribute( 'data-estream-tip' ) ).toBe( 'Share screen' );
+        expect( screen.getByRole( 'button', { name: 'Share screen' } ).getAttribute( 'data-wplus-live-stream-tip' ) ).toBe( 'Share screen' );
 
         // The plan's credits, the bought and a month's borrowing all used, as the cloud says, from a cloud that says no
         // unmetered viewers: new viewers cannot join, with the way to buy more.
-        const warning = () => document.querySelector<HTMLElement>( '.estream-studio__status .estream-chip--warn' );
+        const warning = () => document.querySelector<HTMLElement>( '.wplus-live-stream-studio__status .wplus-live-stream-chip--warn' );
         expect( warning() ).toBeNull();
         act( () => { update( { usage: { included_left_seconds: 0, credits_left: 0, borrowed_seconds: 300_000, admit: false, buy_url: 'https://www.wordplus.cloud/credits', at: 1 } } ); } );
         const spent = warning()!;
-        expect( spent.getAttribute( 'data-estream-tip' ) ).toBe( 'Your credits are used up, and so is what you may borrow. Those watching stay, and nobody new can join until you buy more.' );
+        expect( spent.getAttribute( 'data-wplus-live-stream-tip' ) ).toBe( 'Your credits are used up, and so is what you may borrow. Those watching stay, and nobody new can join until you buy more.' );
         expect( spent.textContent ).toBe( 'New viewers cannot joinBuy credits' );
         expect( spent.querySelector( 'a' )?.getAttribute( 'href' ) ).toBe( 'https://www.wordplus.cloud/credits' );
         // With the site's unmetered viewers, who still join.
         act( () => { update( { usage: { included_left_seconds: 0, credits_left: 0, borrowed_seconds: 300_000, admit: false, unmetered_viewers: 50, buy_url: 'https://www.wordplus.cloud/credits', at: 2 } } ); } );
-        expect( warning()!.getAttribute( 'data-estream-tip' ) ).toBe( 'Your credits are used up, and so is what you may borrow. Up to 50 viewers at once still join, and those above wait until you buy more. Those watching are never cut off.' );
+        expect( warning()!.getAttribute( 'data-wplus-live-stream-tip' ) ).toBe( 'Your credits are used up, and so is what you may borrow. Up to 50 viewers at once still join, and those above wait until you buy more. Those watching are never cut off.' );
         expect( warning()!.textContent ).toBe( 'Viewers above 50 cannot joinBuy credits' );
         act( () => { update( { usage: { included_left_seconds: 0, credits_left: 500, admit: true, unmetered_viewers: 50, buy_url: 'https://www.wordplus.cloud/credits', at: 3 } } ); } );
         expect( warning() ).toBeNull();
 
-        // Switching to OBS while live, from the bar's More.
-        fireEvent.click( screen.getByLabelText( 'More' ) );
-        await act( async () => { fireEvent.click( screen.getByRole( 'menuitem', { name: 'Stream from OBS' } ) ); } );
-        expect( client.useEncoder ).toHaveBeenCalledWith();
+        // Live from the browser: no Stream from OBS, so no More menu, which held it alone (sources.test.tsx).
+        expect( screen.queryByLabelText( 'More' ) ).toBeNull();
+        expect( screen.queryByText( 'Stream from OBS' ) ).toBeNull();
 
         // ⌘/Ctrl+D and ⌘/Ctrl+E, as in calls.
         await act( async () => { fireEvent.keyDown( document, { key: 'd', metaKey: true } ); } );
@@ -226,8 +225,8 @@ describe( 'the studio', () => {
         await flush();
 
         const panel = screen.getByRole( 'region', { name: 'Statistics' } );
-        const section = ( title : string ) => [ ...panel.querySelectorAll( '.estream-stats__section' ) ].find( ( s ) => s.querySelector( 'h3' )?.textContent === title )!;
-        const rows = ( title : string ) => Object.fromEntries( [ ...section( title ).querySelectorAll( '.estream-stats__row' ) ].map( ( r ) => [ r.querySelector( 'dt' )?.textContent, r.querySelector( 'dd' )?.textContent ] ) );
+        const section = ( title : string ) => [ ...panel.querySelectorAll( '.wplus-live-stream-stats__section' ) ].find( ( s ) => s.querySelector( 'h3' )?.textContent === title )!;
+        const rows = ( title : string ) => Object.fromEntries( [ ...section( title ).querySelectorAll( '.wplus-live-stream-stats__row' ) ].map( ( r ) => [ r.querySelector( 'dt' )?.textContent, r.querySelector( 'dd' )?.textContent ] ) );
         expect( [ ...panel.querySelectorAll( 'h3' ) ].map( ( h ) => h.textContent )[0] ).toBe( 'Sending the camera' );
         expect( rows( 'Sending the camera' ) ).toEqual( {
             'Captured': '1280×720 · 30 fps',
@@ -266,9 +265,9 @@ describe( 'the studio', () => {
         await flush();
 
         // Viewers are what a stream costs: a stream said to be paused would raise the question.
-        const status = document.querySelector( '.estream-studio__status' ) as HTMLElement;
+        const status = document.querySelector( '.wplus-live-stream-studio__status' ) as HTMLElement;
         expect( status.textContent ).not.toMatch( /paus/i );
-        expect( screen.getByText( '720p' ).className ).toBe( 'estream-studio__numbers' );
+        expect( screen.getByText( '720p' ).className ).toBe( 'wplus-live-stream-studio__numbers' );
         expect( screen.getByText( 'Good connection' ) ).toBeTruthy();
 
         client.sendingStats.mockResolvedValue( { width: 1280, height: 720, fps: 30, kbps: 2412, limited: null } as any );
@@ -284,13 +283,13 @@ describe( 'the studio', () => {
         await flush();
 
         const numbers = screen.getByText( '720p of 1080p · 30 fps · 2.4 Mbps' );
-        expect( numbers.getAttribute( 'data-estream-tip' ) ).toBe( 'Viewers get 1080p when one watches in a big window or full screen.' );
+        expect( numbers.getAttribute( 'data-wplus-live-stream-tip' ) ).toBe( 'Viewers get 1080p when one watches in a big window or full screen.' );
         // No chip of its own.
         expect( screen.queryByText( /no player/ ) ).toBeNull();
 
         client.sendingStats.mockResolvedValue( { width: 1920, height: 1080, fps: 30, kbps: 4400, limited: null } as any );
         await act( async () => { await new Promise( ( r ) => setTimeout( r, 2100 ) ); } );
-        expect( screen.getByText( '1080p · 30 fps · 4.4 Mbps' ).hasAttribute( 'data-estream-tip' ) ).toBe( false );
+        expect( screen.getByText( '1080p · 30 fps · 4.4 Mbps' ).hasAttribute( 'data-wplus-live-stream-tip' ) ).toBe( false );
     }, 10_000 );
 
     it( 'doesn\'t blame the connection in the first seconds live, while the browser finds what it takes', async () => {
@@ -368,11 +367,11 @@ describe( 'the studio', () => {
         } );
 
         // The picture says so to the host, never a viewer's thanks, and points down to what's next.
-        const picture = document.querySelector( '.estream-stage' )!;
+        const picture = document.querySelector( '.wplus-live-stream-stage' )!;
         expect( picture.textContent ).toContain( 'Your stream has ended' );
         expect( picture.textContent ).toContain( 'It ran for 1:02:15' );
         expect( picture.textContent ).not.toContain( 'Thanks for watching' );
-        const figures = [ ...document.querySelectorAll( '.estream-summary__figure' ) ].map( ( f ) => f.textContent );
+        const figures = [ ...document.querySelectorAll( '.wplus-live-stream-summary__figure' ) ].map( ( f ) => f.textContent );
         expect( figures ).toEqual( [ 'On air1:02:15', 'Watching at the peak1,240', 'Messages87', 'Reactions1,503' ] );
 
         expect( screen.getByRole( 'heading', { name: 'Go live again' } ) ).toBeTruthy();
@@ -384,7 +383,7 @@ describe( 'the studio', () => {
         render( <EasyStreamApp client={ asClient } /> );
         await flush();
 
-        const picture = document.querySelector( '.estream-stage' )!;
+        const picture = document.querySelector( '.wplus-live-stream-stage' )!;
         expect( picture.textContent ).toContain( 'Ready when you are' );
         expect( picture.textContent ).not.toContain( 'The stream starts soon' );
         expect( screen.getByRole( 'heading', { name: 'How do you want to go live?' } ) ).toBeTruthy();
@@ -403,7 +402,7 @@ describe( 'the studio', () => {
         expect( screen.getByText( 'Go live' ) ).toBeTruthy();
         // Named as a tip too, for a narrow bar that shows only its icon.
         const stop = screen.getByRole( 'button', { name: 'Stop sharing' } );
-        expect( stop.getAttribute( 'data-estream-tip' ) ).toBe( 'Stop sharing' );
+        expect( stop.getAttribute( 'data-wplus-live-stream-tip' ) ).toBe( 'Stop sharing' );
         await act( async () => { fireEvent.click( stop ); } );
         expect( client.setScreenShare ).toHaveBeenLastCalledWith( false );
         cleanup();
@@ -559,7 +558,7 @@ describe( 'the studio', () => {
             update( { encoder: { url: 'https://cloud.example/live-stream/v1/whip', key: 'esk_secret' } } );
             await act( async () => { await vi.advanceTimersByTimeAsync( 2000 ); } );
             expect( client.encoderStats ).toHaveBeenCalled();
-            expect( document.querySelector( '.estream-encoder .estream-studio__numbers' )?.textContent ).toBe( '1080p · 30 fps · 4.5 Mbps' );
+            expect( document.querySelector( '.wplus-live-stream-encoder .wplus-live-stream-studio__numbers' )?.textContent ).toBe( '1080p · 30 fps · 4.5 Mbps' );
         } finally {
             vi.useRealTimers();
         }
@@ -628,7 +627,7 @@ describe( 'the studio', () => {
         expect( client.invite ).toHaveBeenCalledWith( 'u:7' );
 
         expect( screen.getByText( 'On stage' ) ).toBeTruthy();
-        expect( document.querySelector( '.estream-queue__note' )?.textContent ).toBe( 'Microphone off' );
+        expect( document.querySelector( '.wplus-live-stream-queue__note' )?.textContent ).toBe( 'Microphone off' );
         await act( async () => { fireEvent.click( screen.getByText( 'Remove from stage' ) ); } );
         expect( client.unstage ).toHaveBeenCalledWith( 'u:5' );
     } );

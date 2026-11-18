@@ -1,0 +1,482 @@
+// ─── The call effects in the device settings (device-panel.tsx) ───────────
+// Under the camera's row, what is behind the user: tiles for None, Blur and
+// each background, the chosen one ringed in the accent, a spinner over it
+// while its files load, then a line on turning it off where the device
+// struggles and Effect Settings, closed. Under the microphone's, Noise Removal
+// as a switch with a line on what it does. Both the width of the row, as its
+// preview is. And in the microphone's test, Play Back.
+
+.wplus-call-wrap .wplus-call-devices {
+    .wplus-call-effects {
+        display: flex;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 6px;
+        padding: 0 8px 8px;
+
+        > .wplus-call-device-note { align-self: flex-start; }
+    }
+
+    .wplus-call-effects-label {
+        color: rgba(255, 255, 255, 0.92);
+        font-size: 12px;
+        font-weight: 600;
+    }
+
+    // Five a row: None, Blur and three pictures, where four left a picture
+    // alone on a row of its own.
+    .wplus-call-effects-list {
+        display: grid;
+        grid-template-columns: repeat(5, minmax(0, 1fr));
+        gap: 6px;
+    }
+
+    // Under the backgrounds while one is on: turn it off where the device
+    // struggles. Quiet, a line of the panel's own, not a warning.
+    .wplus-call-effects-hint {
+        color: rgba(255, 255, 255, 0.55);
+        font-size: 11.5px;
+        line-height: 1.35;
+    }
+
+    // The line on the device's own blur (Portrait), with × at its end, which
+    // closes it for good.
+    .wplus-call-device-blur-close {
+        flex: none;
+        display: inline-flex;
+        margin: 1px -3px 0 2px;
+        cursor: pointer;
+        color: rgba(255, 255, 255, 0.5);
+
+        &:hover,
+        &:focus-visible { color: rgba(255, 255, 255, 0.95); }
+    }
+
+    // In the hint's place while the chosen background gets ready, or while the
+    // effects are made ready as the settings open: the page may freeze for
+    // seconds then, the first time on a computer, and the ring turns all the
+    // same, its rotation a transform the compositor runs without the page.
+    .wplus-call-effects-preparing {
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        color: rgba(255, 255, 255, 0.8);
+        font-size: 11.5px;
+        line-height: 1.35;
+    }
+
+    .wplus-call-effects-spinner {
+        flex: none;
+        box-sizing: border-box;
+        width: 13px;
+        height: 13px;
+        &:not(#\9) { border-radius: 50%; }
+        border: 2px solid rgba(255, 255, 255, 0.22);
+        border-top-color: rgba(255, 255, 255, 0.95);
+        will-change: transform;
+        animation: wplus-call-effects-spin 0.9s linear infinite;
+
+        @media (prefers-reduced-motion: reduce) { animation-duration: 2s; }
+    }
+
+    .wplus-call-effect {
+        position: relative;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        aspect-ratio: 16 / 9;
+        overflow: hidden;
+        &:not(#\9) { border-radius: 8px; }
+        background: rgba(255, 255, 255, 0.07);
+        color: rgba(255, 255, 255, 0.75);
+        cursor: pointer;
+        user-select: none;
+        -webkit-tap-highlight-color: transparent;
+        transition: background 0.12s ease, color 0.12s ease;
+
+        &:hover { background: rgba(255, 255, 255, 0.12); }
+
+        > img {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            max-width: none;
+            margin: 0;
+            object-fit: cover;
+        }
+
+        > svg { width: 18px; height: 18px; }
+
+        // The ring, over a picture too.
+        &::after {
+            content: "";
+            position: absolute;
+            inset: 0;
+            border-radius: inherit;
+            box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.1);
+            pointer-events: none;
+        }
+
+        &[aria-checked="true"] {
+            color: rgba(var(--wplus-color-accent), 1);
+
+            &::after { box-shadow: inset 0 0 0 2px rgba(var(--wplus-color-accent), 1); }
+        }
+
+        &:focus-visible {
+            outline: 2px solid rgba(var(--wplus-color-accent), 0.8);
+            outline-offset: 2px;
+        }
+    }
+
+    // A picture of the site's this browser may not draw (another origin without CORS): there, but not to be chosen.
+    .wplus-call-effect[data-unusable] {
+        cursor: not-allowed;
+        color: rgba(var(--wplus-color-warning), 1);
+    }
+
+    // The background can't run on this device: every tile there, faded, none to be chosen, the line under them says why.
+    .wplus-call-effects[data-unavailable] .wplus-call-effect {
+        opacity: 0.4;
+        cursor: not-allowed;
+
+        &:hover { background: rgba(255, 255, 255, 0.07); }
+    }
+
+    .wplus-call-effect-busy {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: rgba(0, 0, 0, 0.5);
+        color: rgba(255, 255, 255, 1);
+
+        > svg { width: 16px; height: 16px; }
+    }
+
+    // Add Your Own, after the pictures: a dashed tile with a plus, where the app lets people use their own.
+    .wplus-call-effect[data-effect="add"]::after {
+        box-shadow: none;
+        border: 1px dashed rgba(255, 255, 255, 0.28);
+    }
+
+    // A picture of the person's own: its remove button in the corner, over the picture, always there for a phone.
+    .wplus-call-effect-remove {
+        position: absolute;
+        top: 3px;
+        inset-inline-end: 3px;
+        z-index: 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 20px;
+        height: 20px;
+        &:not(#\9) { border-radius: 50%; }
+        background: rgba(0, 0, 0, 0.6);
+        color: rgba(255, 255, 255, 0.95);
+        cursor: pointer;
+        transition: background 0.12s ease;
+
+        &:hover { background: rgba(0, 0, 0, 0.85); }
+
+        &:focus-visible {
+            outline: 2px solid rgba(var(--wplus-color-accent), 0.8);
+            outline-offset: 1px;
+        }
+
+        > svg { width: 12px; height: 12px; }
+    }
+
+    .wplus-call-effects-file { display: none; }
+
+    // AI Noise Removal: a row with its words and a switch.
+    .wplus-call-noise {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 8px 10px;
+        &:not(#\9) { border-radius: 10px; }
+        background: rgba(255, 255, 255, 0.05);
+        cursor: pointer;
+        user-select: none;
+        -webkit-tap-highlight-color: transparent;
+        transition: background 0.12s ease;
+
+        &:hover { background: rgba(255, 255, 255, 0.09); }
+
+        > svg {
+            flex: none;
+            width: 14px;
+            height: 14px;
+            color: rgba(255, 255, 255, 0.7);
+        }
+
+        &:focus-visible {
+            outline: 2px solid rgba(var(--wplus-color-accent), 0.8);
+            outline-offset: 2px;
+        }
+    }
+
+    .wplus-call-noise-text {
+        display: flex;
+        flex: 1 1 auto;
+        flex-direction: column;
+        gap: 2px;
+        min-width: 0;
+    }
+
+    .wplus-call-noise-note {
+        color: rgba(255, 255, 255, 0.6);
+        font-size: 11.5px;
+    }
+
+    // On / off, as Host Controls draws the room's rules.
+    .wplus-call-noise-switch {
+        position: relative;
+        flex: none;
+        width: 34px;
+        height: 20px;
+        &:not(#\9) { border-radius: var(--wplus-radius-pill); }
+        background: rgba(255, 255, 255, 0.2);
+        transition: background 0.15s ease;
+
+        &::after {
+            content: "";
+            position: absolute;
+            top: 3px;
+            inset-inline-start: 3px;
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 1);
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+            transition: inset-inline-start 0.15s ease;
+        }
+    }
+
+    // Effect Settings, under the line on turning the background off: one line, closed at first, opening to the line that
+    // the effect may miss and what helps, and the person's tuning, each a slider between its two ends with its name over
+    // it, and Reset.
+    .wplus-call-tune {
+        display: flex;
+        flex-direction: column;
+        &:not(#\9) { border-radius: 10px; }
+        background: rgba(255, 255, 255, 0.05);
+    }
+
+    .wplus-call-tune-head {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 8px 10px;
+        &:not(#\9) { border-radius: 10px; }
+        cursor: pointer;
+        user-select: none;
+        -webkit-tap-highlight-color: transparent;
+        transition: background 0.12s ease;
+
+        &:hover { background: rgba(255, 255, 255, 0.04); }
+
+        > svg {
+            flex: none;
+            width: 14px;
+            height: 14px;
+            color: rgba(255, 255, 255, 0.7);
+        }
+
+        &:focus-visible {
+            outline: 2px solid rgba(var(--wplus-color-accent), 0.8);
+            outline-offset: 2px;
+        }
+    }
+
+    // Its name takes the line, the arrow at its end.
+    .wplus-call-tune-head > .wplus-call-effects-label { flex: 1 1 auto; }
+
+    .wplus-call-tune-arrow { transition: transform 0.15s ease; }
+    .wplus-call-tune[data-open] .wplus-call-tune-arrow { transform: rotate(180deg); }
+
+    .wplus-call-tune-body {
+        display: flex;
+        flex-direction: column;
+        align-items: stretch;
+        padding: 2px 10px 10px;
+    }
+
+    // Each slider with its name over it and its two ends under it, nearer each other than the next slider's name: 14
+    // pixels between sliders, 2 inside one, and the lines' heights set, as a theme's line height (BuddyX's 1.75) or
+    // its inputs' least height (BuddyX's `input[type="range"] { min-height: 38px }`) spread a slider's own parts
+    // apart, its ends falling nearer the next name than its own track.
+    .wplus-call-tune-sliders {
+        display: flex;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 14px;
+
+        > .wplus-call-device-playback { align-self: flex-start; }
+    }
+
+    .wplus-call-tune-row {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        margin: 0;
+        cursor: pointer;
+
+        > input[type="range"] {
+            width: 100%;
+            height: 18px;
+            min-height: 0;
+            margin: 0;
+            padding: 0;
+            border: 0;
+            background: transparent;
+            box-shadow: none;
+            cursor: pointer;
+            appearance: none;
+
+            &::-webkit-slider-runnable-track {
+                height: 4px;
+                border-radius: 2px;
+                background: rgba(255, 255, 255, 0.22);
+            }
+
+            &::-webkit-slider-thumb {
+                width: 14px;
+                height: 14px;
+                margin-top: -5px;
+                border: 0;
+                border-radius: 50%;
+                background: rgba(var(--wplus-color-accent), 1);
+                box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+                appearance: none;
+            }
+
+            &::-moz-range-track {
+                height: 4px;
+                border-radius: 2px;
+                background: rgba(255, 255, 255, 0.22);
+            }
+
+            &::-moz-range-thumb {
+                width: 14px;
+                height: 14px;
+                border: 0;
+                border-radius: 50%;
+                background: rgba(var(--wplus-color-accent), 1);
+                box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+            }
+
+            &:focus-visible {
+                outline: 2px solid rgba(var(--wplus-color-accent), 0.8);
+                outline-offset: 2px;
+            }
+        }
+    }
+
+    .wplus-call-tune-name {
+        color: rgba(255, 255, 255, 0.92);
+        font-size: 12px;
+        font-weight: 500;
+        line-height: 16px;
+    }
+
+    .wplus-call-tune-ends {
+        display: flex;
+        justify-content: space-between;
+        gap: 8px;
+        color: rgba(255, 255, 255, 0.55);
+        font-size: 11px;
+        line-height: 14px;
+    }
+
+    .wplus-call-noise[data-on] .wplus-call-noise-switch {
+        background: rgba(var(--wplus-color-accent), 1);
+
+        &::after { inset-inline-start: 17px; }
+    }
+
+    .wplus-call-device-playback {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        height: 22px;
+        padding: 0 9px;
+        &:not(#\9) { border-radius: var(--wplus-radius-pill); }
+        background: rgba(255, 255, 255, 0.1);
+        color: rgba(255, 255, 255, 0.92);
+        font-size: 11.5px;
+        font-weight: 500;
+        white-space: nowrap;
+        cursor: pointer;
+        transition: background 0.12s ease, color 0.12s ease;
+
+        &:hover { background: rgba(255, 255, 255, 0.16); }
+
+        &[data-active] {
+            background: rgba(var(--wplus-color-accent), 0.25);
+            color: rgba(var(--wplus-color-accent), 1);
+        }
+
+        > svg { width: 11px; height: 11px; }
+    }
+}
+
+@keyframes wplus-call-effects-spin {
+    to { transform: rotate(360deg); }
+}
+
+// ─── The background slowing the device (device-panel.tsx, EffectsSlowNotice) ───
+// In the join prompt's card and place over the dock, its badge a warning's. It
+// waits behind any other card there (a moderator's ask, the join's notice, the
+// recording's) and stands once that one is gone.
+.wplus-call-wrap .wplus-call-ask-prompt.wplus-call-effects-slow .wplus-call-join-prompt-icon {
+    background: rgba(var(--wplus-color-warning), 0.18);
+    color: rgba(var(--wplus-color-warning), 1);
+}
+
+// Its × at the top end, as the join prompt's: the ask's two areas have no
+// place for one, which put it in a row of its own under Turn Off.
+.wplus-call-wrap .wplus-call-join-prompt.wplus-call-ask-prompt.wplus-call-effects-slow {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    grid-template-areas:
+        "icon text close"
+        ".    actions .";
+    padding-inline-end: 8px;
+}
+
+.wplus-call-wrap:has(.wplus-call-join-prompt-region:not(.wplus-call-effects-slow-region)) .wplus-call-effects-slow-region {
+    display: none;
+}
+
+// It stands in "You are muted"'s place while it shows, as the join's notice does.
+.wplus-call-wrap:has(.wplus-call-effects-slow) .wplus-call-muted-hint-region {
+    display: none;
+}
+
+// ─── AI Noise Removal turned on by the app's default (NoiseAutoNotice) ───
+// The background's notice's card, its badge the accent's. It waits behind a
+// moderator's ask, the join's notice and the recording's, and the background's
+// notice waits behind it, so only one of the two stands at a time.
+.wplus-call-wrap .wplus-call-ask-prompt.wplus-call-noise-auto .wplus-call-join-prompt-icon {
+    background: rgba(var(--wplus-color-accent), 0.18);
+    color: rgba(var(--wplus-color-accent), 1);
+}
+
+.wplus-call-wrap .wplus-call-join-prompt.wplus-call-ask-prompt.wplus-call-noise-auto {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    grid-template-areas:
+        "icon text close"
+        ".    actions .";
+    padding-inline-end: 8px;
+}
+
+.wplus-call-wrap:has(.wplus-call-join-prompt-region:not(.wplus-call-noise-auto-region):not(.wplus-call-effects-slow-region)) .wplus-call-noise-auto-region {
+    display: none;
+}
+
+.wplus-call-wrap:has(.wplus-call-noise-auto) .wplus-call-muted-hint-region {
+    display: none;
+}

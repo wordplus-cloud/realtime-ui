@@ -49,6 +49,8 @@ export class Keyring {
         this.keys = new Map();
         this.listeners = new Set();
         this.resolver = null;
+        /** The connections open on the page (rooms.ts, lend()), the newest last, each with its own way to ask or none. */
+        this.holders = [];
         this.inFlight = new Map();
         this.refused = new Map();
         this.batch = null;
@@ -193,7 +195,36 @@ export class Keyring {
         this.resolver = resolver;
     }
     hasResolver() {
-        return this.resolver !== null;
+        return this.asker() !== null;
+    }
+    /**
+     * A connection holding the keyring while it is open (rooms.ts), with its way to ask the site for keys, its own
+     * credentials with it: the newest open one asks, unless a plugin set its own (setResolver()), which is asked first.
+     * Returns its release. Once the last connection releases and no plugin asks its own way, every key goes, so a user
+     * who signs out of a page that stays open (an app of one page) leaves none of theirs, nor their way to ask, to
+     * whoever signs in next.
+     */
+    lend(ask) {
+        const holder = { ask };
+        this.holders.push(holder);
+        return () => {
+            const at = this.holders.indexOf(holder);
+            if (at < 0)
+                return;
+            this.holders.splice(at, 1);
+            if (this.holders.length === 0 && this.resolver === null)
+                this.clear();
+        };
+    }
+    /** Who asks for a missing key: the plugin's own way, else the newest open connection's. */
+    asker() {
+        if (this.resolver)
+            return this.resolver;
+        for (let i = this.holders.length - 1; i >= 0; i--) {
+            if (this.holders[i].ask)
+                return this.holders[i].ask;
+        }
+        return null;
     }
     /**
      * Makes sure the keyring holds these keys, asking the resolver once for those it doesn't. Labels asked for in
@@ -211,7 +242,7 @@ export class Keyring {
                 waits.push(pending);
                 continue;
             }
-            if ((this.refused.get(label) ?? 0) > now || !this.resolver)
+            if ((this.refused.get(label) ?? 0) > now || !this.asker())
                 continue;
             if (!this.batch) {
                 const batch = { labels: new Set(), promise: Promise.resolve() };
@@ -220,7 +251,7 @@ export class Keyring {
                         this.batch = null;
                     const asked = [...batch.labels];
                     try {
-                        await this.resolver?.(asked);
+                        await this.asker()?.(asked);
                     }
                     catch {
                         /* the values stay sealed */
@@ -347,7 +378,7 @@ function utf8Encode(text) {
     }
     return new Uint8Array(out);
 }
-function utf8Decode(bytes) {
+export function utf8Decode(bytes) {
     if (typeof TextDecoder !== 'undefined')
         return new TextDecoder('utf-8', { fatal: true }).decode(bytes);
     let out = '';

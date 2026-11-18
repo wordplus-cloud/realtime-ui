@@ -11,6 +11,7 @@ import {
     PersonRow, PresenceLabel, ReactionPill, ReactionPills, ReadBy, RowAction, StatusTick, SystemRow, TypingDots, TypingPinned,
     UnreadDivider, configureUi, setUiUsers, AiWaiting, type DeliveryState,
 } from "../src/index.ts";
+import { MessageFiles } from "../src/sdk/chat-files.tsx";
 import { CallScreen } from "../src/calls.ts";
 import { fakeCall, participant } from "../test/fake-call.ts";
 
@@ -96,6 +97,37 @@ function Messages() {
     );
 }
 
+const FIELD = { id: "field", name: "field.svg", type: "image/svg+xml", size: 0, url: "/photos/field.svg" };
+
+// Photos, with a caption long and short and with none: each caption wraps to its photo's width.
+function Photos() {
+    return (
+        <div className="realtime-chat gallery-chat gallery-photos">
+            <div className="wplus-msg-list-wrap">
+                <div className="wplus-msg-list">
+                    <div className="wplus-msg-day">
+                        <MessageStack isMe={ false } side="left" bubble="filled" avatar={ <Avatar user={ PEOPLE.ben } size={ 32 } title="" /> } name={ <span className="wplus-name">Ben</span> }>
+                            <MessageBody isMe={ false } data-has-text={ 1 } data-has-files={ 1 } className="wplus-msg-body wplus-message gallery-captioned">
+                                <MessageFiles files={ [ FIELD ] } attached onOpen={ () => {} } />
+                                <MessageText><span className="wplus-chat-text">Film mostly. This is a scan from my last roll, a field near where I grew up, on a morning with no wind at all.</span>{ meta( "10:14" ) }</MessageText>
+                            </MessageBody>
+                            <MessageBody isMe={ false } data-has-text={ 1 } data-has-files={ 1 } className="wplus-msg-body wplus-message gallery-captioned">
+                                <MessageFiles files={ [ FIELD ] } attached onOpen={ () => {} } />
+                                <MessageText><span className="wplus-chat-text">Same field</span>{ meta( "10:15" ) }</MessageText>
+                            </MessageBody>
+                        </MessageStack>
+                        <MessageStack isMe side="right" bubble="filled" name={ <span className="wplus-name">Ann</span> }>
+                            <MessageBody isMe data-has-text={ 0 } data-has-files={ 1 } after={ <ReactionPills meta={ <MessageMeta variant="row" pieces={ ( i ) => <MetaPieces interactive={ i } time={ { label: "10:16" } } status={ <StatusTick status="seen" interactive={ i } /> } /> } /> } /> }>
+                                <MessageFiles files={ [ FIELD, FIELD ] } onOpen={ () => {} } />
+                            </MessageBody>
+                        </MessageStack>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+}
+
 function Composer( { text }: { text?: string } ) {
     const editable = useRef<HTMLDivElement>( null );
     // The editor's content is its host's: here, the text typed.
@@ -157,6 +189,33 @@ function App() {
                 </div>
             </Shot>
 
+            <Shot name="group-video-jam" title="A group call, the person's upload jammed" width={ 720 }>
+                <div className="wplus-call-surface gallery-call" data-layout="video">
+                    <CallScreen layout="group-video" call={ callWith( [
+                        [ "user_34", { name: "Ann", avatar: PEOPLE.ann.avatar } ],
+                        [ "user_42", { name: "Ben", avatar: PEOPLE.ben.avatar, isSpeaking: true, audioLevel: 0.6 } ],
+                        [ "user_43", { name: "Cara", avatar: PEOPLE.cara.avatar, micMuted: true } ],
+                    ], { uploadJammed: true, quality: "good" } ) } />
+                </div>
+            </Shot>
+
+            <Shot name="private-call-jam" title="A call between two, the person's upload jammed" width={ 720 }>
+                <div className="wplus-call-surface gallery-call" data-layout="private">
+                    <CallScreen layout="private" call={ callWith( [ [ "user_34", { name: "Ann", avatar: PEOPLE.ann.avatar } ], [ "user_42", { name: "Ben", avatar: PEOPLE.ben.avatar } ] ],
+                        { thread: { thread_id: 7, participants: [ 42 ] }, uploadJammed: true } ) } />
+                </div>
+            </Shot>
+
+            <Shot name="group-audio-jam" title="A group audio call, the person's upload jammed" width={ 520 }>
+                <div className="wplus-call-surface gallery-call" data-layout="audio">
+                    <CallScreen layout="group-audio" call={ callWith( [
+                        [ "user_34", { name: "Ann", avatar: PEOPLE.ann.avatar } ],
+                        [ "user_42", { name: "Ben", avatar: PEOPLE.ben.avatar, isSpeaking: true } ],
+                        [ "user_43", { name: "Cara", avatar: PEOPLE.cara.avatar, micMuted: true } ],
+                    ], { uploadJammed: true, quality: "good" } ) } />
+                </div>
+            </Shot>
+
             <Shot name="presence" title="Presence" width={ 520 }>
                 <div className="gallery-row">
                     <Avatar user={ PEOPLE.ann } size={ 48 } presence="online" title="" />
@@ -191,6 +250,10 @@ function App() {
 
             <Shot name="messages" title="A conversation" width={ 560 }>
                 <Messages />
+            </Shot>
+
+            <Shot name="photos" title="Photos with a caption" width={ 560 }>
+                <Photos />
             </Shot>
 
             <Shot name="hover-actions" title="A message hovered" width={ 560 }>

@@ -9,6 +9,8 @@ export const GRANT_KEY_LABEL = 'live-stream grant v1';
 export const GRANT_MAX_LIFETIME_S = 7 * 24 * 3600;
 export const STREAM_ID = /^[A-Za-z0-9-]{1,64}$/;
 export const USER_ID = /^[\w.@-]{1,64}$/;
+// A grant's `lang`: two or three letters, then up to three parts of a locale or a tag, 16 characters at most.
+export const LANG = /^(?=.{2,16}$)[A-Za-z]{2,3}(?:[_-][A-Za-z0-9]{1,8}){0,3}$/;
 export const JOIN_PATH = '/live-stream/v1/join';
 // Where an encoder (OBS) posts its offer over WHIP, with the stream's ingest key as its bearer token, and
 // the identity it has in the stream's room.
@@ -28,7 +30,7 @@ export const REACTIONS = ['❤️', '👏', '😂', '😮', '🔥'];
 export const REACTION_EMOJI = { heart: '❤️', clap: '👏', laugh: '😂', wow: '😮', fire: '🔥' };
 // The largest picture a viewer may choose, by its short side: Full HD comes only on auto, to a player that needs it.
 export const CHOSEN_MAX_SIDE = 720;
-export const CLAIM_ORDER = ['iss', 'aud', 'str', 'role', 'sub', 'name', 'avatar', 'chat', 'mod', 'src', 'q', 'stage', 'offline', 'links', 'fresh', 'people', 'viewers', 'reactions', 'track', 'autostart', 'org', 'iat', 'exp'];
+export const CLAIM_ORDER = ['iss', 'aud', 'str', 'role', 'sub', 'name', 'avatar', 'lang', 'chat', 'mod', 'src', 'q', 'stage', 'offline', 'links', 'fresh', 'people', 'viewers', 'reactions', 'track', 'autostart', 'org', 'iat', 'exp'];
 // The check a site's admin and a host's studio ask (`POST`, `{grant}`): whether the cloud takes the site's grants,
 // and what it has left.
 export const CHECK_PATH = '/live-stream/v1/check';

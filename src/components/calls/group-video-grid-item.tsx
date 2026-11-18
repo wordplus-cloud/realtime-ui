@@ -1,13 +1,14 @@
-import React, {memo, useContext, useEffect, useMemo, useRef, useState } from "react";
+import React, {memo, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {CallContext, CallContextInterface, CallParticipant} from "./context.ts";
 import {getSpeakerHighlightStyles} from "../../inc/functions.ts";
 import {_x} from "../../inc/globals.ts";
 import { host } from "../../host.ts";
 import Tooltip from "../helpers/tooltip.tsx";
+import BaseTooltip from "../../primitives/tooltip.tsx";
 import useStateRef from "../../inc/hooks/state-ref.ts";
 import UserName from "../users/user-name.tsx";
 import Resizable from "../helpers/resizable.tsx";
-import Icon, { IconName } from "../../primitives/icon.tsx";
+import Icon, { IconName } from "../../primitives/icons.tsx";
 import { ManageParticipant, MicLockedChip, ModerationPanelContext, heldMute, tileModerated } from "./moderation-panels.tsx";
 import { usePictureDrawn } from "../../inc/calls/ratio.ts";
 import usePendingActions from "../../inc/calls/pending.ts";
@@ -15,6 +16,52 @@ import useHeld, { PAUSED_NOTICE_MS } from "../../inc/hooks/held.ts";
 import { Piece } from "../../pieces.tsx";
 import { CameraOptimizingNotice, useCameraOptimizing } from "./optimizing.tsx";
 import { pictureless, stalledShown, STALLED_VIDEO_CLASS, VideoInterruptedNotice } from "./stalled.tsx";
+import { PinForMe, PinsContext, SpotlightLabel } from "./spotlight.tsx";
+import { usePinOffered } from "./layout-choice.tsx";
+import { isMobile } from "../../inc/functions/browser-info.ts";
+import KeptMedia from "./kept-media.tsx";
+
+const TILE_TAPPED_MS = 4000;
+const CAMERA = { datatype: 'camera' };
+const SCREEN = { datatype: 'screen' };
+
+/**
+ * A tile's name pill. It says the name, so no tooltip repeats it, unless the pill cuts the name short with an ellipsis
+ * (a narrow tile, a long name): then the whole of what it writes shows over the pill, as text. The host writes the name
+ * (UserName), which can differ from the one the call carries. Measured again whenever the pill or the name in it
+ * changes size, or the name changes.
+ */
+function TileName( { user_id }: { user_id: number | string } ) {
+    const pill = useRef<HTMLSpanElement | null>( null );
+    // The pill's text while the pill cuts it short, else empty.
+    const [ whole, setWhole ] = useState( '' );
+
+    useLayoutEffect( () => {
+        const element = pill.current;
+        if ( ! element ) return;
+        const text = element.querySelector<HTMLElement>( '.wplus-caller-name' );
+        const measure = () => {
+            const cut = [ element, text ].some( ( box ) => !! box && box.scrollWidth > box.clientWidth + 1 );
+            setWhole( cut ? ( element.textContent ?? '' ).trim() : '' );
+        };
+        measure();
+        const resized = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver( measure );
+        resized?.observe( element );
+        if ( text ) resized?.observe( text );
+        const written = typeof MutationObserver === 'undefined' ? null : new MutationObserver( measure );
+        written?.observe( element, { childList: true, subtree: true, characterData: true } );
+        return () => {
+            resized?.disconnect();
+            written?.disconnect();
+        };
+    }, [ user_id ] );
+
+    return <BaseTooltip label={ whole } disabled={ whole === '' }>
+        <span ref={ pill } className="wplus-info-name">
+            <span className="wplus-caller-name"><UserName user_id={ user_id }/></span>
+        </span>
+    </BaseTooltip>;
+}
 
 /**
  * One person's tile in a group video call: their camera or shared screen (their picture until one comes; the user's
@@ -25,13 +72,17 @@ import { pictureless, stalledShown, STALLED_VIDEO_CLASS, VideoInterruptedNotice 
  * locked microphone for one a moderator muted, and for a moderator the ⋯ that opens what they can do about this person
  * (moderation-panels.tsx), the tile outlined while that panel is open.
  */
-export default memo(function GroupVideoGridItem({ unique_key, participant, width, height, x, y } : {
+export default memo(function GroupVideoGridItem({ unique_key, participant, width, height, x, y, spotlit = false, cover = false } : {
     unique_key: string,
     participant: CallParticipant,
     width: number,
     height: number,
     x: number,
-    y: number
+    y: number,
+    // In the spotlight for everyone (spotlight.tsx).
+    spotlit?: boolean,
+    // The camera fills the tile, its edges cropped (a phone's or a tablet's grid, group-video-grid.tsx).
+    cover?: boolean
 }){
     const itemRef = useRef<HTMLDivElement>(null);
 
@@ -99,6 +150,7 @@ export default memo(function GroupVideoGridItem({ unique_key, participant, width
 
     if( !! participant.screen ) className += " wplus-group-call-input-video-screen";
     if( unique_key === 'me' ) className += " wplus-group-call-input-mine";
+    if( cover && ! participant.screen ) className += " wplus-cover-video";
 
     let style : React.CSSProperties = {
         width: width + '%',
@@ -143,6 +195,22 @@ export default memo(function GroupVideoGridItem({ unique_key, participant, width
     const moderating = useContext( ModerationPanelContext ).panel === unique_key;
     if( moderating ) innerClass += " wplus-moderating";
 
+    // On a touch screen a tile's pin and ⋯ show for TILE_TAPPED_MS once it is tapped (_touch.scss), a tap on them
+    // aside, and go on a second tap.
+    const touchTiles = isMobile();
+    const [ tapped, setTapped ] = useState( false );
+    useEffect( () => {
+        if ( ! tapped ) return;
+        const timer = window.setTimeout( () => setTapped( false ), TILE_TAPPED_MS );
+        return () => window.clearTimeout( timer );
+    }, [ tapped ] );
+    const onTileTap = ( event: React.MouseEvent<HTMLDivElement> ) => {
+        if ( ( event.target as Element ).closest?.( '.wplus-admin-controls' ) ) return;
+        setTapped( ( was ) => ! was );
+    };
+    const pinnedHere = useContext( PinsContext ).pinned.has( unique_key );
+    const pin = usePinOffered()( unique_key ) ? <PinForMe tileKey={ unique_key } name={ participant.name } /> : null;
+
     // The moderator's lowering of a raised hand waits from the click until the tile shows it (see pending.ts).
     const [ isPending, run ] = usePendingActions(
         [ participant.isPinned, participant.canPublish, participant.micMuted, participant.handRaised ].join( '|' )
@@ -183,16 +251,21 @@ export default memo(function GroupVideoGridItem({ unique_key, participant, width
         : undefined;
 
     // Their sound, in the tile's media, and after an app's own tile in its place (pieces.tsx).
+    // The page's elements, kept as the tile is drawn again elsewhere (kept-media.tsx), so the picture and the sound play on.
     const sound = ( !! participant.audio && unique_key !== 'me' ) &&
-        <audio ref={setAudioElement} autoPlay playsInline muted={false} style={{display: 'none'}}/>;
+        <KeptMedia id={ unique_key + ':audio' } tag="audio" hidden onElement={ setAudioElement as ( element: HTMLMediaElement | null ) => void } />;
 
+    // The wrapper still names the tile and makes a tapped tile a control on a touch screen, with no tooltip: the name
+    // pill says who it is (TileName).
     return <div ref={itemRef} data-key={ unique_key } className={className} style={style} part="grid-tile">
         <Piece name="GridTile" props={ { participant, layout: 'group-video' } } always={ sound }>
-        <Tooltip content={ participant.name }>
-            <div className={innerClass} style={innerStyle}>
-                {/* A moderator's actions for this person, in their panel above the dock (moderation-panels.tsx). */}
-                { ( adminMode && connectionState === 'connected' && tileModerated( moderation, unique_key, 'video' ) ) &&
-                    <ManageParticipant tileKey={ unique_key } participant={ participant } />
+        <Tooltip content={ participant.name } disabled>
+            <div className={innerClass} style={innerStyle} data-tapped={ tapped ? 1 : undefined } onClick={ touchTiles ? onTileTap : undefined }>
+                {/* Pin for Me for everyone (spotlight.tsx), and a moderator's actions for this person, in their panel
+                    above the dock (moderation-panels.tsx). */}
+                { connectionState === 'connected' && ( ( adminMode && tileModerated( moderation, unique_key, 'video' ) )
+                    ? <ManageParticipant tileKey={ unique_key } participant={ participant } shown={ pinnedHere }>{ pin }</ManageParticipant>
+                    : pin && <span className="wplus-admin-controls" data-open={ pinnedHere ? 1 : undefined }>{ pin }</span> )
                 }
 
                 { ( participant.reconnecting || stalled === 'all' ) &&
@@ -241,26 +314,26 @@ export default memo(function GroupVideoGridItem({ unique_key, participant, width
                     </span>
                 }
 
-                {/* The name on every tile, over a picture too: who is who stays on screen for everyone. */}
+                {/* The name on every tile, over a picture too: who is who stays on screen for everyone. A spotlighted
+                    tile says so beside it. */}
                 <div className="wplus-group-call-input-video-inner-info">
+                    { spotlit && <SpotlightLabel /> }
                     <span className="wplus-caller-info" style={callerInfoStyle}>
-                        <span className="wplus-info-name">
-                            <span className="wplus-caller-name"><UserName user_id={user_id}/></span>
-                        </span>
+                        <TileName user_id={ user_id } />
                     </span>
                 </div>
 
                 <div className={"wplus-media-container" + ( !! participant.screen ? " wplus-screen-shared" : "" )}>
-                    { ( !! participant.screen ) && <video ref={setScreenElement} className={screenClass} datatype="screen" autoPlay={true} playsInline={true}></video> }
+                    { ( !! participant.screen ) && <KeptMedia id={ unique_key + ':screen' } tag="video" className={ screenClass } attributes={ SCREEN } onElement={ setScreenElement as ( element: HTMLMediaElement | null ) => void } /> }
 
                     { ( !! participant.video && !! participant.screen ) &&
                         <Resizable className="wplus-small-video" resizeDirection="none">
-                            <video ref={setVideoElement} className={cameraClass()} datatype="camera" autoPlay playsInline muted={unique_key === 'me'}/>
+                            <KeptMedia id={ unique_key + ':camera' } tag="video" className={ cameraClass() } attributes={ CAMERA } muted={ unique_key === 'me' } onElement={ setVideoElement as ( element: HTMLMediaElement | null ) => void } />
                         </Resizable>
                     }
 
                     { ( !! participant.video && ! participant.screen ) &&
-                        <video ref={setVideoElement} className={cameraClass( selfPictureClass )} datatype="camera" autoPlay={true} playsInline={true}></video>
+                        <KeptMedia id={ unique_key + ':camera' } tag="video" className={ cameraClass( selfPictureClass ) } attributes={ CAMERA } muted={ unique_key === 'me' } onElement={ setVideoElement as ( element: HTMLMediaElement | null ) => void } />
                     }
                     { sound }
                 </div>

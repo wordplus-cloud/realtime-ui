@@ -1,6 +1,6 @@
 import React, {cloneElement, JSX, memo} from "react";
-import parse from "html-react-parser";
-import {stripHtml} from "string-strip-html";
+import {markup} from "../../inc/markup.tsx";
+import {plainLabel} from "../../inc/names.ts";
 import {isMobile} from "../../inc/functions/browser-info.ts";
 import BaseTooltip, {TooltipSide} from "../../primitives/tooltip.tsx";
 
@@ -64,7 +64,7 @@ function Tooltip ({ children, content, placement = "top", disabled = false, show
     // controls, so keep stamping it (never overriding an explicit one).
     const labelled = cloneElement( children, {
         ...children.props,
-        ...( children.props[ "aria-label" ] ? {} : { "aria-label": stripHtml( content ).result } ),
+        ...( children.props[ "aria-label" ] ? {} : { "aria-label": plainLabel( content ) } ),
         ...asControl( children ),
     } );
 
@@ -73,7 +73,7 @@ function Tooltip ({ children, content, placement = "top", disabled = false, show
     }
 
     return (
-        <BaseTooltip label={ parse( content ) } side={ sideFromPlacement( placement ) } disabled={ disabled }>
+        <BaseTooltip label={ markup( content ) } side={ sideFromPlacement( placement ) } disabled={ disabled }>
             { labelled }
         </BaseTooltip>
     );

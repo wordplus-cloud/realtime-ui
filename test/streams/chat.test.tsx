@@ -28,11 +28,11 @@ describe( 'the chat', () => {
         ] } );
         const { container } = render( <EasyStreamApp client={ asClient } /> );
 
-        const rows = [ ...container.querySelectorAll( '.estream-message' ) ];
-        expect( rows.map( ( r ) => r.querySelector( '.estream-role' )?.textContent ?? '' ) ).toEqual( [ 'Host', 'Guest', '' ] );
+        const rows = [ ...container.querySelectorAll( '.wplus-live-stream-message' ) ];
+        expect( rows.map( ( r ) => r.querySelector( '.wplus-live-stream-role' )?.textContent ?? '' ) ).toEqual( [ 'Host', 'Guest', '' ] );
         expect( rows[0]!.querySelector( 'img' )?.getAttribute( 'src' ) ).toBe( 'https://site.example/maya.png' );
         // No avatar: initials, on a colour of the sender's own.
-        expect( rows[1]!.querySelector( '.estream-message__avatar--initials' )?.textContent ).toBe( 'O' );
+        expect( rows[1]!.querySelector( '.wplus-live-stream-message__avatar--initials' )?.textContent ).toBe( 'O' );
         expect( rows[0]!.querySelector( 'time' )?.getAttribute( 'dateTime' ) ).toBe( '2026-10-08T18:05:00.000Z' );
     } );
 
@@ -55,13 +55,13 @@ describe( 'the chat', () => {
 
         const { asClient } = fakeClient( { chat: [ message( '1-0', 'hi @Maya' ), message( '2-0', 'hi all' ) ] } );
         const { container } = render( <EasyStreamApp client={ asClient } /> );
-        expect( [ ...container.querySelectorAll( '.estream-message' ) ].map( ( r ) => r.classList.contains( 'estream-message--mention' ) ) ).toEqual( [ true, false ] );
+        expect( [ ...container.querySelectorAll( '.wplus-live-stream-message' ) ].map( ( r ) => r.classList.contains( 'wplus-live-stream-message--mention' ) ) ).toEqual( [ true, false ] );
     } );
 
     it( 'counts what comes while the reader is scrolled up, and takes them down to it', () => {
         const { update, asClient } = fakeClient( { chat: [ message( '1-0', 'one' ) ] } );
         const { container } = render( <EasyStreamApp client={ asClient } /> );
-        const list = container.querySelector( '.estream-chat__list' ) as HTMLElement;
+        const list = container.querySelector( '.wplus-live-stream-chat__list' ) as HTMLElement;
 
         // Scrolled up, far from the bottom.
         Object.defineProperty( list, 'scrollHeight', { configurable: true, value: 1000 } );
@@ -87,9 +87,9 @@ describe( 'the chat', () => {
         fireEvent.click( within( screen.getByRole( 'menu', { name: 'Emoji' } ) ).getByText( '🔥' ) );
         expect( input.value ).toBe( 'hello🔥 world' );
 
-        expect( document.querySelector( '.estream-chat__left' ) ).toBeNull();
+        expect( document.querySelector( '.wplus-live-stream-chat__left' ) ).toBeNull();
         fireEvent.change( input, { target: { value: 'x'.repeat( 495 ) } } );
-        expect( document.querySelector( '.estream-chat__left' )?.textContent ).toBe( '5' );
+        expect( document.querySelector( '.wplus-live-stream-chat__left' )?.textContent ).toBe( '5' );
     } );
 
     it( 'holds the Send button through slow mode\'s wait, for all but moderators', async () => {
@@ -121,7 +121,7 @@ describe( 'the chat', () => {
         fireEvent.change( input, { target: { value: 'one' } } );
         await act( async () => { fireEvent.submit( input.closest( 'form' )! ); } );
         fireEvent.change( input, { target: { value: 'two' } } );
-        expect( [ send.disabled, send.querySelector( '.estream-chat__wait' ) ] ).toEqual( [ true, null ] );
+        expect( [ send.disabled, send.querySelector( '.wplus-live-stream-chat__wait' ) ] ).toEqual( [ true, null ] );
 
         act( () => { vi.advanceTimersByTime( 1_100 ); } );
         expect( send.disabled ).toBe( false );
@@ -204,13 +204,13 @@ describe( 'the chat', () => {
         const { asClient } = fakeClient( live );
         const { container } = render( <EasyStreamApp client={ asClient } room={ '<div class="wplus-chat-wrap" data-thread-id="7"></div>' } /> );
 
-        const room = container.querySelector( '.estream-bm-room > .wplus-chat-wrap' )!;
+        const room = container.querySelector( '.wplus-live-stream-bm-room > .wplus-chat-wrap' )!;
         expect( room.getAttribute( 'data-thread-id' ) ).toBe( '7' );
-        expect( room.hasAttribute( 'data-estream-room' ) ).toBe( true );
+        expect( room.hasAttribute( 'data-wplus-live-stream-room' ) ).toBe( true );
 
         // A phone's room opened over the page, outside the stream's parts.
         document.body.appendChild( room );
-        expect( room.closest( '.estream-theme' ) ).toBeNull();
-        expect( room.closest( '[data-estream-room]' ) ).toBe( room );
+        expect( room.closest( '.wplus-live-stream-theme' ) ).toBeNull();
+        expect( room.closest( '[data-wplus-live-stream-room]' ) ).toBe( room );
     } );
 } );

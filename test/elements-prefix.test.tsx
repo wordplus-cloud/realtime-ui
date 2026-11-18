@@ -12,7 +12,7 @@ it( 'names every element after the page prefix, and leaves the plain names to th
     ( globalThis as Record<string, unknown> ).wordplusRealtimeConfig = { screen: { prefix: 'shop' } };
 
     await import( '../src/elements.tsx' );
-    for ( const name of [ 'call-button', 'room-button', 'online-list', 'online-count', 'typing-line', 'chat-room', 'call-screen' ] ) {
+    for ( const name of [ 'call-button', 'group-call-button', 'room-button', 'online-list', 'online-count', 'typing-line', 'chat-room', 'call-screen' ] ) {
         expect( customElements.get( 'shop-' + name ), 'shop-' + name ).toBeTruthy();
         expect( customElements.get( name ), name ).toBeUndefined();
     }

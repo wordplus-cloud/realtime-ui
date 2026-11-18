@@ -15,6 +15,21 @@ export interface QualitySent {
     nack?: number;
     pli?: number;
     lost?: number;
+    codec?: string;
+    encoder?: string;
+    encodeMs?: number;
+    keyFrames?: number;
+    encoded?: number;
+    framesSent?: number;
+    target?: number;
+    resent?: number;
+    huge?: number;
+    mode?: QualityMode;
+}
+export interface QualityMode {
+    width: number;
+    height: number;
+    fps?: number;
 }
 export interface QualityPlayed {
     kind: 'audio' | 'video';
@@ -29,6 +44,18 @@ export interface QualityPlayed {
     jbMs?: number;
     concealed?: number;
     hw?: boolean;
+    codec?: string;
+    decoder?: string;
+    decodeMs?: number;
+    unevenMs?: number;
+    pauses?: number;
+    pauseMs?: number;
+    plis?: number;
+    nacks?: number;
+    jitterMs?: number;
+    stretched?: number;
+    hiddenGaps?: number;
+    hiddenGapMs?: number;
 }
 export interface QualityHealth {
     cpu?: 'nominal' | 'fair' | 'serious' | 'critical';
@@ -64,6 +91,7 @@ export interface QualityScope {
     sending: Set<P2PSource>;
     playing: Set<P2PSource>;
     sourceOfTrack?: (trackId: unknown) => P2PSource | null;
+    modeOf?: (source: P2PSource) => QualityMode | undefined;
 }
 type StatsLike = {
     forEach(fn: (s: any) => void): void;
@@ -85,6 +113,15 @@ interface OutTotals {
     nack?: number;
     pli?: number;
     remoteLost?: number;
+    codec?: string;
+    encoder?: string;
+    encodeS?: number;
+    encoded?: number;
+    framesSent?: number;
+    keyFrames?: number;
+    target?: number;
+    resent?: number;
+    huge?: number;
 }
 interface InTotals {
     kind: 'audio' | 'video';
@@ -101,6 +138,17 @@ interface InTotals {
     samples?: number;
     concealed?: number;
     hw?: boolean;
+    codec?: string;
+    decoder?: string;
+    decodeS?: number;
+    gaps?: number;
+    gapsSquared?: number;
+    pauses?: number;
+    pauseS?: number;
+    plis?: number;
+    nacks?: number;
+    stretched?: number;
+    jitter?: number;
 }
 interface PathTotals {
     rtt?: number;
@@ -128,8 +176,10 @@ export declare function qualityTotals(report: StatsLike, scope: Pick<QualityScop
  * What changed between two totals, as a reading's tracks and connection:
  * only the sources in `sending` and `playing` at the end, and only what the
  * browser keeps. `stalls`: how long each sent source's capture gave nothing.
+ * `shownAgain`: when this side last started showing each source again after not
+ * showing it, whose gap is this side's own and not the call's.
  */
-export declare function qualityBetween(prev: QualityTotals, now: QualityTotals, scope: Pick<QualityScope, 'sending' | 'playing'>, stalls?: Map<P2PSource, number>): Omit<QualityReading, 'health'>;
+export declare function qualityBetween(prev: QualityTotals, now: QualityTotals, scope: Pick<QualityScope, 'sending' | 'playing' | 'modeOf'>, stalls?: Map<P2PSource, number>, shownAgain?: Map<P2PSource, number>): Omit<QualityReading, 'health'>;
 export declare function pathBetween(prev: QualityTotals, now: QualityTotals): QualityHealth['path'] | undefined;
 /**
  * A peer connection's readings: tick() on every stats pass, reading() when a
@@ -142,6 +192,7 @@ export declare class QualityWatch {
     private scope;
     private readonly produced;
     private readonly stalls;
+    private readonly shownAgain;
     tick(report: StatsLike, scope: QualityScope, at?: number): void;
     reading(health?: QualityHealth): QualityReading | undefined;
 }

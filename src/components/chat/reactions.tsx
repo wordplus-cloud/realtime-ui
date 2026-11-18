@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import Btn from "../../inc/helpers/btn.tsx";
 import { _x } from "../../inc/globals.ts";
 import { isMobile } from "../../inc/functions/browser-info.ts";
+import Tooltip from "../../primitives/tooltip.tsx";
 import { type ClampedPosition, clampToViewport, liveAnchorRect, viewportSize } from "../../primitives/viewport.ts";
 
 // Reactions, Better Messages' (its message-reactions.tsx): the pill row under a message and the picker, a small round
@@ -53,22 +54,32 @@ export interface ReactionPillProps {
     /** How many picked it: shown from two up. */
     count: number;
     mine?: boolean;
+    /**
+     * Who reacted, in words, as a screen reader says the pill and its tooltip shows it ("Tom reacted with a thumbs
+     * up"): in place of the emoji and the count, which a reader names by the emoji's own name or not at all. A pill
+     * that only shows is then an image of it, never a control.
+     */
+    label?: string;
     /** Toggles the user's own, or opens who reacted: none for a pill that only shows. */
     onClick?: () => void;
 }
 
-export function ReactionPill( { emoji, count, mine, onClick }: ReactionPillProps ) {
-    return (
+export function ReactionPill( { emoji, count, mine, label, onClick }: ReactionPillProps ) {
+    const still = !! label && ! onClick;
+    const pill = (
         <Btn
             className="wplus-reaction-pill"
             data-reacted-by-me={ mine ? 1 : undefined }
             data-static={ onClick ? undefined : 1 }
+            role={ still ? "img" : undefined }
+            tabIndex={ still ? -1 : undefined }
             onClick={ onClick }
         >
-            <span className="wplus-reaction-pill__emoji">{ emoji }</span>
-            { count > 1 && <span className="wplus-reaction-pill__count">{ count }</span> }
+            <span className="wplus-reaction-pill__emoji" aria-hidden={ label ? true : undefined }>{ emoji }</span>
+            { count > 1 && <span className="wplus-reaction-pill__count" aria-hidden={ label ? true : undefined }>{ count }</span> }
         </Btn>
     );
+    return label ? <Tooltip label={ label }>{ pill }</Tooltip> : pill;
 }
 
 let iconHeight = 32;
@@ -104,15 +115,34 @@ export interface ReactionPickerProps {
     onPick: ( key: string ) => void;
     /** How an emoji is drawn, at a size: the emoji as text by default. */
     renderEmoji?: ( key: string, size: number ) => ReactNode;
+    /** The trigger's name, and the strip's: "React" by default. */
+    label?: string;
+    /**
+     * Each emoji of the set in words ("Thumbs up"), its name: none by default. Never a tooltip, which would cover the
+     * emoji next to it in the strip.
+     */
+    labelOf?: ( key: string ) => string;
+}
+
+/**
+ * An emoji as text, drawn as an emoji: a lone symbol older than the emoji blocks (the heart, U+2764) is text by default,
+ * a black glyph, until U+FE0F asks for its colour, which a key leaves out (encodeReaction). The emoji blocks from
+ * U+1F000 are colour already and stay as they are.
+ */
+export function emojiText( key: string ): string {
+    const text = decodeReaction( key );
+    const points = [ ...text ];
+    return points.length === 1 && points[ 0 ].codePointAt( 0 )! < 0x1f000 ? text + "️" : text;
 }
 
 const textEmoji = ( key: string, size: number ) => (
-    <span className="wplus-reaction-emoji" style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: size, height: size, fontSize: Math.round( size * 0.85 ), lineHeight: 1 }}>{ decodeReaction( key ) }</span>
+    <span className="wplus-reaction-emoji" style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: size, height: size, fontSize: Math.round( size * 0.85 ), lineHeight: 1 }}>{ emojiText( key ) }</span>
 );
 
 /** The reaction picker at a message's corner: its trigger, and the strip of the set it opens. */
-export function ReactionPicker( { keys, mine, onPick, renderEmoji = textEmoji }: ReactionPickerProps ) {
+export function ReactionPicker( { keys, mine, onPick, renderEmoji = textEmoji, label, labelOf }: ReactionPickerProps ) {
     const touch = isMobile();
+    const name = label || _x( "React", "Reactions selector trigger", "bp-better-messages" );
 
     const [ isOpen, setIsOpen ] = useState( false );
     // Kept mounted through the closing transition: unmounting on the state flip would cut the fade off at its first
@@ -134,6 +164,16 @@ export function ReactionPicker( { keys, mine, onPick, renderEmoji = textEmoji }:
     // different emoji under a pointer that had not moved.
     const holdRef = useRef( false );
 
+    // Opened from the keyboard (Enter or Space on the trigger, which Btn passes on as a click): focus goes into the
+    // strip once it is placed, the arrows walk it, and a pick or Escape gives focus back to the trigger. Hover alone
+    // opened it on a computer, so the set could not be reached without a pointer.
+    const keysRef = useRef( false );
+    const focusTrigger = () => requestAnimationFrame( () => triggerRef.current?.focus() );
+    // Whether the click being handled is a key's: set by the key before Btn clicks for it, read once by the click.
+    const pressRef = useRef( false );
+    const markPress = ( e: React.KeyboardEvent ) => { pressRef.current = e.key === "Enter" || e.key === " " || e.key === "Spacebar"; };
+    const takePress = () => { const pressed = pressRef.current; pressRef.current = false; return pressed; };
+
     const cancelClose = () => {
         if ( ! closeTimer.current ) return;
         clearTimeout( closeTimer.current );
@@ -145,7 +185,7 @@ export function ReactionPicker( { keys, mine, onPick, renderEmoji = textEmoji }:
         document.removeEventListener( "pointermove", unblockRef.current, true );
         unblockRef.current = null;
     };
-    const openStrip = () => { cancelClose(); holdRef.current = false; setMounted( true ); setIsOpen( true ); };
+    const openStrip = ( fromKeys = false ) => { cancelClose(); holdRef.current = false; keysRef.current = fromKeys; setMounted( true ); setIsOpen( true ); };
     const closeStrip = () => { cancelClose(); setIsOpen( false ); };
     const scheduleClose = () => {
         cancelClose();
@@ -230,6 +270,27 @@ export function ReactionPicker( { keys, mine, onPick, renderEmoji = textEmoji }:
         return () => cancelAnimationFrame( raf );
     }, [ isOpen, !! pos ] );
 
+    // Opened from the keyboard: focus on the user's own reaction, else the first of the set, once the strip is placed
+    // and so can take it.
+    useEffect( () => {
+        if ( ! isOpen || ! pos || ! keysRef.current ) return;
+        const items = stripItems();
+        ( items.find( ( el ) => el.getAttribute( "data-mine" ) === "1" ) ?? items[ 0 ] )?.focus();
+    }, [ isOpen, !! pos ] );
+
+    const stripItems = () => [ ...( anchorRef.current?.querySelectorAll<HTMLElement>( ".wplus-reaction-strip__item" ) ?? [] ) ];
+
+    // The arrows walk the strip as a menu's do, round from either end, and Home and End go to its ends.
+    const walk = ( e: React.KeyboardEvent ) => {
+        const items = stripItems();
+        const at = items.indexOf( e.target as HTMLElement );
+        if ( at < 0 ) return;
+        const to = { ArrowRight: at + 1, ArrowDown: at + 1, ArrowLeft: at - 1, ArrowUp: at - 1, Home: 0, End: items.length - 1 }[ e.key ];
+        if ( to === undefined ) return;
+        e.preventDefault();
+        items[ ( to + items.length ) % items.length ]?.focus();
+    };
+
     // Outside press and Escape, in the capture phase, so a handler that stops propagation can't strand it open.
     useEffect( () => {
         if ( ! isOpen ) return;
@@ -239,7 +300,11 @@ export function ReactionPicker( { keys, mine, onPick, renderEmoji = textEmoji }:
             if ( anchorRef.current?.contains( t ) || triggerRef.current?.contains( t ) ) return;
             dismissStrip();
         };
-        const escape = ( e: KeyboardEvent ) => { if ( e.key === "Escape" ) dismissStrip(); };
+        const escape = ( e: KeyboardEvent ) => {
+            if ( e.key !== "Escape" ) return;
+            dismissStrip();
+            if ( keysRef.current ) focusTrigger();
+        };
         document.addEventListener( "pointerdown", outside, true );
         document.addEventListener( "keydown", escape, true );
         return () => {
@@ -261,11 +326,17 @@ export function ReactionPicker( { keys, mine, onPick, renderEmoji = textEmoji }:
             <Btn
                 className={ "wplus-reaction-trigger" + ( isOpen ? " wplus-hidden" : "" ) }
                 ref={ triggerRef }
-                aria-label={ _x( "React", "Reactions selector trigger", "bp-better-messages" ) }
+                aria-label={ name }
+                aria-haspopup="menu"
                 aria-expanded={ isOpen }
                 onMouseEnter={ touch ? undefined : hoverOpen }
                 onMouseLeave={ touch ? undefined : scheduleClose }
-                onClick={ touch ? ( () => { isOpen ? closeStrip() : openStrip(); } ) : undefined }
+                // A tap toggles it on a phone. On a computer hover opens it, and Enter or Space opens it for the
+                // keyboard.
+                onKeyDown={ markPress }
+                onClick={ touch
+                    ? ( () => { takePress(); isOpen ? closeStrip() : openStrip(); } )
+                    : ( () => { const pressed = takePress(); if ( ! isOpen ) openStrip( pressed ); } ) }
             >
                 { renderEmoji( faceKey, 14 ) }
             </Btn>
@@ -277,17 +348,30 @@ export function ReactionPicker( { keys, mine, onPick, renderEmoji = textEmoji }:
                     style={ { left: pos?.left ?? 0, top: pos?.top ?? 0, visibility: pos ? undefined : "hidden" } }
                     onMouseEnter={ touch ? undefined : cancelClose }
                     onMouseLeave={ touch ? undefined : scheduleClose }
+                    // Focus that leaves the strip for anything but the trigger closes what the keyboard opened.
+                    onBlur={ ( e ) => {
+                        const to = e.relatedTarget as Node | null;
+                        if ( keysRef.current && to && ! anchorRef.current?.contains( to ) && to !== triggerRef.current ) closeStrip();
+                    } }
                 >
-                    <div className="wplus-reaction-strip" role="menu">
+                    <div className="wplus-reaction-strip" role="menu" aria-label={ name } onKeyDownCapture={ markPress } onKeyDown={ walk }>
                         { keys.map( key => (
                             <Btn
                                 key={ "reaction-" + key }
                                 role="menuitem"
                                 className="wplus-reaction-strip__item"
+                                aria-label={ labelOf?.( key ) || undefined }
                                 data-mine={ key === mine ? 1 : undefined }
-                                // A finger never leaves the strip, so a pick closes it on a phone; a pointer walks
-                                // off on its own. Pinned first: the pill row the pick adds resizes the bubble.
-                                onClick={ () => { pinThroughThePick(); onPick( key ); if ( touch ) closeStrip(); } }
+                                // A finger never leaves the strip, so a pick closes it on a phone; a pointer
+                                // walks off on its own, and the keyboard goes back to the trigger. Pinned first:
+                                // the pill row the pick adds resizes the bubble.
+                                onClick={ () => {
+                                    const pressed = takePress();
+                                    pinThroughThePick();
+                                    onPick( key );
+                                    if ( touch || pressed ) closeStrip();
+                                    if ( pressed ) focusTrigger();
+                                } }
                             >
                                 { renderEmoji( key, 20 ) }
                             </Btn>

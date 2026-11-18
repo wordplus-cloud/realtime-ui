@@ -5,6 +5,7 @@
  * who rang calls it off.
  */
 import { Listeners } from '../channel.js';
+import { RealtimeError } from '../errors.js';
 const STATES = ['ringing', 'answered', 'rejected', 'busy', 'no_answer', 'cancelled'];
 export const inviteState = (value) => (STATES.includes(value) ? value : null);
 /** One ring into a group call, as everyone in it hears of it. Event: `state` (InviteState), at each change. */
@@ -31,7 +32,7 @@ export class Invite {
         if (this.state !== 'ringing')
             return Promise.resolve();
         if (!this.canceller)
-            return Promise.reject(Object.assign(new Error('forbidden'), { code: 'forbidden' }));
+            return Promise.reject(new RealtimeError('forbidden'));
         return this.canceller();
     }
     /** @internal The page that rang can call it off. */

@@ -121,7 +121,8 @@ describe( 'the group calls', () => {
         await act( async () => { fireEvent.click( container.querySelector( '[data-key="user_43"] .wplus-manage-participant' )! ); } );
         const person = container.querySelector( '.wplus-call-moderation-person' )!;
         expect( person.querySelector( '.wplus-call-moderation-title' )?.textContent ).toBe( 'User user_43' );
-        expect( [ ...person.querySelectorAll( '.wplus-call-moderation-label' ) ].map( ( l ) => l.textContent ) ).toEqual( [ 'Mute Microphone', 'Demote to Viewer', 'Remove from Call' ] );
+        // Their microphone off: the mute keeps it off.
+        expect( [ ...person.querySelectorAll( '.wplus-call-moderation-label' ) ].map( ( l ) => l.textContent ) ).toEqual( [ 'Keep Microphone Off', 'Demote to Viewer', 'Remove from Call' ] );
         expect( container.querySelector( '[data-key="user_43"] .wplus-moderating' ) ).not.toBeNull();
         await act( async () => { fireEvent.click( person.querySelector( '.wplus-remove-participant' )! ); } );
 
@@ -131,6 +132,30 @@ describe( 'the group calls', () => {
             'moderate {"act":"lock_room","type":"video"}',
             'moderate {"act":"remove_participant","identity":"user_43","type":"audio"}',
         ] );
+    } );
+
+    it( 'offer Remove and Ban from Calls where the call bans, the menu giving way to the app\'s own dialog', async () => {
+        const banned: string[] = [];
+        const call = fakeCall( { participants: three(), adminMode: true, banFromCalls: ( person ) => { banned.push( person.identity ); } } );
+        const { container } = wrapped( call, 'group-audio' );
+        await act( async () => {} );
+
+        await act( async () => { fireEvent.click( container.querySelector( '[data-key="user_43"] .wplus-manage-participant' )! ); } );
+        const person = container.querySelector( '.wplus-call-moderation-person' )!;
+        expect( [ ...person.querySelectorAll( '.wplus-call-moderation-label' ) ].map( ( l ) => l.textContent ) ).toEqual( [ 'Keep Microphone Off', 'Demote to Viewer', 'Remove from Call', 'Remove and Ban from Calls…' ] );
+        await act( async () => { fireEvent.click( person.querySelector( '.wplus-ban-participant' )! ); } );
+
+        expect( banned ).toEqual( [ 'user_43' ] );
+        expect( container.querySelector( '.wplus-call-moderation-person' ) ).toBeNull();
+        expect( call.calls.filter( ( c ) => c.startsWith( 'moderate' ) ) ).toEqual( [] );
+
+        // A call that bans no one offers Remove alone.
+        cleanup();
+        const plain = wrapped( fakeCall( { participants: three(), adminMode: true } ), 'group-audio' );
+        await act( async () => {} );
+        await act( async () => { fireEvent.click( plain.container.querySelector( '[data-key="user_43"] .wplus-manage-participant' )! ); } );
+        expect( plain.container.querySelector( '.wplus-remove-participant' ) ).not.toBeNull();
+        expect( plain.container.querySelector( '.wplus-ban-participant' ) ).toBeNull();
     } );
 
     it( 'say a microphone a moderator muted: locked on the tile and on the muted person\'s own dock', async () => {
@@ -170,11 +195,46 @@ describe( 'the group calls', () => {
         };
         const blocked = three();
         blocked.set( 'user_43', participant( 'user_43', { canPublish: false } ) );
+        const sending = three();
+        sending.set( 'user_43', participant( 'user_43', { audio: fakeTrack(), video: fakeTrack() } ) );
 
-        expect( labels( three(), 'video' ) ).toEqual( [ 'Pin Participant', 'Mute Microphone', 'Stop Camera & Mic', 'Remove from Call' ] );
-        expect( labels( blocked, 'video' ) ).toEqual( [ 'Pin Participant', 'Allow Camera & Mic', 'Remove from Call' ] );
+        expect( labels( sending, 'video' ) ).toEqual( [ 'Spotlight for Everyone', 'Pin for Me', 'Mute Microphone', 'Stop Camera and Microphone', 'Remove from Call' ] );
+        expect( labels( blocked, 'video' ) ).toEqual( [ 'Spotlight for Everyone', 'Pin for Me', 'Allow Camera and Microphone', 'Remove from Call' ] );
         // An audio call has no camera to name.
-        expect( labels( three(), 'audio' ) ).toEqual( [ 'Mute Microphone', 'Demote to Viewer', 'Remove from Call' ] );
+        expect( labels( sending, 'audio' ) ).toEqual( [ 'Mute Microphone', 'Demote to Viewer', 'Remove from Call' ] );
+    } );
+
+    // Asked on 2026-11-02: "Mute Microphone" and "Stop Camera & Mic" "shown even if user does not have them enabled and
+    // this can create confusion". Off already, each still holds it off, and says that.
+    it( 'say what a mute or a stop does to someone who has it off already: it keeps it off until allowed', () => {
+        const menu = ( participants: Map<string, CallParticipant>, type: 'audio' | 'video' ) => {
+            const { container, unmount } = render( <CallContext.Provider value={ fakeCall( { participants, adminMode: true } ) }>
+                <PersonPanel stage={ createRef<HTMLElement>() } tileKey="user_43" type={ type } close={ () => {} } />
+            </CallContext.Provider> );
+            const rows = [ ...container.querySelectorAll( '.wplus-mute-mic, .wplus-demote-participant' ) ].map( ( row ) => [
+                row.getAttribute( 'aria-label' ), row.querySelector( '.wplus-call-moderation-note' )?.textContent ?? null,
+            ] );
+            unmount();
+            return rows;
+        };
+        const sharing = three();
+        sharing.set( 'user_43', participant( 'user_43', { screen: fakeTrack() } ) );
+
+        // Nothing on: both keep it off, each saying how long.
+        expect( menu( three(), 'video' ) ).toEqual( [
+            [ 'Keep Microphone Off', 'They cannot turn it on until you allow it.' ],
+            [ 'Keep Camera and Microphone Off', 'They cannot turn them on until you allow them.' ],
+        ] );
+        // Only their screen: the stop takes something, the mute nothing.
+        expect( menu( sharing, 'video' ) ).toEqual( [
+            [ 'Keep Microphone Off', 'They cannot turn it on until you allow it.' ],
+            [ 'Stop Camera and Microphone', null ],
+        ] );
+        // An audio call: viewer and speaker, whatever is on.
+        expect( menu( three(), 'audio' ) ).toEqual( [
+            [ 'Keep Microphone Off', 'They cannot turn it on until you allow it.' ],
+            [ 'Demote to Viewer', null ],
+        ] );
     } );
 
     it( 'spin a moderator\'s control while its request is out, and turn a second click away', async () => {
@@ -269,6 +329,43 @@ describe( 'the group calls', () => {
 
         expect( container.querySelector( '[data-key="user_43"] .wplus-call-reconnecting' )?.textContent ).toBe( 'Reconnecting...' );
         expect( container.querySelector( '[data-key="user_34"] .wplus-call-reconnecting' ) ).toBeNull();
+    } );
+
+    it( 'shape a screen shared in an audio call as the share: at the size it was published at until it plays, then as it plays', async () => {
+        // The stylesheet sizes the stage's card from --wplus-screen-ratio, so the card is the share's shape from the start.
+        const participants = three();
+        participants.set( 'user_34', participant( 'user_34', { screen: fakeTrack(), screenPub: { dimensions: { width: 1024, height: 768 } } as never } ) );
+        const { container } = wrapped( fakeCall( { participants } ), 'group-audio' );
+        await act( async () => {} );
+
+        const stage = container.querySelector<HTMLElement>( '[data-key="user_34"].wplus-group-call-input-audio-screen' )!;
+        expect( stage.style.getPropertyValue( '--wplus-screen-ratio' ) ).toBe( String( 1024 / 768 ) );
+
+        // The share made a phone's page as it runs: what plays decides.
+        const video = stage.querySelector( 'video' )!;
+        Object.defineProperty( video, 'videoWidth', { value: 1080, configurable: true } );
+        Object.defineProperty( video, 'videoHeight', { value: 2340, configurable: true } );
+        await act( async () => { video.dispatchEvent( new Event( 'resize' ) ); } );
+        expect( stage.style.getPropertyValue( '--wplus-screen-ratio' ) ).toBe( String( 1080 / 2340 ) );
+    } );
+
+    it( 'mark the audio roster as sharing while someone shares a screen, for the stage to end where its card does', async () => {
+        // The stylesheet reads the roster's width as a container while it is marked: the stage is no taller than its card.
+        const participants = three();
+        const { container, rerender } = wrapped( fakeCall( { participants } ), 'group-audio' );
+        await act( async () => {} );
+        const grid = () => container.querySelector( '.wplus-group-call-audios-grid' )!;
+        expect( grid().classList.contains( 'wplus-group-call-audios-sharing' ) ).toBe( false );
+
+        const sharing = new Map( participants );
+        sharing.set( 'user_43', participant( 'user_43', { screen: fakeTrack(), screenPub: { dimensions: { width: 1920, height: 1080 } } as never } ) );
+        rerender( <CallScreen call={ { ...fakeCall( { participants: sharing } ), wrapper: createRef<HTMLDivElement>() as never } } layout="group-audio" /> );
+        await act( async () => {} );
+        expect( grid().classList.contains( 'wplus-group-call-audios-sharing' ) ).toBe( true );
+
+        rerender( <CallScreen call={ { ...fakeCall( { participants } ), wrapper: createRef<HTMLDivElement>() as never } } layout="group-audio" /> );
+        await act( async () => {} );
+        expect( grid().classList.contains( 'wplus-group-call-audios-sharing' ) ).toBe( false );
     } );
 
     it( 'show a moderation error as the host shows errors', async () => {
@@ -550,8 +647,64 @@ describe( 'the camera checked before it goes out', () => {
     }
 } );
 
+// A host's enableMic and enableCamera wait for the effect to start before the call has the track, the first time after a
+// page load seconds of its files: a control that kept its glyph that long read as a press that did nothing.
+describe( 'the camera and the microphone turning on', () => {
+    const opening = () => {
+        let done!: () => void;
+        const promise = new Promise<void>( ( resolve ) => { done = resolve; } );
+        return { promise, done };
+    };
+    const me = () => new Map( [ [ 'me', participant( 'me' ) ] ] );
+    const devices = [
+        { name: 'microphone', layouts: [ 'private', 'group-video', 'group-audio' ], enable: 'enableMic', on: '.wplus-enable-mic', off: '.wplus-disable-mic', track: 'myMicrophoneTrack' },
+        { name: 'camera', layouts: [ 'private', 'group-video' ], enable: 'enableCamera', on: '.wplus-enable-video', off: '.wplus-disable-video', track: 'myCameraTrack' },
+    ] as const;
+
+    for ( const device of devices ) for ( const layout of device.layouts ) {
+        it( `spins the ${ layout } call's ${ device.name } from the press until the call has it, a second press handed on`, async () => {
+            const wait = opening();
+            const pressed: string[] = [];
+            const call = fakeCall( { participants: me(), [ device.enable ]: () => { pressed.push( device.enable ); return wait.promise; } } );
+            const screen = ( over: Record<string, unknown> = {} ) =>
+                <CallScreen call={ { ...call, ...over, wrapper: createRef<HTMLDivElement>() as never } } layout={ layout } />;
+            const { container, rerender } = render( screen() );
+
+            const control = () => container.querySelector( device.on )!;
+            expect( control().getAttribute( 'data-busy' ) ).toBeNull();
+            await act( async () => { fireEvent.click( control() ); } );
+            expect( control().getAttribute( 'data-busy' ) ).toBe( '1' );
+            expect( control().querySelector( '.wplus-svg-animate' ) ).not.toBeNull();
+
+            // The host turns a press away while one is out, as it does: the spin holds.
+            await act( async () => { fireEvent.click( control() ); } );
+            expect( pressed ).toEqual( [ device.enable, device.enable ] );
+            expect( control().getAttribute( 'data-busy' ) ).toBe( '1' );
+
+            // On before its promise settles (the SDK's calls still send it): the control that turns it off, its own.
+            rerender( screen( { [ device.track ]: fakeTrack() } ) );
+            expect( container.querySelector( device.on ) ).toBeNull();
+            expect( container.querySelector( `${ device.off } .wplus-svg-animate` ) ).toBeNull();
+            await act( async () => { wait.done(); } );
+            expect( container.querySelector( `${ device.off } .wplus-svg-animate` ) ).toBeNull();
+        } );
+
+        it( `stops spinning the ${ layout } call's ${ device.name } when it does not turn on, the browser refusing it`, async () => {
+            const wait = opening();
+            const call = fakeCall( { participants: me(), [ device.enable ]: () => wait.promise } );
+            const { container } = render( <CallScreen call={ { ...call, wrapper: createRef<HTMLDivElement>() as never } } layout={ layout } /> );
+
+            await act( async () => { fireEvent.click( container.querySelector( device.on )! ); } );
+            expect( container.querySelector( device.on )?.getAttribute( 'data-busy' ) ).toBe( '1' );
+            await act( async () => { wait.done(); } );
+            expect( container.querySelector( device.on )?.getAttribute( 'data-busy' ) ).toBeNull();
+            expect( container.querySelector( `${ device.on } .wplus-svg-animate` ) ).toBeNull();
+        } );
+    }
+} );
+
 describe( 'the private call\'s controls on a touch', () => {
-    it( 'take no press from the tap that brings them back, and their own taps as before (Better Messages ticket 10500 sweep)', () => {
+    it( 'take no press from the tap that brings them back, and their own taps as before (from a support report)', () => {
         const call = fakeCall();
         const { container } = wrapped( call, 'private' );
         const end = container.querySelector( '.wplus-cancel' )!;

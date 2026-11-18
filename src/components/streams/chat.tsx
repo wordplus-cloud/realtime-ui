@@ -46,7 +46,7 @@ function withEmoji( text : string, emoji : SharedEmoji | null, key : string ) : 
 
     return emoji.split( text ).map( ( part, i ) => typeof part === 'string'
         ? part
-        : <img key={ key + '-' + i } className="estream-emoji-image" src={ part.src } alt={ part.emoji } draggable={ false } /> );
+        : <img key={ key + '-' + i } className="wplus-live-stream-emoji-image" src={ part.src } alt={ part.emoji } draggable={ false } /> );
 }
 
 // The site's emoji set, once a text among these has an emoji and the set's index has loaded; null meanwhile, and
@@ -119,14 +119,14 @@ export function mentions( text : string, name : string | undefined ) : boolean {
 // Someone's face: their avatar, or without one, their initials on a colour of their own.
 function Avatar( props : { who : { id : string, name : string, avatar : string | null } } ){
     const from = props.who;
-    if( from.avatar ) return <img className="estream-message__avatar" src={ from.avatar } alt="" loading="lazy" />;
+    if( from.avatar ) return <img className="wplus-live-stream-message__avatar" src={ from.avatar } alt="" loading="lazy" />;
 
     let hash = 0;
     for( const c of from.id ) hash = ( hash * 31 + c.charCodeAt( 0 ) ) | 0;
     const letters = from.name.split( /\s+/ ).filter( Boolean ).slice( 0, 2 ).map( ( w ) => w[0]?.toUpperCase() ).join( '' );
 
     return (
-        <span className="estream-message__avatar estream-message__avatar--initials" style={ { background: 'hsl(' + ( Math.abs( hash ) % 360 ) + ' 45% 46%)' } } aria-hidden="true">
+        <span className="wplus-live-stream-message__avatar wplus-live-stream-message__avatar--initials" style={ { background: 'hsl(' + ( Math.abs( hash ) % 360 ) + ' 45% 46%)' } } aria-hidden="true">
             { letters || '?' }
         </span>
     );
@@ -145,8 +145,8 @@ function time( at : number ) : { short : string, full : string } {
 }
 
 function RoleBadge( props : { role : ChatMessage['from']['role'] } ){
-    if( props.role === 'host' ) return <span className="estream-role estream-role--host">{ _x( 'Host', 'a role in chat', 'wordplus-live-stream' ) }</span>;
-    if( props.role === 'guest' ) return <span className="estream-role estream-role--guest">{ _x( 'Guest', 'a role in chat', 'wordplus-live-stream' ) }</span>;
+    if( props.role === 'host' ) return <span className="wplus-live-stream-role wplus-live-stream-role--host">{ _x( 'Host', 'a role in chat', 'wordplus-live-stream' ) }</span>;
+    if( props.role === 'guest' ) return <span className="wplus-live-stream-role wplus-live-stream-role--guest">{ _x( 'Guest', 'a role in chat', 'wordplus-live-stream' ) }</span>;
     return null;
 }
 
@@ -158,16 +158,16 @@ function Message( props : { message : ChatMessage, canModerate : boolean, self :
     const canBan = ! props.self && message.from.role !== 'host';
 
     return (
-        <li className={ 'estream-message' + ( message.from.role === 'host' ? ' estream-message--host' : '' ) + ( props.mentioned ? ' estream-message--mention' : '' ) }>
+        <li className={ 'wplus-live-stream-message' + ( message.from.role === 'host' ? ' wplus-live-stream-message--host' : '' ) + ( props.mentioned ? ' wplus-live-stream-message--mention' : '' ) }>
             <Avatar who={ message.from } />
-            <div className="estream-message__body">
-                <span className="estream-message__name">{ message.from.name }</span>
+            <div className="wplus-live-stream-message__body">
+                <span className="wplus-live-stream-message__name">{ message.from.name }</span>
                 <RoleBadge role={ message.from.role } />
-                <time className="estream-message__time" dateTime={ new Date( message.at ).toISOString() } data-estream-tip={ when.full }>{ when.short }</time>
-                <span className="estream-message__text">{ linkify( message.text, props.emoji ) }</span>
+                <time className="wplus-live-stream-message__time" dateTime={ new Date( message.at ).toISOString() } data-wplus-live-stream-tip={ when.full }>{ when.short }</time>
+                <span className="wplus-live-stream-message__text">{ linkify( message.text, props.emoji ) }</span>
             </div>
             { props.canModerate && (
-                <MenuButton icon="more" label={ sprintf( _x( 'Moderate the message of %s', 'a name in chat', 'wordplus-live-stream' ), message.from.name ) } className="estream-message__actions" placement="down">
+                <MenuButton icon="more" label={ sprintf( _x( 'Moderate the message of %s', 'a name in chat', 'wordplus-live-stream' ), message.from.name ) } className="wplus-live-stream-message__actions" placement="down">
                     { ( close ) => (
                         <>
                             <MenuItem icon="pin" onSelect={ () => { close(); void ( props.pinned ? client.unpin() : client.pin( message.id ) ); } }>
@@ -276,20 +276,20 @@ function People(){
     const visitors = Math.max( 0, watching - signedIn );
 
     return (
-        <div className="estream-people">
-            <h4 className="estream-people__heading">{ __( 'Who is here', 'wordplus-live-stream' ) }</h4>
+        <div className="wplus-live-stream-people">
+            <h4 className="wplus-live-stream-people__heading">{ __( 'Who is here', 'wordplus-live-stream' ) }</h4>
             { people === null ? (
-                <p className="estream-chat__note">{ failed ? __( 'Who is here cannot be shown right now', 'wordplus-live-stream' ) : __( 'Loading…', 'wordplus-live-stream' ) }</p>
+                <p className="wplus-live-stream-chat__note">{ failed ? __( 'Who is here cannot be shown right now', 'wordplus-live-stream' ) : __( 'Loading…', 'wordplus-live-stream' ) }</p>
             ) : (
-                <ul className="estream-people__list" aria-label={ __( 'Who is here', 'wordplus-live-stream' ) }>
+                <ul className="wplus-live-stream-people__list" aria-label={ __( 'Who is here', 'wordplus-live-stream' ) }>
                     { people.map( ( person ) => (
-                        <li key={ person.identity } className="estream-person">
+                        <li key={ person.identity } className="wplus-live-stream-person">
                             <Avatar who={ { id: person.identity, name: person.name, avatar: person.avatar } } />
-                            <span className="estream-person__name">{ person.name }</span>
+                            <span className="wplus-live-stream-person__name">{ person.name }</span>
                             <RoleBadge role={ person.role } />
-                            { person.timeoutUntil ? <span className="estream-person__muted" data-estream-tip={ __( 'Muted in the chat', 'wordplus-live-stream' ) }><Icon name="clock" /></span> : null }
+                            { person.timeoutUntil ? <span className="wplus-live-stream-person__muted" data-wplus-live-stream-tip={ __( 'Muted in the chat', 'wordplus-live-stream' ) }><Icon name="clock" /></span> : null }
                             { mod && person.identity !== you?.identity && person.role !== 'host' && (
-                                <MenuButton icon="more" label={ sprintf( _x( 'Moderate %s', 'a name in chat', 'wordplus-live-stream' ), person.name ) } className="estream-person__actions" placement="down" align="end">
+                                <MenuButton icon="more" label={ sprintf( _x( 'Moderate %s', 'a name in chat', 'wordplus-live-stream' ), person.name ) } className="wplus-live-stream-person__actions" placement="down" align="end">
                                     { ( close ) => (
                                         <ModerateItems who={ { id: person.identity, name: person.name, avatar: person.avatar } } mutedUntil={ person.timeoutUntil ?? null } close={ close } confirm={ confirm } done={ () => void load() } />
                                     ) }
@@ -300,7 +300,7 @@ function People(){
                 </ul>
             ) }
             { people !== null && visitors > 0 && (
-                <p className="estream-people__more">
+                <p className="wplus-live-stream-people__more">
                     { people.length > 0
                         ? sprintf( _n( 'and %d visitor', 'and %d visitors', visitors, 'wordplus-live-stream' ), visitors )
                         : sprintf( _n( '%d visitor', '%d visitors', visitors, 'wordplus-live-stream' ), visitors ) }
@@ -308,13 +308,13 @@ function People(){
             ) }
             { mod && banned.length > 0 && (
                 <>
-                    <h4 className="estream-people__heading">{ __( 'Banned', 'wordplus-live-stream' ) }</h4>
-                    <ul className="estream-people__list" aria-label={ __( 'Banned', 'wordplus-live-stream' ) }>
+                    <h4 className="wplus-live-stream-people__heading">{ __( 'Banned', 'wordplus-live-stream' ) }</h4>
+                    <ul className="wplus-live-stream-people__list" aria-label={ __( 'Banned', 'wordplus-live-stream' ) }>
                         { banned.map( ( b ) => (
-                            <li key={ b.identity } className="estream-person estream-person--banned">
+                            <li key={ b.identity } className="wplus-live-stream-person wplus-live-stream-person--banned">
                                 <Avatar who={ { id: b.identity, name: b.name || '?', avatar: b.avatar } } />
-                                <span className="estream-person__name">{ b.name || __( 'Someone', 'wordplus-live-stream' ) }</span>
-                                <button type="button" className="estream-button estream-button--small" onClick={ () => void client.unban( b.identity ).then( () => load() ) }>
+                                <span className="wplus-live-stream-person__name">{ b.name || __( 'Someone', 'wordplus-live-stream' ) }</span>
+                                <button type="button" className="wplus-live-stream-button wplus-live-stream-button--small" onClick={ () => void client.unban( b.identity ).then( () => load() ) }>
                                     { __( 'Let back', 'wordplus-live-stream' ) }
                                 </button>
                             </li>
@@ -361,16 +361,16 @@ function EmojiPicker( props : { onPick : ( emoji : string ) => void } ){
 
 // Whether the chat is dark where the button is: the dark theme, or the visitor's system's with `auto`.
 function darkAt( el : HTMLElement ) : boolean {
-    const theme = el.closest( '.estream-theme' );
-    if( theme?.classList.contains( 'estream-theme--dark' ) ) return true;
-    return Boolean( theme?.classList.contains( 'estream-theme--auto' ) && globalThis.matchMedia?.( '(prefers-color-scheme: dark)' ).matches );
+    const theme = el.closest( '.wplus-live-stream-theme' );
+    if( theme?.classList.contains( 'wplus-live-stream-theme--dark' ) ) return true;
+    return Boolean( theme?.classList.contains( 'wplus-live-stream-theme--auto' ) && globalThis.matchMedia?.( '(prefers-color-scheme: dark)' ).matches );
 }
 
 // The site's accent where the button is, as the picker takes its colours: `r, g, b`. The theme root's own style
 // holds the site's, where the computed one isn't there (a test's DOM).
 function accentAt( el : HTMLElement ) : string | null {
-    const hex = ( getComputedStyle( el ).getPropertyValue( '--estream-accent' )
-        || el.closest<HTMLElement>( '.estream-theme' )?.style.getPropertyValue( '--estream-accent' ) || '' ).trim();
+    const hex = ( getComputedStyle( el ).getPropertyValue( '--wplus-live-stream-accent' )
+        || el.closest<HTMLElement>( '.wplus-live-stream-theme' )?.style.getPropertyValue( '--wplus-live-stream-accent' ) || '' ).trim();
     return /^#[0-9a-f]{6}$/i.test( hex ) ? [ 1, 3, 5 ].map( ( i ) => parseInt( hex.slice( i, i + 2 ), 16 ) ).join( ', ' ) : null;
 }
 
@@ -425,15 +425,15 @@ function SharedEmojiPicker( props : { pickers : SharedPickers, onPick : ( emoji 
     const label = __( 'Emoji', 'wordplus-live-stream' );
 
     return (
-        <span className="estream-emoji">
+        <span className="wplus-live-stream-emoji">
             <button
                 ref={ button }
                 type="button"
-                className="estream-icon-button"
+                className="wplus-live-stream-icon-button"
                 aria-label={ label }
                 aria-haspopup="dialog"
                 aria-expanded={ open }
-                data-estream-tip={ open ? undefined : label }
+                data-wplus-live-stream-tip={ open ? undefined : label }
                 onClick={ toggle }
             >
                 <Icon name="smile" />
@@ -444,11 +444,11 @@ function SharedEmojiPicker( props : { pickers : SharedPickers, onPick : ( emoji 
 
 function OwnEmojiPicker( props : { onPick : ( emoji : string ) => void } ){
     return (
-        <MenuButton icon="smile" label={ __( 'Emoji', 'wordplus-live-stream' ) } className="estream-emoji" placement="up" align="end">
+        <MenuButton icon="smile" label={ __( 'Emoji', 'wordplus-live-stream' ) } className="wplus-live-stream-emoji" placement="up" align="end">
             { ( close ) => (
-                <div className="estream-emoji__grid">
+                <div className="wplus-live-stream-emoji__grid">
                     { EMOJI.map( ( e ) => (
-                        <button key={ e } type="button" role="menuitem" className="estream-emoji__item" onClick={ () => { props.onPick( e ); close(); } }>{ e }</button>
+                        <button key={ e } type="button" role="menuitem" className="wplus-live-stream-emoji__item" onClick={ () => { props.onPick( e ); close(); } }>{ e }</button>
                     ) ) }
                 </div>
             ) }
@@ -521,7 +521,7 @@ function darkRooms( body : HTMLElement ) : () => void {
 
 // What the stream's own Better Messages room carries wherever Better Messages takes it, a phone's room opened over the
 // whole page outside the stream's parts too, so that the stream draws nothing of its own into it there either.
-export const ROOM_ATTRIBUTE = 'data-estream-room';
+export const ROOM_ATTRIBUTE = 'data-wplus-live-stream-room';
 
 // A Better Messages chat room in the chat's place: Better Messages' own placeholder for it, put in an element React
 // leaves alone. Better Messages' script mounts the room into any placeholder that lands on the page, and takes it down
@@ -550,11 +550,11 @@ export function BetterMessagesRoom( props : { markup : string, home? : boolean }
 
     useEffect( () => {
         const body = box.current?.ownerDocument.body;
-        if( ! fullscreen || ! body || ! box.current?.closest( '.estream-theme--full' ) ) return;
+        if( ! fullscreen || ! body || ! box.current?.closest( '.wplus-live-stream-theme--full' ) ) return;
         return darkRooms( body );
     }, [ fullscreen ] );
 
-    return <div className="estream-bm-room" ref={ box } />;
+    return <div className="wplus-live-stream-bm-room" ref={ box } />;
 }
 
 // The room in the player's full screen, for a stream in parts: the page's own room, moved in as the full screen opens
@@ -578,7 +578,7 @@ export function FullScreenRoom( props : { markup : string } ){
         };
     }, [ page ] );
 
-    return page ? <div className="estream-bm-room" ref={ box } /> : <BetterMessagesRoom markup={ props.markup } />;
+    return page ? <div className="wplus-live-stream-bm-room" ref={ box } /> : <BetterMessagesRoom markup={ props.markup } />;
 }
 
 // The cloud's own chat, kept light: for the moment, never saved.
@@ -705,23 +705,23 @@ function LightChat( props : { loginUrl? : string } ){
     const slowly = sprintf( _nx( 'Slow mode: one message every %d second', 'Slow mode: one message every %d seconds', state.slow, 'how long each waits between messages', 'wordplus-live-stream' ), state.slow );
 
     return (
-        <section className="estream-chat" aria-label={ __( 'Chat', 'wordplus-live-stream' ) }>
-            <header className="estream-chat__header">
-                <h3 className="estream-chat__title">{ __( 'Chat', 'wordplus-live-stream' ) }</h3>
+        <section className="wplus-live-stream-chat" aria-label={ __( 'Chat', 'wordplus-live-stream' ) }>
+            <header className="wplus-live-stream-chat__header">
+                <h3 className="wplus-live-stream-chat__title">{ __( 'Chat', 'wordplus-live-stream' ) }</h3>
                 { state.slow > 0 && (
-                    <span className="estream-chat__slow" tabIndex={ 0 } data-estream-tip={ slowly } aria-description={ slowly }>
+                    <span className="wplus-live-stream-chat__slow" tabIndex={ 0 } data-wplus-live-stream-tip={ slowly } aria-description={ slowly }>
                         <Icon name="clock" />
                         { sprintf( _x( '%ds', 'slow mode\'s wait, in seconds', 'wordplus-live-stream' ), state.slow ) }
                     </span>
                 ) }
-                <span className="estream-chat__spacer" />
+                <span className="wplus-live-stream-chat__spacer" />
                 { you?.people && (
                     <button
                         type="button"
-                        className="estream-icon-button estream-chat__people"
+                        className="wplus-live-stream-icon-button wplus-live-stream-chat__people"
                         aria-pressed={ showPeople }
                         aria-label={ __( 'Who is here', 'wordplus-live-stream' ) }
-                        data-estream-tip={ showPeople ? __( 'Back to the chat', 'wordplus-live-stream' ) : __( 'Who is here', 'wordplus-live-stream' ) }
+                        data-wplus-live-stream-tip={ showPeople ? __( 'Back to the chat', 'wordplus-live-stream' ) : __( 'Who is here', 'wordplus-live-stream' ) }
                         onClick={ () => setShowPeople( ! showPeople ) }
                     >
                         <Icon name="people" />
@@ -731,22 +731,22 @@ function LightChat( props : { loginUrl? : string } ){
             </header>
 
             { state.pinned && (
-                <div className="estream-chat__pinned" role="note" aria-label={ __( 'Pinned message', 'wordplus-live-stream' ) }>
+                <div className="wplus-live-stream-chat__pinned" role="note" aria-label={ __( 'Pinned message', 'wordplus-live-stream' ) }>
                     <Icon name="pin" />
-                    <div className="estream-chat__pinned-body">
-                        <span className="estream-message__name">{ state.pinned.from.name }</span>
+                    <div className="wplus-live-stream-chat__pinned-body">
+                        <span className="wplus-live-stream-message__name">{ state.pinned.from.name }</span>
                         <span>{ linkify( state.pinned.text, emoji ) }</span>
                     </div>
                     { canModerate && (
-                        <button type="button" className="estream-icon-button" aria-label={ __( 'Unpin message', 'wordplus-live-stream' ) } data-estream-tip={ __( 'Unpin message', 'wordplus-live-stream' ) } onClick={ () => void client.unpin() }>
+                        <button type="button" className="wplus-live-stream-icon-button" aria-label={ __( 'Unpin message', 'wordplus-live-stream' ) } data-wplus-live-stream-tip={ __( 'Unpin message', 'wordplus-live-stream' ) } onClick={ () => void client.unpin() }>
                             <Icon name="close" />
                         </button>
                     ) }
                 </div>
             ) }
 
-            { showPeople ? <div className="estream-chat__body"><People /></div> : <div className="estream-chat__body">
-                <ol className="estream-chat__list" ref={ list } aria-live="polite" aria-relevant="additions" onScroll={ ( e ) => {
+            { showPeople ? <div className="wplus-live-stream-chat__body"><People /></div> : <div className="wplus-live-stream-chat__body">
+                <ol className="wplus-live-stream-chat__list" ref={ list } aria-live="polite" aria-relevant="additions" onScroll={ ( e ) => {
                     const el = e.currentTarget;
                     const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < PINNED_PX;
                     pinned.current = atBottom;
@@ -756,10 +756,10 @@ function LightChat( props : { loginUrl? : string } ){
                     }
                 } }>
                     { state.chat.length === 0 && (
-                        <li className="estream-chat__empty">
+                        <li className="wplus-live-stream-chat__empty">
                             <Icon name="chat" />
                             <span>{ __( 'No messages yet', 'wordplus-live-stream' ) }</span>
-                            { canWrite && <span className="estream-chat__empty-sub">{ __( 'Say hello to get things going', 'wordplus-live-stream' ) }</span> }
+                            { canWrite && <span className="wplus-live-stream-chat__empty-sub">{ __( 'Say hello to get things going', 'wordplus-live-stream' ) }</span> }
                         </li>
                     ) }
                     { state.chat.map( ( m ) => (
@@ -776,7 +776,7 @@ function LightChat( props : { loginUrl? : string } ){
                 </ol>
 
                 { unseen > 0 && (
-                    <button type="button" className="estream-chat__unseen" onClick={ toBottom }>
+                    <button type="button" className="wplus-live-stream-chat__unseen" onClick={ toBottom }>
                         <Icon name="arrow-down" />
                         { sprintf( _nx( '%d new message', '%d new messages', unseen, 'messages that came while scrolled up', 'wordplus-live-stream' ), unseen ) }
                     </button>
@@ -784,23 +784,23 @@ function LightChat( props : { loginUrl? : string } ){
             </div> }
 
             { ! state.chatConnected && state.status === 'ready' && ! ended && (
-                <p className="estream-chat__note">{ __( 'Reconnecting to the chat…', 'wordplus-live-stream' ) }</p>
+                <p className="wplus-live-stream-chat__note">{ __( 'Reconnecting to the chat…', 'wordplus-live-stream' ) }</p>
             ) }
-            { error && <p className="estream-chat__note estream-chat__note--error" role="alert">{ error }</p> }
+            { error && <p className="wplus-live-stream-chat__note wplus-live-stream-chat__note--error" role="alert">{ error }</p> }
 
             { canWrite && timedOut ? (
-                <p className="estream-chat__note estream-chat__note--error" role="status">
+                <p className="wplus-live-stream-chat__note wplus-live-stream-chat__note--error" role="status">
                     { sprintf( _x( 'A moderator timed you out. You can write again in %s', 'a time left, as 4:32', 'wordplus-live-stream' ), clock( state.timeoutUntil! - clockNow ) ) }
                 </p>
             ) : canWrite ? (
-                <form className="estream-chat__form" onSubmit={ submit }>
-                    <div className="estream-chat__field">
+                <form className="wplus-live-stream-chat__form" onSubmit={ submit }>
+                    <div className="wplus-live-stream-chat__field">
                         { emojiSet ? (
                             <EmojiField ref={ field } value={ text } onChange={ setText } onSubmit={ () => void send() } placeholder={ placeholder } maxLength={ CHAT_MAX } emoji={ emojiSet } />
                         ) : (
                             <input
                                 ref={ input }
-                                className="estream-input"
+                                className="wplus-live-stream-input"
                                 value={ text }
                                 maxLength={ CHAT_MAX }
                                 placeholder={ placeholder }
@@ -810,30 +810,30 @@ function LightChat( props : { loginUrl? : string } ){
                         ) }
                         { player.appearance.emoji !== false && <EmojiPicker onPick={ insert } /> }
                     </div>
-                    { left <= COUNT_FROM && <span className={ 'estream-chat__left' + ( left <= 10 ? ' estream-chat__left--low' : '' ) } aria-live="polite">{ left }</span> }
+                    { left <= COUNT_FROM && <span className={ 'wplus-live-stream-chat__left' + ( left <= 10 ? ' wplus-live-stream-chat__left--low' : '' ) } aria-live="polite">{ left }</span> }
                     <button
                         type="submit"
-                        className="estream-button estream-button--primary estream-chat__send"
+                        className="wplus-live-stream-button wplus-live-stream-button--primary wplus-live-stream-chat__send"
                         disabled={ ! text.trim() || ! state.chatConnected || waitMs > 0 }
                         aria-label={ __( 'Send', 'wordplus-live-stream' ) }
-                        data-estream-tip={ wait > 0 ? sprintf( _nx( 'You can send again in %d second', 'You can send again in %d seconds', wait, 'slow mode\'s wait', 'wordplus-live-stream' ), wait ) : __( 'Send', 'wordplus-live-stream' ) }
+                        data-wplus-live-stream-tip={ wait > 0 ? sprintf( _nx( 'You can send again in %d second', 'You can send again in %d seconds', wait, 'slow mode\'s wait', 'wordplus-live-stream' ), wait ) : __( 'Send', 'wordplus-live-stream' ) }
                     >
-                        { wait > 0 ? <span className="estream-chat__wait">{ wait }</span> : <Icon name="send" /> }
+                        { wait > 0 ? <span className="wplus-live-stream-chat__wait">{ wait }</span> : <Icon name="send" /> }
                     </button>
                 </form>
             ) : closed && you?.chat === 'write' ? (
-                <p className="estream-chat__note">
+                <p className="wplus-live-stream-chat__note">
                     { ended
                         ? player.texts?.chat_after || __( 'The chat closed when the stream ended', 'wordplus-live-stream' )
                         : player.texts?.chat_before || __( 'The chat opens when the stream goes live', 'wordplus-live-stream' ) }
                 </p>
             ) : you && ! ended ? (
                 anonymous && loginUrl ? (
-                    <p className="estream-chat__note estream-chat__note--action">
-                        <a className="estream-button estream-button--primary" href={ loginUrl }>{ __( 'Log in to chat', 'wordplus-live-stream' ) }</a>
+                    <p className="wplus-live-stream-chat__note wplus-live-stream-chat__note--action">
+                        <a className="wplus-live-stream-button wplus-live-stream-button--primary" href={ loginUrl }>{ __( 'Log in to chat', 'wordplus-live-stream' ) }</a>
                     </p>
                 ) : (
-                    <p className="estream-chat__note">{ __( 'Chat is read-only for you', 'wordplus-live-stream' ) }</p>
+                    <p className="wplus-live-stream-chat__note">{ __( 'Chat is read-only for you', 'wordplus-live-stream' ) }</p>
                 )
             ) : null }
         </section>

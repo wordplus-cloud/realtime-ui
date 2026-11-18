@@ -168,7 +168,7 @@ export function MenuButton( props : {
             // The next item after this one whose name starts with the letter.
             const letter = event.key.toLocaleLowerCase();
             const order = [ ...items.slice( at + 1 ), ...items.slice( 0, at + 1 ) ];
-            const found = order.find( ( item ) => ( item.querySelector( '.estream-menu__label' )?.textContent ?? item.textContent ?? '' ).trim().toLocaleLowerCase().startsWith( letter ) );
+            const found = order.find( ( item ) => ( item.querySelector( '.wplus-live-stream-menu__label' )?.textContent ?? item.textContent ?? '' ).trim().toLocaleLowerCase().startsWith( letter ) );
             next = found ? items.indexOf( found ) : -1;
         }
         if( next < 0 ) return;
@@ -177,16 +177,16 @@ export function MenuButton( props : {
     };
 
     return (
-        <div ref={ box } className={ 'estream-menu' + ( props.className ? ' ' + props.className : '' ) }>
+        <div ref={ box } className={ 'wplus-live-stream-menu' + ( props.className ? ' ' + props.className : '' ) }>
             <button
                 ref={ button }
                 type="button"
-                className={ 'estream-menu__button' + ( props.text ? '' : ' estream-icon-button' ) + ( open ? ' estream-menu__button--open' : '' ) }
+                className={ 'wplus-live-stream-menu__button' + ( props.text ? '' : ' wplus-live-stream-icon-button' ) + ( open ? ' wplus-live-stream-menu__button--open' : '' ) }
                 aria-haspopup="menu"
                 aria-expanded={ open }
                 aria-controls={ open ? id : undefined }
                 aria-label={ props.text ? undefined : props.label }
-                data-estream-tip={ props.text || open ? undefined : props.label }
+                data-wplus-live-stream-tip={ props.text || open ? undefined : props.label }
                 onClick={ () => setOpen( ! open ) }
             >
                 <Icon name={ props.icon } />
@@ -198,7 +198,7 @@ export function MenuButton( props : {
                     id={ id }
                     role="menu"
                     aria-label={ props.label }
-                    className={ 'estream-menu__list estream-menu__list--' + ( props.placement ?? 'up' ) + ' estream-menu__list--' + ( props.align ?? 'end' ) }
+                    className={ 'wplus-live-stream-menu__list wplus-live-stream-menu__list--' + ( props.placement ?? 'up' ) + ' wplus-live-stream-menu__list--' + ( props.align ?? 'end' ) }
                     onKeyDown={ onKeyDown }
                 >
                     { props.children( () => close() ) }
@@ -209,28 +209,28 @@ export function MenuButton( props : {
 }
 
 export function MenuHeading( props : { children : ReactNode } ){
-    return <div className="estream-menu__heading" role="presentation">{ props.children }</div>;
+    return <div className="wplus-live-stream-menu__heading" role="presentation">{ props.children }</div>;
 }
 
 // One of a set of choices, ticked when chosen; `hint` beside its name, `note` under it.
 export function MenuChoice( props : { checked : boolean, onSelect : () => void, children : ReactNode, hint? : string, note? : string } ){
     return (
-        <button type="button" role="menuitemradio" aria-checked={ props.checked } className="estream-menu__item" onClick={ props.onSelect }>
-            <span className="estream-menu__tick">{ props.checked && <Icon name="check" /> }</span>
-            <span className="estream-menu__label">
+        <button type="button" role="menuitemradio" aria-checked={ props.checked } className="wplus-live-stream-menu__item" onClick={ props.onSelect }>
+            <span className="wplus-live-stream-menu__tick">{ props.checked && <Icon name="check" /> }</span>
+            <span className="wplus-live-stream-menu__label">
                 { props.children }
-                { props.note && <span className="estream-menu__note">{ props.note }</span> }
+                { props.note && <span className="wplus-live-stream-menu__note">{ props.note }</span> }
             </span>
-            { props.hint && <span className="estream-menu__hint">{ props.hint }</span> }
+            { props.hint && <span className="wplus-live-stream-menu__hint">{ props.hint }</span> }
         </button>
     );
 }
 
 export function MenuItem( props : { onSelect : () => void, children : ReactNode, icon? : IconName, danger? : boolean } ){
     return (
-        <button type="button" role="menuitem" className={ 'estream-menu__item' + ( props.danger ? ' estream-menu__item--danger' : '' ) } onClick={ props.onSelect }>
-            <span className="estream-menu__tick">{ props.icon && <Icon name={ props.icon } /> }</span>
-            <span className="estream-menu__label">{ props.children }</span>
+        <button type="button" role="menuitem" className={ 'wplus-live-stream-menu__item' + ( props.danger ? ' wplus-live-stream-menu__item--danger' : '' ) } onClick={ props.onSelect }>
+            <span className="wplus-live-stream-menu__tick">{ props.icon && <Icon name={ props.icon } /> }</span>
+            <span className="wplus-live-stream-menu__label">{ props.children }</span>
         </button>
     );
 }

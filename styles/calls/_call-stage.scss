@@ -39,34 +39,45 @@
 // scrollbar-color, which Blink would take over the -webkit- rules with: so
 // those are put back to auto where -webkit- is drawn, over a page's own thin
 // scrollbars (Better Messages hides its own until a hover).
+//
+// Armored (`:not(#\9)`), because a page's rules for its own scrollers reach the
+// panel too: Better Messages gives every element of the messenger a
+// scrollbar-color while it is hovered or scrolls. One that lands here makes
+// Blink drop the -webkit- bar for its own, which macOS draws as an overlay of
+// no width and other systems wider, so the rows moved under the pointer and
+// the bar went with them, and its 10% black thumb was lost on the dark panel.
 @mixin wplus-call-scrollbar {
     @supports selector(::-webkit-scrollbar) {
-        scrollbar-width: auto;
-        scrollbar-color: auto;
+        &:not(#\9) {
+            scrollbar-width: auto;
+            scrollbar-color: auto;
+        }
     }
 
-    &::-webkit-scrollbar {
+    &:not(#\9)::-webkit-scrollbar {
         width: 6px;
         height: 6px;
     }
 
-    &::-webkit-scrollbar-track {
+    &:not(#\9)::-webkit-scrollbar-track {
         margin: 12px 0;
         background: transparent;
     }
 
-    &::-webkit-scrollbar-thumb {
+    &:not(#\9)::-webkit-scrollbar-thumb {
         border-radius: 3px;
         background: rgba(255, 255, 255, 0.24);
     }
 
-    &::-webkit-scrollbar-thumb:hover {
+    &:not(#\9)::-webkit-scrollbar-thumb:hover {
         background: rgba(255, 255, 255, 0.4);
     }
 
     @supports not selector(::-webkit-scrollbar) {
-        scrollbar-width: thin;
-        scrollbar-color: rgba(255, 255, 255, 0.24) transparent;
+        &:not(#\9) {
+            scrollbar-width: thin;
+            scrollbar-color: rgba(255, 255, 255, 0.24) transparent;
+        }
     }
 }
 
@@ -327,12 +338,15 @@
             transform: rotate(90deg);
         }
 
-        // The press-scale every dock button gets would take the open sheet
-        // down with it — the sheet is a child of this button, so a transform
-        // here both shrinks it and makes this button its containing block,
-        // moving it mid-press. Nothing to show anyway: the button is already
-        // latched while its sheet is open.
-        > .wplus-call-more[data-active]:active {
+        // No press-scale on More, open or closed. The sheet is a child of this
+        // button, and a transform here, the press or the 0.12s it eases back
+        // after it, both shrinks the sheet and makes this button its
+        // containing block: a press that opened it drew it scaled against the
+        // button, then it jumped to its place against the dock as the press
+        // eased off (measured 2026-10-30: six frames growing, then 56px across).
+        // The button latches as its sheet opens, which says the press took.
+        > .wplus-call-more,
+        > .wplus-call-more:active {
             transform: none;
         }
     }
@@ -365,7 +379,11 @@
         min-width: min(180px, calc(100cqw - 32px));
         max-width: min(260px, calc(100cqw - 32px));
         padding: 6px;
-        @include wplus-call-glass(0.82);
+        // Solid, as the call's other menus (.wplus-call-popover), not the
+        // dock's glass: at 82% a tile's red muted mark under its last row
+        // showed through beside the row's label.
+        background: rgb(22, 24, 30);
+        border: 1px solid rgba(255, 255, 255, 0.08);
         &:not(#\9) { border-radius: var(--wplus-radius-card); }
         box-shadow: var(--wplus-shadow-card);
         // The dock's buttons are glyph-only, so the mixin zeroes the text
@@ -407,6 +425,47 @@
         white-space: nowrap;
         text-overflow: ellipsis;
         text-align: start;
+    }
+
+    // The dock's More, a menu over the stage as Host Controls is (call-dock.tsx): its runs of rows are the sheet's,
+    // each the control itself unrolled into a line, inside the card rather than a card of their own, a thin rule
+    // between the folded controls, the layout and the rest.
+    // It opens where it stays, with no entrance, as the sheet did (call-more-sheet.spec.ts), above the dock too.
+    .wplus-call-popover.wplus-call-more-menu {
+        width: 300px;
+        gap: 0;
+
+        &,
+        &[data-side] {
+            animation: none;
+        }
+    }
+
+    .wplus-call-more-menu {
+        > .wplus-call-dock-sheet {
+            position: static;
+            z-index: auto;
+            min-width: 0;
+            max-width: none;
+            padding: 0;
+            background: none;
+            border: 0;
+            box-shadow: none;
+        }
+
+        > * + * {
+            margin-top: 6px;
+            padding-top: 6px;
+            border-top: 1px solid rgba(255, 255, 255, 0.07);
+        }
+    }
+
+    .wplus-call-more-title {
+        display: block;
+        padding: 4px 8px 6px;
+        color: rgba(255, 255, 255, 0.55);
+        font-size: 12px;
+        font-weight: 600;
     }
 
     // A sheet above the dock: the devices (device-panel.tsx, styled further
@@ -624,6 +683,11 @@
     // The own camera (or screen) fills the stage while the call rings.
     // Never mirrored: you see yourself the way the others do, as 2.0
     // showed it, and as the picture stays once the call connects.
+    // The one camera cut to its box whatever its shape: it is a backdrop
+    // under the ringing card and its scrim, seen by no one else, and bars
+    // would frame the card instead of the picture. Everywhere else a camera
+    // covers its box only where that cuts at most 2% of it (fillsBox). A
+    // shared screen is drawn whole here as well.
     .wplus-placeholder-video {
         position: absolute;
         inset: 0;
@@ -887,7 +951,9 @@
             margin: 0;
             padding: 0;
             vertical-align: middle;
-            object-fit: cover;
+            // Whole: the chip is the picture's shape, so it fills it, and where a bound holds the chip to another
+            // shape the picture is not cut (FILL_CUTS_MOST, inc/calls/ratio.ts).
+            object-fit: contain;
             object-position: center;
         }
     }
@@ -1042,9 +1108,13 @@
     transition-delay: 0s;
 }
 
-// The window as a whole needs no ring of its own: the dock it brings back is what shows the keyboard is there.
-.wplus-call-wrap .wplus-private-call:focus-visible {
-    outline: none;
+// A container the call focuses itself, so that a screen reader reads it and Escape reaches it, is no control and
+// draws no ring: the window of a call between two as it opens (the dock it brings back shows the keyboard is there),
+// and a card focused by script (tabindex -1), the shortcuts' list among them. The ring stays on the controls inside,
+// from their first Tab on. Armored, as a theme may ring every :focus-visible with !important (a WordPress theme's
+// `:focus-visible { outline: 2px solid #2271b1 !important }` drew one around the whole list).
+.wplus-call-wrap :is(.wplus-private-call, [tabindex="-1"]):not(#\9):focus-visible {
+    outline: none !important;
 }
 
 // The Design preview's call is photographed, and a photograph never hovers
@@ -1144,23 +1214,63 @@
         overflow: hidden;
     }
 
+    // The grid, its two blocks and its tiles take their new places at once, and
+    // each tile is moved there from where it was by a transform (grid-moves.ts):
+    // transitions of the blocks' heights and the tiles' places, in percentages
+    // of those blocks, had a tile follow two animations at once.
     .wplus-group-call-videos-grid {
         position: relative;
         box-sizing: border-box;
         width: 100%;
         margin: 0;
         padding: 4px;
-        transition: height var(--wplus-duration-slow) ease;
 
         .wplus-group-call-videos-grid-primary,
         .wplus-group-call-videos-grid-secondary {
             position: relative;
-            transition: height var(--wplus-duration-slow) ease, width var(--wplus-duration-slow) ease;
         }
 
         .wplus-group-call-videos-grid-secondary {
             overflow-x: auto;
             overflow-y: hidden;
+        }
+
+        // A strip beside or under a large tile (group-video-grid.tsx): it scrolls across, or down beside a tall
+        // picture and on a phone, with no scrollbar, its edge faded on a side where more of it is.
+        .wplus-group-call-videos-grid-secondary[data-scroll] {
+            --wplus-strip-fade-before: 0px;
+            --wplus-strip-fade-after: 0px;
+            scrollbar-width: none;
+            -webkit-mask-image: linear-gradient(var(--wplus-strip-fade-to), transparent 0, #000 var(--wplus-strip-fade-before), #000 calc(100% - var(--wplus-strip-fade-after)), transparent 100%);
+            mask-image: linear-gradient(var(--wplus-strip-fade-to), transparent 0, #000 var(--wplus-strip-fade-before), #000 calc(100% - var(--wplus-strip-fade-after)), transparent 100%);
+
+            &::-webkit-scrollbar { display: none; }
+            &[data-more-before] { --wplus-strip-fade-before: 40px; }
+            &[data-more-after] { --wplus-strip-fade-after: 40px; }
+        }
+
+        .wplus-group-call-videos-grid-secondary[data-scroll="x"] {
+            --wplus-strip-fade-to: to right;
+            overscroll-behavior-x: contain;
+
+            &:dir(rtl) { --wplus-strip-fade-to: to left; }
+        }
+
+        .wplus-group-call-videos-grid-secondary[data-scroll="y"] {
+            --wplus-strip-fade-to: to bottom;
+            overflow-x: hidden;
+            overflow-y: auto;
+            overscroll-behavior-y: contain;
+        }
+
+        // Where a strip ends, which holds its length while the tiles far along it are not drawn.
+        .wplus-call-strip-end {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 1px;
+            height: 1px;
+            pointer-events: none;
         }
 
         // Someone pinned whose picture is taller than it is wide — a phone's
@@ -1188,9 +1298,11 @@
         margin: 0;
         padding: 4px;
         color: rgba(var(--wplus-call-fg), 1);
-        transition: top var(--wplus-duration-slow) ease, left var(--wplus-duration-slow) ease, height var(--wplus-duration-slow) ease, width var(--wplus-duration-slow) ease;
 
+        // A camera filling its tile, on a phone or a tablet (group-video-grid.tsx).
         &.wplus-cover-video > .wplus-group-call-input-video-inner video {
+            width: 100%;
+            max-width: none;
             object-fit: cover;
         }
 
@@ -1583,6 +1695,11 @@
         overflow-y: auto;
     }
 
+    // The height of the rows a long roster doesn't draw (group-audio-grid.tsx, AUDIO_WINDOW_FROM).
+    .wplus-group-call-audios-spacer {
+        flex: none;
+    }
+
     .wplus-group-call-input-audio {
         display: block;
         flex: none;
@@ -1611,16 +1728,89 @@
     // `flex` rather than being written down. A roster long enough to fill the
     // stage by itself scrolls, and `min-height` is what stops the share being
     // squeezed to nothing on the way — the grid scrolls, it does not compress.
+    //
+    // The row is the room the stage stands in, and the card in it is the
+    // share's shape: the picture whole, as large as the room allows, the
+    // sharer's row under it, and the card hugging the two at the top of the
+    // room, centred across, so no band of card is left beside a 4:3 window
+    // or a phone's page. Two people sharing each get a card the shape of
+    // their own share.
     .wplus-group-call-input-audio.wplus-group-call-input-audio-screen {
         display: flex;
+        align-items: center;
+        justify-content: center;
         flex: 1 1 auto;
         min-height: 45%;
 
         > .wplus-group-call-input-audio-inner {
             display: flex;
             flex-direction: column;
+            align-self: stretch;
             width: 100%;
             min-height: 0;
+        }
+    }
+
+    // The card is sized from the room's two sides at once, which container
+    // units give (see the picture below for why max-width and max-height
+    // cannot): as wide as the picture at the room's height, less the
+    // sharer's row, or the room's width where that is narrower. A card too
+    // narrow for the whole of the sharer's row (a phone's page in a short
+    // room) leaves their picture out of it, and the name and microphone hold
+    // the card at 120px at the least, the picture in the middle of it. A
+    // browser without them keeps the card the room's size and the picture
+    // letterboxed in it.
+    //
+    // The room is no taller than the card at the roster's whole width (the
+    // roster is a container while someone shares, group-audio-grid.tsx), and
+    // the 45% is a floor only up to that: a wide share on a phone held
+    // upright has a card shorter than 45% of the call, and a room that tall
+    // left empty space above the card and under it, the rows of everyone
+    // else standing apart from it. So the card's room ends where the card
+    // does, the rows follow it 8px under, and what the call has to spare is
+    // under the last row, as in a call where nobody shares.
+    @supports (width: 1cqw) {
+        .wplus-group-call-audios-grid.wplus-group-call-audios-sharing {
+            container-type: inline-size;
+        }
+
+        .wplus-group-call-input-audio.wplus-group-call-input-audio-screen {
+            --wplus-audio-stage-row: 56px;
+            --wplus-audio-stage-least: 120px;
+            --wplus-audio-stage-full: calc((100cqw - 2px) / var(--wplus-screen-ratio, 1.7777) + var(--wplus-audio-stage-row) + 2px);
+            container-type: size;
+            align-items: flex-start;
+            min-height: min(45%, var(--wplus-audio-stage-full));
+            max-height: var(--wplus-audio-stage-full);
+
+            > .wplus-group-call-input-audio-inner {
+                container: wplus-audio-stage / inline-size;
+                align-self: flex-start;
+                flex: none;
+                width: clamp(min(100cqw, var(--wplus-audio-stage-least)), calc((100cqh - var(--wplus-audio-stage-row) - 2px) * var(--wplus-screen-ratio, 1.7777) + 2px), 100cqw);
+                max-height: 100cqh;
+            }
+
+            @container wplus-audio-stage (max-width: 171px) {
+                .wplus-info-avatar {
+                    display: none;
+                }
+            }
+
+            .wplus-group-call-input-audio-screen-wrapper {
+                flex: none;
+
+                video {
+                    width: min(100%, calc((100cqh - var(--wplus-audio-stage-row) - 2px) * var(--wplus-screen-ratio, 1.7777)));
+                    height: auto;
+                    aspect-ratio: var(--wplus-screen-ratio, 1.7777);
+                }
+            }
+
+            .wplus-group-call-input-audio-inner-info {
+                box-sizing: border-box;
+                height: var(--wplus-audio-stage-row);
+            }
         }
     }
 
@@ -1656,7 +1846,8 @@
         // of the two is written comes out exact for one orientation and
         // leaves the other with a box the wrong shape — measured, not
         // assumed. Container units hand the arithmetic both sides, and it is
-        // then right either way up. The width/height pair above is what a
+        // then right either way up: the stage's rule above sizes the card
+        // and the picture with them. The width/height pair here is what a
         // browser without them falls back to: the picture letterboxed rather
         // than hugged, which is the old behaviour minus the 320px ceiling.
         .wplus-group-call-input-audio-screen-wrapper {
@@ -1666,7 +1857,6 @@
             flex: 1 1 auto;
             min-height: 0;
             line-height: 0;
-            container-type: size;
 
             video {
                 position: relative;
@@ -1675,10 +1865,6 @@
                 height: 100%;
                 object-fit: contain;
                 background: rgba(0, 0, 0, 1);
-
-                width: auto;
-                aspect-ratio: var(--wplus-screen-ratio, 1.7777);
-                height: min(100cqh, calc(100cqw / var(--wplus-screen-ratio, 1.7777)));
             }
         }
 
@@ -1882,6 +2068,15 @@ html.wplus-call-windowed body {
     overflow: hidden;
 }
 
+// Participants, the list of everyone in a group call (people-panel.tsx), and the Layout menu with the pages of tiles
+// (layout-choice.tsx).
+@import "people";
+@import "layout";
+// A phone or a tablet: tiles filling their cells, the own picture floating, pages that swipe, bottom sheets.
+@import "touch";
+// The REC mark at the start of the dock while a recording runs (recording.tsx).
+@import "recording";
+
 // ─── Moderation: Host Controls, a person's menu, a locked microphone ──────
 //
 // Menus at the button that opened them, placed in the stage by
@@ -1917,7 +2112,8 @@ html.wplus-call-windowed body {
     @include wplus-call-scrollbar;
     border: 1px solid rgba(255, 255, 255, 0.09);
     &:not(#\9) { border-radius: 14px; }
-    background: rgba(22, 24, 30, 0.97);
+    // Solid: a tile's marks under it, a red muted microphone above all, showed through even at 97%.
+    background: rgb(22, 24, 30);
     box-shadow: 0 18px 48px rgba(0, 0, 0, 0.5), 0 2px 8px rgba(0, 0, 0, 0.35);
     color: rgba(255, 255, 255, 0.94);
     font-size: 13px;
@@ -2238,10 +2434,10 @@ html.wplus-call-windowed body {
     max-width: calc(100% - 28px);
 }
 
-// Touch has no hover: moderation controls stay on show, as they do on
-// every other hover-only affordance in 3.0.
+// Touch has no hover: a roster row's moderation controls stay on show, as
+// they do on every other hover-only affordance in 3.0. A video tile's are
+// in _touch.scss.
 @media (pointer: coarse) {
-    .wplus-call-wrap.wplus-call-wrap-group .wplus-group-call-input-video-inner .wplus-admin-controls,
     .wplus-call-wrap.wplus-group-audio-call-container .wplus-group-call-input-audio-inner .wplus-caller-actions > .wplus-admin-controls {
         opacity: 1;
         visibility: visible;
@@ -2615,14 +2811,105 @@ html.wplus-call-windowed body {
         color: rgba(255, 255, 255, 1);
     }
 
-    // The camera's test, in its row under its text: only while it runs. Not
-    // mirrored, as the own tile in the call is not: the user sees what the
-    // others would.
+    // At the top while the browser does not let the site use a device:
+    // Allow Access in the accent where it was never allowed, a warning's
+    // tone with the steps and Try Again where it refused it.
+    .wplus-call-access {
+        display: flex;
+        align-items: flex-start;
+        gap: 10px;
+        margin: 0 0 6px;
+        padding: 10px 12px;
+        &:not(#\9) { border-radius: 12px; }
+        background: rgba(var(--wplus-color-accent), 0.14);
+        box-shadow: inset 0 0 0 1px rgba(var(--wplus-color-accent), 0.3);
+
+        &[data-stuck] {
+            background: rgba(var(--wplus-color-warning), 0.12);
+            box-shadow: inset 0 0 0 1px rgba(var(--wplus-color-warning), 0.3);
+
+            .wplus-call-access-icon { color: rgba(var(--wplus-color-warning), 1); }
+        }
+    }
+
+    .wplus-call-access-icon {
+        display: inline-flex;
+        flex: none;
+        margin-top: 1px;
+        color: rgba(var(--wplus-color-accent), 1);
+        line-height: 0;
+
+        > svg { width: 16px; height: 16px; }
+    }
+
+    .wplus-call-access-text {
+        display: flex;
+        flex: 1 1 auto;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+        min-width: 0;
+    }
+
+    .wplus-call-access-section {
+        display: flex;
+        flex-direction: column;
+        gap: 3px;
+    }
+
+    .wplus-call-access-title {
+        color: rgba(255, 255, 255, 1);
+        font-size: 13px;
+        font-weight: 600;
+    }
+
+    .wplus-call-access-note {
+        color: rgba(255, 255, 255, 0.72);
+        font-size: 12px;
+        line-height: 1.4;
+    }
+
+    .wplus-call-access-button {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        height: 30px;
+        padding: 0 14px;
+        &:not(#\9) { border-radius: var(--wplus-radius-pill); }
+        background: rgba(var(--wplus-color-accent), 1);
+        color: rgba(255, 255, 255, 1);
+        font-size: 12.5px;
+        font-weight: 600;
+        white-space: nowrap;
+        cursor: pointer;
+        user-select: none;
+        -webkit-tap-highlight-color: transparent;
+        transition: filter 0.12s ease, opacity 0.12s ease;
+
+        &:hover { filter: brightness(1.1); }
+
+        &[data-busy] {
+            opacity: 0.75;
+            cursor: default;
+        }
+
+        > svg { width: 13px; height: 13px; }
+    }
+
+    .wplus-call-access[data-stuck] .wplus-call-access-button {
+        background: rgba(255, 255, 255, 0.14);
+
+        &:hover { background: rgba(255, 255, 255, 0.2); filter: none; }
+    }
+
+    // The camera's test, in its row the width of the row: only while it runs.
+    // Not mirrored, as the own tile in the call is not: the user sees what
+    // the others would, the whole picture, a phone's upright camera too, as
+    // the tiles draw a camera of another shape than theirs (FILL_CUTS_MOST).
     .wplus-call-device-preview {
         position: relative;
         aspect-ratio: 16 / 9;
         margin: 0 8px 8px;
-        margin-inline-start: 56px;
         overflow: hidden;
         &:not(#\9) { border-radius: 10px; }
         background: #000;
@@ -2634,8 +2921,25 @@ html.wplus-call-windowed body {
             height: 100%;
             max-width: none;
             margin: 0;
-            object-fit: cover;
+            object-fit: contain;
         }
+    }
+
+    // The picture while Effect Settings is open: at the top of the settings
+    // as they scroll, the sliders passing under it, on the panel's own
+    // ground so nothing under it shows round its corners. Where it stood
+    // otherwise, its margins now the holder's. Pinned the panel's padding
+    // higher, as the browser pins it inside that padding: the backgrounds
+    // showed in the strip over it.
+    .wplus-call-device-preview-holder[data-pinned] {
+        position: sticky;
+        top: -8px;
+        z-index: 2;
+        margin-top: -8px;
+        padding: 8px;
+        background: rgba(22, 24, 30, 1);
+
+        > .wplus-call-device-preview { margin: 0; }
     }
 
     // On the preview: the user's alone.
@@ -2658,91 +2962,134 @@ html.wplus-call-windowed body {
         > svg { width: 12px; height: 12px; }
     }
 
-    .wplus-call-device {
-        &:not(#\9) { border-radius: 11px; }
-        transition: background 0.12s ease;
-
-        &[data-open] { background: rgba(255, 255, 255, 0.04); }
-    }
-
     .wplus-call-device-head {
         display: flex;
         align-items: center;
-        gap: 12px;
-        padding: 8px;
+        gap: 8px;
+        // The height the device's test gives it, so the row does not move as
+        // the test goes once the device is live.
+        box-sizing: border-box;
+        min-height: 38px;
+        padding: 6px 8px 4px;
     }
 
+    // The glyph, before the name and level with it: no tile, which made a
+    // column the width of the preview's margin.
     .wplus-call-device-icon {
         display: inline-flex;
         align-items: center;
         justify-content: center;
         flex: none;
-        width: 36px;
-        height: 36px;
-        &:not(#\9) { border-radius: 10px; }
-        background: rgba(255, 255, 255, 0.07);
-        color: rgba(255, 255, 255, 0.7);
+        width: 16px;
+        height: 18px;
+        color: rgba(255, 255, 255, 0.6);
         line-height: 0;
-        transition: background 0.15s ease, color 0.15s ease;
+        transition: color 0.15s ease;
 
-        > svg { width: 18px; height: 18px; }
+        > svg { width: 16px; height: 16px; }
     }
 
     .wplus-call-device[data-on] .wplus-call-device-icon {
-        background: rgba(var(--wplus-color-accent), 0.2);
         color: rgba(var(--wplus-color-accent), 1);
     }
 
-    .wplus-call-device-text {
-        display: flex;
-        flex: 1 1 auto;
-        flex-direction: column;
-        align-items: flex-start;
-        gap: 2px;
-        min-width: 0;
-    }
-
     .wplus-call-device-label {
+        flex: 1 1 auto;
+        min-width: 0;
         font-weight: 600;
         color: rgba(255, 255, 255, 1);
     }
 
-    // The device in use, a quiet button that opens the others, its text
-    // level with the name over it.
+    // The device in use, a field the width of the row with its arrow on the
+    // end, which opens the others: a line of quiet text here read as a
+    // caption under the name, and people did not find where to choose a
+    // device.
     .wplus-call-device-current {
-        display: inline-flex;
+        position: relative;
+        display: flex;
         align-items: center;
-        gap: 4px;
+        justify-content: space-between;
+        gap: 6px;
         box-sizing: border-box;
-        max-width: calc(100% + 12px);
-        margin: 0 -6px;
-        padding: 1px 6px;
-        &:not(#\9) { border-radius: 6px; }
-        color: rgba(255, 255, 255, 0.6);
-        font-size: 12px;
+        height: 32px;
+        margin: 0 8px 8px;
+        padding: 0 8px;
+        padding-inline-start: 10px;
+        border: 1px solid rgba(255, 255, 255, 0.16);
+        &:not(#\9) { border-radius: 8px; }
+        background: rgba(255, 255, 255, 0.06);
+        color: rgba(255, 255, 255, 0.92);
+        font-size: 12.5px;
         cursor: pointer;
-        transition: background 0.12s ease, color 0.12s ease;
+        user-select: none;
+        -webkit-tap-highlight-color: transparent;
+        transition: background 0.12s ease, border-color 0.12s ease;
 
         &:hover {
-            background: rgba(255, 255, 255, 0.08);
-            color: rgba(255, 255, 255, 0.9);
+            border-color: rgba(255, 255, 255, 0.28);
+            background: rgba(255, 255, 255, 0.1);
         }
+
+        &:focus-within { border-color: rgba(var(--wplus-color-accent), 1); }
 
         > svg {
             flex: none;
             width: 14px;
             height: 14px;
-            transition: transform 0.15s ease;
+            color: rgba(255, 255, 255, 0.7);
         }
 
-        &[aria-expanded="true"] > svg { transform: rotate(180deg); }
-
+        // Nothing to open: plain text, level with the name over it.
         &[data-fixed],
         &[data-fixed]:hover {
+            height: auto;
+            min-height: 18px;
+            padding: 0;
+            padding-inline-start: 24px;
+            border: 0;
             background: none;
             color: rgba(255, 255, 255, 0.6);
+            font-size: 12px;
             cursor: default;
         }
+    }
+
+    // The browser's own menu of the devices, unseen over the whole field, as
+    // the voice recorder's microphone picker is. 16px as iOS Safari zooms the
+    // page into a control with smaller text. A theme's rules on every select
+    // can't move it off the field, and where the browser draws the menu itself
+    // (Windows, Linux) it is on the settings' own ground.
+    .wplus-call-device-select:not(#\9) {
+        position: absolute;
+        inset: 0;
+        display: block;
+        box-sizing: border-box;
+        width: 100%;
+        min-width: 0;
+        max-width: none;
+        height: 100%;
+        min-height: 0;
+        margin: 0;
+        padding: 0;
+        border: 0;
+        outline: none;
+        opacity: 0;
+        visibility: visible !important;
+        background: rgba(22, 24, 30, 1);
+        color: rgba(255, 255, 255, 1);
+        color-scheme: dark;
+        font-size: 16px !important;
+        cursor: pointer;
+
+        option {
+            background: rgba(22, 24, 30, 1);
+            color: rgba(255, 255, 255, 1);
+        }
+    }
+
+    // The microphone's level, or why it is off, under the field.
+    .wplus-call-device-reading {
+        padding: 0 8px 8px;
     }
 
     .wplus-call-device-name {
@@ -2839,7 +3186,6 @@ html.wplus-call-windowed body {
         align-items: center;
         gap: 10px;
         padding: 0 8px 8px;
-        padding-inline-start: 56px;
     }
 
     .wplus-call-device-status {
@@ -2916,44 +3262,6 @@ html.wplus-call-windowed body {
         > svg { width: 12px; height: 12px; }
     }
 
-    // The others, in place under the row, under its text, the one in use
-    // ticked.
-    .wplus-call-device-list {
-        display: flex;
-        flex-direction: column;
-        gap: 1px;
-        padding: 0 8px 8px;
-        padding-inline-start: 50px;
-    }
-
-    .wplus-call-device-choice {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        padding: 7px 8px;
-        &:not(#\9) { border-radius: 8px; }
-        color: rgba(255, 255, 255, 0.82);
-        font-size: 12.5px;
-        cursor: pointer;
-        transition: background 0.12s ease;
-
-        &:hover { background: rgba(255, 255, 255, 0.08); }
-
-        &[aria-selected="true"] {
-            color: rgba(255, 255, 255, 1);
-            font-weight: 500;
-        }
-    }
-
-    .wplus-call-device-check {
-        display: inline-flex;
-        flex: none;
-        width: 14px;
-        color: rgba(var(--wplus-color-accent), 1);
-
-        > svg { width: 14px; height: 14px; }
-    }
-
     // A call between two: how much it has sent and received.
     .wplus-call-traffic {
         display: flex;
@@ -2987,6 +3295,47 @@ html.wplus-call-windowed body {
     }
 }
 
+// The dock's Configure while AI Noise Removal runs on the microphone: a small
+// accent badge with its sparkles in the start corner, as the warning's dot
+// has the end one, so the two never stand on each other.
+.wplus-call-wrap .wplus-configure-call .wplus-configure-call-badge {
+    position: absolute;
+    top: 0;
+    inset-inline-start: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+    width: 15px;
+    height: 15px;
+    border: 2px solid rgba(22, 24, 30, 1);
+    &:not(#\9) { border-radius: 50%; }
+    background: rgba(var(--wplus-color-accent), 1);
+    color: rgba(var(--wplus-color-text-on-accent), 1);
+    pointer-events: none;
+
+    > svg {
+        width: 9px;
+        height: 9px;
+    }
+}
+
+// The dock's Configure while the browser blocks a device the user may send:
+// a dot in its corner, as the settings behind it say what to do.
+.wplus-call-wrap .wplus-configure-call[data-warning]::after {
+    content: "";
+    position: absolute;
+    top: 1px;
+    inset-inline-end: 1px;
+    box-sizing: border-box;
+    width: 11px;
+    height: 11px;
+    border: 2px solid rgba(22, 24, 30, 1);
+    border-radius: 50%;
+    background: rgba(var(--wplus-color-warning), 1);
+    pointer-events: none;
+}
+
 // ─── Talking while muted (muted-hint.tsx), and the prompt of a join ───────
 // (device-panel.tsx' JoinPrompt). A pill over the dock, centred, clear of it
 // in either layout: the 1:1 dock's top is 58px up (44px over its 14px floor),
@@ -3011,6 +3360,17 @@ html.wplus-call-windowed body {
 .wplus-call-wrap:has(.wplus-call-popover, .wplus-call-dock-sheet, .wplus-call-settings) .wplus-call-muted-hint-region,
 .wplus-call-wrap:has(.wplus-call-popover, .wplus-call-dock-sheet) .wplus-call-join-prompt-region {
     display: none;
+}
+
+// While the device settings are open, the card over the dock (a moderator's
+// ask, the join's notice, the recording's) stands at the top of the stage
+// instead, under the status line where it shows: the
+// settings stand where it would, and an ask's Test Microphone opens them. The
+// settings hold themselves under it and say where that is
+// (--wplus-call-prompt-top, device-panel.tsx).
+.wplus-call-wrap:has(.wplus-call-settings) .wplus-call-join-prompt-region {
+    top: var(--wplus-call-prompt-top, 10px);
+    bottom: auto;
 }
 
 // The prompt of a join stands in the hint's place for its few seconds: it says
@@ -3100,21 +3460,26 @@ html.wplus-call-windowed body {
 }
 
 // The prompt of a join: a card in the devices' look, the microphone off on a
-// red badge, its title and a quieter line under it, then Preview and the ×,
-// on one row where the stage has room. On a narrow stage the button
-// goes under the words, the × stays at the top end.
+// red badge, its title and a quieter line under it, the × at the top end, and
+// Preview under the words on a stage of any width, as the recording's notice
+// and a moderator's ask have their buttons. On one row beside the words, a
+// wide stage squeezed the line under the title onto two.
 .wplus-call-wrap .wplus-call-join-prompt {
     display: inline-grid;
-    grid-template-columns: auto minmax(0, 1fr) auto auto;
-    grid-template-areas: "icon text check close";
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    grid-template-areas:
+        "icon text close"
+        ".    check .";
     align-items: center;
     gap: 8px 12px;
     box-sizing: border-box;
     max-width: min(560px, 100%);
-    padding: 10px 8px 10px 12px;
+    padding: 12px 8px 12px 12px;
     border: 1px solid rgba(255, 255, 255, 0.09);
     &:not(#\9) { border-radius: 14px; }
-    background: rgba(22, 24, 30, 0.96);
+    // Solid, as the call's menus: at 96% a tile's name and red muted mark under
+    // it showed through on a phone, where the card lies over the last tile.
+    background: rgb(22, 24, 30);
     box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45), 0 2px 8px rgba(0, 0, 0, 0.3);
     color: rgba(255, 255, 255, 0.94);
     text-align: start;
@@ -3188,8 +3553,41 @@ html.wplus-call-windowed body {
     &:hover { background: rgba(var(--wplus-color-accent-hover), 1); }
 }
 
+// Preview, and beside it Do Not Show Again where the app keeps the user's
+// choice: a quiet text button, as an ask's Not Now.
+.wplus-call-wrap .wplus-call-join-prompt-actions {
+    grid-area: check;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+    justify-self: start;
+}
+
+.wplus-call-wrap .wplus-call-join-prompt-never {
+    display: inline-flex;
+    align-items: center;
+    height: 32px;
+    padding: 0 10px;
+    &:not(#\9) { border-radius: var(--wplus-radius-pill); }
+    color: rgba(255, 255, 255, 0.62);
+    font-size: 13px;
+    font-weight: 600;
+    white-space: nowrap;
+    cursor: pointer;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+    transition: background 0.12s ease, color 0.12s ease;
+
+    &:hover {
+        background: rgba(255, 255, 255, 0.08);
+        color: rgba(255, 255, 255, 1);
+    }
+}
+
 .wplus-call-wrap .wplus-call-join-prompt-close {
     grid-area: close;
+    align-self: start;
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -3204,19 +3602,6 @@ html.wplus-call-windowed body {
     &:hover {
         background: rgba(255, 255, 255, 0.1);
         color: rgba(255, 255, 255, 1);
-    }
-}
-
-@container (max-width: 519px) {
-    .wplus-call-wrap .wplus-call-join-prompt {
-        grid-template-columns: auto minmax(0, 1fr) auto;
-        grid-template-areas:
-            "icon text close"
-            ".    check .";
-    }
-
-    .wplus-call-wrap .wplus-call-join-prompt-close {
-        align-self: start;
     }
 }
 
@@ -3304,5 +3689,131 @@ html.wplus-call-windowed body {
     &:hover {
         background: rgba(255, 255, 255, 0.12);
         color: rgba(var(--wplus-call-fg), 1);
+    }
+}
+
+// The call effects in the device settings.
+@import "effects";
+
+// A group call's picture-in-picture window.
+@import "pip";
+
+// A moderator's ask to turn on a camera or a microphone, in the join prompt's card.
+@import "ask";
+
+// The call's keys, named at the end of a menu's rows.
+@import "keys";
+
+// ─── The person's own upload jammed (jam-tip.tsx, upload-jam.tsx) ─────────────────────
+// Said small. On the connection badge a warning glyph in the amber stands in
+// the dot's place, and the badge stays at full strength while the jam lasts.
+// The words are a tip over the badge: on a mouse's hover, on the keyboard's
+// focus, and after a tap until a tap elsewhere. The 1:1 screen has no badge,
+// so the glyph is a round chip of the badge's height in the top end corner of
+// its stage, with the tip under it. Nothing stands over the stage.
+
+.wplus-call-wrap .wplus-connection-control {
+    position: relative;
+}
+
+.wplus-call-wrap .wplus-connection-control .wplus-connection-quality.wplus-upload-jammed {
+    opacity: 1;
+    cursor: pointer;
+    // a tap opens the tip: no flash of the browser's own over the badge
+    -webkit-tap-highlight-color: transparent;
+
+    &::before { display: none; }
+
+    > svg.wplus-jam-icon {
+        display: block;
+        color: rgba(var(--wplus-color-warning), 1);
+    }
+
+    &:focus-visible {
+        outline: 2px solid rgba(var(--wplus-color-accent), 1);
+        outline-offset: 2px;
+    }
+}
+
+.wplus-call-wrap .wplus-call-jam-tip {
+    position: absolute;
+    z-index: 12;
+    bottom: calc(100% + 8px);
+    inset-inline-start: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    width: max-content;
+    max-width: min(300px, calc(100vw - 28px));
+    box-sizing: border-box;
+    padding: 9px 12px;
+    // opaque all but in name: it lies over a tile's name or picture, which showed through its words at the chips' own
+    @include wplus-call-glass(0.97);
+    &:not(#\9) { border-radius: var(--wplus-radius-card); }
+    color: rgba(var(--wplus-call-fg), 0.85);
+    font-size: 13px;
+    font-weight: 400;
+    line-height: 1.35;
+    letter-spacing: 0;
+    text-align: start;
+    text-transform: none;
+    white-space: normal;
+    overflow-wrap: break-word;
+    // the pointer passes through to what it covers, and leaving the badge for it doesn't hold it open
+    pointer-events: none;
+    animation: wplus-call-popover-up 0.18s ease-out;
+
+    strong {
+        color: rgba(var(--wplus-call-fg), 1);
+        font-weight: 600;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        animation: none;
+    }
+}
+
+// Heard, not seen: the jam's title for a screen reader as it begins.
+.wplus-call-wrap .wplus-call-jam-said {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+}
+
+.wplus-call-wrap .wplus-call-jam-chip {
+    position: absolute;
+    z-index: 12;
+    top: 14px;
+    inset-inline-end: 14px;
+
+    .wplus-call-jam-mark {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        box-sizing: border-box;
+        width: 28px;
+        height: 28px;
+        @include wplus-call-glass(0.42);
+        &:not(#\9) { border-radius: var(--wplus-radius-circle); }
+        color: rgba(var(--wplus-color-warning), 1);
+        cursor: pointer;
+        -webkit-tap-highlight-color: transparent;
+
+        &:focus-visible {
+            outline: 2px solid rgba(var(--wplus-color-accent), 1);
+            outline-offset: 2px;
+        }
+    }
+
+    .wplus-call-jam-tip {
+        top: calc(100% + 8px);
+        bottom: auto;
+        inset-inline-start: auto;
+        inset-inline-end: 0;
     }
 }

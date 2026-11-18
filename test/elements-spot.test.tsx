@@ -32,6 +32,7 @@ it( 'shows a call in its <call-spot>, its children until then, and the call back
     } );
     const calls = Object.assign( new Emitter(), { start: vi.fn( async () => placed ), group: vi.fn(), people: vi.fn( async () => [] ) } );
     ( globalThis as Record<string, unknown> ).wordplusRealtimeCalls = { page: () => ( { rt: { user: '42' }, calls } ) };
+    const into = vi.spyOn( Element.prototype, 'scrollIntoView' ).mockImplementation( () => {} );
 
     // A spot on the page before the screens start: it takes its calls once they do.
     document.body.insertAdjacentHTML( 'beforeend', '<call-spot call="match:{a}:{b}" style="height: 420px"><p>The chat</p></call-spot><call-spot call="office:{id}"></call-spot>' );
@@ -48,6 +49,11 @@ it( 'shows a call in its <call-spot>, its children until then, and the call back
     expect( spot.getAttribute( 'data-call' ) ).toBe( 'match:34:42' );
     expect( empty.hasAttribute( 'data-call' ) ).toBe( false );
     const started = placed.setTrack.mock.calls.length;
+    // In view: a spot off the screen shows the person nothing, and the other side, told nothing shows its camera, stops
+    // sending it.
+    const place = spot.shadowRoot!.querySelector( '.realtime-call-spot' );
+    expect( into.mock.contexts ).toEqual( [ place ] );
+    expect( into ).toHaveBeenCalledWith( { block: 'nearest' } );
 
     // The spot leaves the page: the call goes on in the window of <call-screen>, the same element.
     spot.remove();
@@ -55,10 +61,13 @@ it( 'shows a call in its <call-spot>, its children until then, and the call back
     expect( document.querySelector( 'call-screen' )!.shadowRoot!.querySelector( '.realtime-call-window' ) ).toBe( window );
     expect( placed.end ).not.toHaveBeenCalled();
     expect( placed.setTrack.mock.calls.length ).toBe( started );
+    expect( into ).toHaveBeenCalledTimes( 1 );
 
-    // Back on the page: the call comes back to it.
+    // Back on the page: the call comes back to it, in view again.
     document.body.append( spot );
     await settle();
     expect( spot.shadowRoot!.querySelector( '.realtime-call-window' ) ).toBe( window );
     expect( spot.getAttribute( 'data-call' ) ).toBe( 'match:34:42' );
+    expect( into.mock.contexts ).toEqual( [ place, place ] );
+    into.mockRestore();
 } );

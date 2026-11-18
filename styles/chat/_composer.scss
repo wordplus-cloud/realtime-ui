@@ -55,20 +55,31 @@
 }
 
 // Inline sticker suggestions — horizontal strip above the input that pops
-// up when the composer holds a single matching word. Source: StickerStrip
-// in composer.tsx.
+// up when the composer holds a single matching word. It floats over the
+// message list: in the composer's flow it took its height from the list each
+// time it opened, and the conversation moved under whoever was typing. Source:
+// StickerStrip in composer.tsx.
 .wplus-sticker-strip {
+    position: absolute;
+    bottom: calc(100% + 6px);
+    inset-inline-start: 12px;
+    z-index: 5;
+    box-sizing: border-box;
     display: flex;
     align-items: center;
     gap: 4px;
-    margin: 0 12px 6px;
     padding: 4px;
-    max-width: 100%;
+    max-width: calc(100% - 24px);
     overflow-x: auto;
     &:not(#\9) { border-radius: var(--wplus-radius-md); }
     background: rgba(var(--wplus-color-bg-elevated), 1);
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+    border: 1px solid rgba(var(--wplus-color-border), 1);
+    box-shadow: var(--wplus-shadow-card);
     scrollbar-width: none;
+    animation: wplus-sticker-strip-in 0.15s ease-out;
+    @media (prefers-reduced-motion: reduce) {
+        animation: none;
+    }
 
     &::-webkit-scrollbar { display: none; }
 
@@ -92,6 +103,11 @@
             display: block;
         }
     }
+}
+
+@keyframes wplus-sticker-strip-in {
+    from { opacity: 0; transform: translateY(4px); }
+    to   { opacity: 1; transform: none; }
 }
 
 .wplus-composer {
@@ -556,7 +572,19 @@
         &:hover { background: rgba(var(--wplus-color-bg-hover), 1); }
     }
 
-    &__name { font-weight: 500; }
+    // A list may only be as wide as the window, which on a phone is
+    // narrower than a long name, and a name with nowhere to break
+    // ("Alex_Prokopenko298448") ran out past the list's edge. It breaks
+    // instead of ending in an ellipsis: names that differ only at the end
+    // would all read the same cut short. Where there is room, the list
+    // grows to the name instead (Better Messages' mention-popover.tsx).
+    &__name {
+        flex: 1 1 auto;
+        min-width: 0;
+        font-weight: 500;
+        overflow-wrap: break-word;
+        overflow-wrap: anywhere;
+    }
 }
 
 // v2 GifPickerButton + StickerPickerButton both render their own

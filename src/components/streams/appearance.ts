@@ -86,21 +86,21 @@ export function safeImage( url : unknown ) : string | null {
 
 const clamp = ( n : number, min : number, max : number ) => Math.min( max, Math.max( min, Math.round( n ) ) );
 
-// The classes on the theme root (.estream-theme), which the stylesheet keys the theme and layout to; and
+// The classes on the theme root (.wplus-live-stream-theme), which the stylesheet keys the theme and layout to; and
 // `wp-exclude-emoji`, which keeps WordPress from swapping the emoji inside for pictures of its own (with
 // the WordPlus SDK's emoji guard, which the plugin loads before the player). `picture` is the shape of the picture as
 // it arrives (the player's videoShape), which an `auto` shape takes.
 export function themeClass( appearance : Appearance = {}, picture : Shape = '16:9' ) : string {
     const theme = appearance.theme === 'dark' || appearance.theme === 'auto' ? appearance.theme : 'light';
-    const classes = [ 'estream-theme', 'wp-exclude-emoji', 'estream-theme--' + theme ];
+    const classes = [ 'wplus-live-stream-theme', 'wp-exclude-emoji', 'wplus-live-stream-theme--' + theme ];
     const shape = appearance.shape === '16:9' || appearance.shape === '4:3' || appearance.shape === '9:16' ? appearance.shape : picture;
 
-    if( appearance.chat === 'below' ) classes.push( 'estream-theme--chat-below' );
-    if( appearance.font === 'system' ) classes.push( 'estream-theme--system-font' );
-    if( shape === '4:3' ) classes.push( 'estream-theme--standard' );
-    if( shape === '9:16' ) classes.push( 'estream-theme--upright' );
-    if( appearance.times === true ) classes.push( 'estream-theme--times' );
-    if( appearance.avatars === false ) classes.push( 'estream-theme--no-avatars' );
+    if( appearance.chat === 'below' ) classes.push( 'wplus-live-stream-theme--chat-below' );
+    if( appearance.font === 'system' ) classes.push( 'wplus-live-stream-theme--system-font' );
+    if( shape === '4:3' ) classes.push( 'wplus-live-stream-theme--standard' );
+    if( shape === '9:16' ) classes.push( 'wplus-live-stream-theme--upright' );
+    if( appearance.times === true ) classes.push( 'wplus-live-stream-theme--times' );
+    if( appearance.avatars === false ) classes.push( 'wplus-live-stream-theme--no-avatars' );
 
     return classes.join( ' ' );
 }
@@ -110,20 +110,20 @@ export function themeStyle( appearance : Appearance = {} ) : CSSProperties {
     const style : Record<string, string> = {};
 
     if( typeof appearance.accent === 'string' && HEX.test( appearance.accent ) ){
-        style[ '--estream-accent' ] = appearance.accent;
-        style[ '--estream-accent-text' ] = contrastText( appearance.accent );
+        style[ '--wplus-live-stream-accent' ] = appearance.accent;
+        style[ '--wplus-live-stream-accent-text' ] = contrastText( appearance.accent );
     }
 
     if( typeof appearance.live === 'string' && HEX.test( appearance.live ) ){
-        style[ '--estream-live' ] = appearance.live;
+        style[ '--wplus-live-stream-live' ] = appearance.live;
     }
 
     if( typeof appearance.radius === 'number' && Number.isFinite( appearance.radius ) ){
-        style[ '--estream-radius' ] = clamp( appearance.radius, 0, 24 ) + 'px';
+        style[ '--wplus-live-stream-radius' ] = clamp( appearance.radius, 0, 24 ) + 'px';
     }
 
     if( typeof appearance.chatHeight === 'number' && Number.isFinite( appearance.chatHeight ) ){
-        style[ '--estream-chat-height' ] = clamp( appearance.chatHeight, 320, 900 ) + 'px';
+        style[ '--wplus-live-stream-chat-height' ] = clamp( appearance.chatHeight, 320, 900 ) + 'px';
     }
 
     return style as CSSProperties;

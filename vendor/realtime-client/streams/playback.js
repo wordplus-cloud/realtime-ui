@@ -1,4 +1,5 @@
 import { CHOSEN_MAX_SIDE } from "./protocol.js";
+import { selectedPair } from "../calls/pair.js";
 // A picture that shows no new frame this long while it should is stalled: a camera sends 30 a second.
 const STALL_MS = 1000;
 // A picture too much for this viewer's connection, and only theirs: no new frame for TOO_SLOW_MS while the media server
@@ -357,12 +358,9 @@ export class PlaybackMonitor {
         };
     }
 }
-// The candidate pair in use, of a report's.
+// The candidate pair in use, of a report's, not any pair once nominated (calls/pair.ts).
 export function pairOf(stats) {
-    const all = [...stats.values()];
-    const selected = all.find((s) => s.type === 'transport' && typeof s.selectedCandidatePairId === 'string');
-    return (selected ? stats.get(selected.selectedCandidatePairId) : undefined)
-        ?? all.find((s) => s.type === 'candidate-pair' && (s.selected === true || (s.nominated === true && s.state === 'succeeded')));
+    return selectedPair(stats);
 }
 // The candidate pair in use: its round trip, and how the local side reaches the server.
 export function transportOf(stats) {

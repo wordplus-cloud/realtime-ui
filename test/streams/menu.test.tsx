@@ -30,7 +30,7 @@ function measure( top : number, height : number ){
     Object.defineProperty( Element.prototype, 'getBoundingClientRect', {
         configurable: true,
         value(){
-            return this.classList?.contains( 'estream-menu__button' )
+            return this.classList?.contains( 'wplus-live-stream-menu__button' )
                 ? { top, bottom: top + 36, left: 504, right: 540, width: 36, height: 36, x: 504, y: top }
                 : { top: 0, bottom: 0, left: 0, right: 0, width: 0, height: 0, x: 0, y: 0 };
         }

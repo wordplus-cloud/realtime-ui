@@ -68,6 +68,17 @@ export declare const CHECK_MAX_FRAME_SHARE: number;
 /** The frames the camera must give over the window for a verdict: fewer (a dim room, a camera starting) say too little. */
 export declare const CHECK_MIN_FRAMES = 6;
 /**
+ * A layered encoding's (VP9 or AV1 SVC) time a picture against its layers' average: Chrome gives each spatial layer the
+ * time from its picture's start to that layer's end and counts each as a frame encoded and sent (libwebrtc's
+ * FrameEncodeMetadataWriter stamps one start a picture for every layer, SendStatisticsProxy adds each layer's), so
+ * totalEncodeTime over the pictures counts what comes before the last layer two or three times. Measured in a loopback
+ * (Chromium 153, a Mac, 10 fps, the layers' times seen leaving the encoder): a picture's time came to 1.2 to 1.5 times
+ * its layers' average, against 2 to 2.5 times for that sum (VP9 L3T3 at 1080: 26 ms summed, 9.8 to 11 a picture).
+ */
+export declare const SVC_PICTURE_SHARE = 1.5;
+/** The share of the camera's frames sent that is every one of them, for a verdict on its time alone (judgeEncoder()). */
+export declare const CHECK_KEPT_ALL_SHARE = 0.95;
+/**
  * 1.0.53: the check's own numbers, the node's to change without a client update (check.connectMs, check.warmupMs,
  * check.keepUpMs, check.windowMs, check.minFrames, check.bandwidthShare, check.pollMs, check.headroom,
  * check.fallbackKbps): the constants here without settings.
@@ -115,7 +126,17 @@ export interface EncoderSample {
     late?: EncoderSample;
     /** the lines of the picture it encoded at the end (outbound-rtp frameHeight, the top layer's): the CPU may have shrunk it */
     frameHeight?: number;
+    /**
+     * the spatial layers of a picture, as the browser names its encoding (outbound-rtp scalabilityMode: L3T3_KEY 3, and
+     * L2T3_KEY where it runs two at a small size); missing: not said (pictureLayers())
+     */
+    layers?: number;
 }
+/**
+ * The frames a picture makes, each counted as encoded and as sent: its spatial layers where the browser names them,
+ * else the frames encoded over the camera's where clearly more than one (a browser that doesn't say), else one.
+ */
+export declare function pictureLayers(s: Pick<EncoderSample, 'captured' | 'encoded' | 'layers'>): number;
 /** What a check found of one codec: its result (null: too little to tell), and the numbers it was found by. */
 export interface CameraCheckVerdict {
     codec: CameraCodec;
@@ -162,19 +183,24 @@ export interface CheckWarmup {
  *   CHECK_MIN_SENT_SHARE of the camera's frames;
  * - software: `cpu` where the CPU held it back over CHECK_MAX_CPU_SHARE of the window, a picture took over
  *   CHECK_MAX_FRAME_SHARE of its interval, or it sent under CHECK_MIN_SENT_SHARE;
- * - `pass` otherwise.
+ * - `pass` otherwise, and ("tight") where a picture took over CHECK_MAX_FRAME_SHARE of its interval but no more than
+ *   the interval, above CAMERA_STEP_DOWN_HEIGHT, while every frame was sent (CHECK_KEPT_ALL_SHARE) and the CPU never held it back: it keeps
+ *   up, and a call's CPU watch brings it down to CAMERA_STEP_DOWN_HEIGHT in place should it fall behind (camera-adapt.ts,
+ *   stepDownCamera()), where a verdict of too heavy would keep it there or move it to VP8 for good. A move's check
+ *   measures while the camera still goes out in its old codec, which slows it too.
  * Sending under CHECK_MIN_SENT_SHARE over the window while keeping up in its second half (`late`) is an encoder still
- * starting: too little to tell ("slow-start"), never drops nor cpu. The time a picture takes is the encoding time over
- * the pictures the camera gave, no more: an SVC encoding (VP9, AV1) counts each spatial layer's frame as encoded (Chrome's
- * VP9 L3T3 about 31 a second from a 15 fps camera), which spread a picture's time over two or three. The three shares
- * are the policy's tune's where given (passSent, passCpu, passEncode).
+ * starting: too little to tell ("slow-start"), never drops nor cpu. A layered encoding (VP9, AV1 SVC) counts each spatial
+ * layer's frame as encoded and as sent (pictureLayers()), so its frames sent are over its layers, and its time a picture
+ * is its layers' average time times SVC_PICTURE_SHARE, not their sum. The three shares are the policy's tune's where given
+ * (passSent, passCpu, passEncode).
  */
 export declare function judgeEncoder(codec: CameraCodec, wantHardware: boolean, s: EncoderSample, tune?: Pick<CameraTune, 'passSent' | 'passCpu' | 'passEncode'>, check?: Pick<CheckNumbers, 'minFrames' | 'bandwidthShare'>): CameraCheckVerdict;
+type SentCounts = Pick<EncoderSample, 'captured' | 'sent' | 'elapsedMs'> & Partial<Pick<EncoderSample, 'encoded' | 'layers'>>;
 /**
  * Whether an encoder keeps up with its camera over a stretch (the check's warm-up, CAMERA_CHECK_KEEPUP_MS): the camera
  * gave two frames or more, and it sent at least passSent of them.
  */
-export declare function keepsUp(s: Pick<EncoderSample, 'captured' | 'sent' | 'elapsedMs'>, passSent: number): boolean;
+export declare function keepsUp(s: SentCounts, passSent: number): boolean;
 /**
  * The share of its frame interval a picture inferred at a lower height (fitsLower()) may take: it goes out unmeasured,
  * so it needs room to spare that a measured one doesn't.
@@ -216,6 +242,8 @@ export interface EncoderCountsNow {
     sourceHeight: number;
     /** what the browser says holds the encoder back now (qualityLimitationReason); '' not said */
     limit: string;
+    /** the spatial layers of a picture, from its scalabilityMode (L3T3_KEY 3); 0 not said */
+    layers: number;
 }
 /** The sender's counts from its stats (an RTCStatsReport): its outbound-rtp's, summed, and its media-source's frames. */
 export declare function encoderCounts(report: StatsLike): EncoderCountsNow;

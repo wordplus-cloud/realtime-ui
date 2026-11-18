@@ -36,7 +36,7 @@ function Share(){
     };
 
     return (
-        <button type="button" className="estream-button estream-button--quiet" onClick={ () => void share() } aria-live="polite">
+        <button type="button" className="wplus-live-stream-button wplus-live-stream-button--quiet" onClick={ () => void share() } aria-live="polite">
             <Icon name={ copied ? 'check' : 'share' } />
             { copied ? __( 'Link copied', 'wordplus-live-stream' ) : __( 'Share', 'wordplus-live-stream' ) }
         </button>
@@ -68,14 +68,14 @@ export function Info( props : { guests : boolean, show? : InfoShows } ){
                 : '';
 
     return (
-        <div className="estream-info">
-            <div className="estream-info__text">
-                { titled && <h2 className="estream-info__title">{ player.title }</h2> }
+        <div className="wplus-live-stream-info">
+            <div className="wplus-live-stream-info__text">
+                { titled && <h2 className="wplus-live-stream-info__title">{ player.title }</h2> }
                 { ( when || counted ) && (
-                    <p className="estream-info__meta">
+                    <p className="wplus-live-stream-info__meta">
                         { when && <span>{ when }</span> }
                         { counted && (
-                            <span className="estream-info__count">
+                            <span className="wplus-live-stream-info__count">
                                 { sprintf( _nx( '%s watching', '%s watching', state.viewers, 'how many people watch', 'wordplus-live-stream' ), count( state.viewers ) ) }
                             </span>
                         ) }
@@ -83,7 +83,7 @@ export function Info( props : { guests : boolean, show? : InfoShows } ){
                 ) }
             </div>
             { state.status === 'ready' && show.actions !== false && (
-                <div className="estream-info__actions">
+                <div className="wplus-live-stream-info__actions">
                     { ! host && <ViewerControls guests={ props.guests } /> }
                     <Share />
                 </div>

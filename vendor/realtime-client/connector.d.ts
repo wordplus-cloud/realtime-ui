@@ -44,13 +44,18 @@ export interface ConnectorOptions {
     doc?: Pick<Document, 'addEventListener' | 'removeEventListener'> | null;
     /** socket.io's options for every connection. WebSocket only by default, as every product had it. */
     options?: Partial<ManagerOptions>;
+    /**
+     * False for a page on another website (embedded.ts): its connections go through the realtime server's own name
+     * alone, never to a node directly, and keep no node (hub.ts). True by default.
+     */
+    direct?: boolean;
     /** Stand-ins for tests. */
     manager?: ManagerFactory;
     random?: () => number;
 }
 export declare class Connector implements ConnectorApi {
     private readonly options;
-    readonly version = "1.0.59";
+    readonly version = "1.0.87";
     private readonly hubs;
     /** Namespaces several attaches share (share.ts), by cluster, path, namespace and key. */
     private readonly shared;

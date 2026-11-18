@@ -16,12 +16,12 @@ export function HostNote( props : { hidden? : boolean } ){
     const label = live ? __( 'Open the studio', 'wordplus-live-stream' ) : __( 'Go live in the studio', 'wordplus-live-stream' );
 
     return (
-        <div className="estream-hostnote">
+        <div className="wplus-live-stream-hostnote">
             <Icon name="broadcast" />
-            <span className="estream-hostnote__text">{ live ? __( 'You are live.', 'wordplus-live-stream' ) : __( 'You host this stream.', 'wordplus-live-stream' ) }</span>
+            <span className="wplus-live-stream-hostnote__text">{ live ? __( 'You are live.', 'wordplus-live-stream' ) : __( 'You host this stream.', 'wordplus-live-stream' ) }</span>
             { player.preview
-                ? <span className="estream-button estream-button--small estream-button--primary">{ label }</span>
-                : <a className="estream-button estream-button--small estream-button--primary" href={ player.studioUrl }>{ label }</a> }
+                ? <span className="wplus-live-stream-button wplus-live-stream-button--small wplus-live-stream-button--primary">{ label }</span>
+                : <a className="wplus-live-stream-button wplus-live-stream-button--small wplus-live-stream-button--primary" href={ player.studioUrl }>{ label }</a> }
         </div>
     );
 }

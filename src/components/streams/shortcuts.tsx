@@ -29,11 +29,11 @@ export function ShortcutList(){
             labelId={ labelId }
             title={ _x( 'Keyboard shortcuts', 'of the player', 'wordplus-live-stream' ) }
             onCancel={ close }
-            actions={ <button type="button" className="estream-button estream-button--primary" onClick={ close }>{ _x( 'Close', 'the statistics', 'wordplus-live-stream' ) }</button> }
+            actions={ <button type="button" className="wplus-live-stream-button wplus-live-stream-button--primary" onClick={ close }>{ _x( 'Close', 'the statistics', 'wordplus-live-stream' ) }</button> }
         >
-            <dl className="estream-keys">
+            <dl className="wplus-live-stream-keys">
                 { keys.map( ( [ key, what ] ) => (
-                    <div key={ key } className="estream-keys__row">
+                    <div key={ key } className="wplus-live-stream-keys__row">
                         <dt><kbd>{ key }</kbd></dt>
                         <dd>{ what }</dd>
                     </div>

@@ -22,6 +22,6 @@ export function EmojiGlyph( props : { emoji : string } ){
     const image = emoji && ready ? emoji.split( props.emoji ).find( ( part ) : part is EmojiImage => typeof part !== 'string' ) : undefined;
 
     return image
-        ? <img className="estream-emoji-image" src={ image.src } alt={ props.emoji } draggable={ false } />
+        ? <img className="wplus-live-stream-emoji-image" src={ image.src } alt={ props.emoji } draggable={ false } />
         : <>{ props.emoji }</>;
 }

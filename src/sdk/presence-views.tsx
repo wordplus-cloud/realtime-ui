@@ -4,12 +4,12 @@ import { OnlineCount as Count, OnlineList as List, PersonRow } from "../componen
 import { host } from "../host.ts";
 import { _x } from "../inc/globals.ts";
 import { plainName } from "../inc/names.ts";
-import { personOf, useProfiles, useRoom, useTyping, type RoomMember, type SdkRooms } from "./rooms.ts";
+import { personOf, useProfiles, useRealtime, useRoom, useTyping, type RoomMember, type SdkRooms } from "./rooms.ts";
 import { Piece, PiecesProvider, type Pieces } from "../pieces.tsx";
 
 // Presence on the SDK's rooms: Better Messages' online column, typing line and count, fed by a presence room of the
-// app's. Each takes the page's `rt` (connect()'s Realtime, or a WordPress page's room client) and the room's name, and
-// joins the room while it is on the screen.
+// app's. Each takes the room's name and draws on <RealtimeProvider>'s connection, or the `rt` it is given (connect()'s
+// Realtime, or a WordPress page's room client), and joins the room while it is on the screen.
 
 export interface RoomPerson extends RoomMember {
     name: string;
@@ -17,7 +17,8 @@ export interface RoomPerson extends RoomMember {
 }
 
 export interface RoomOnlineProps {
-    rt: SdkRooms | null | undefined;
+    /** The page's connection: <RealtimeProvider>'s when left out. */
+    rt?: SdkRooms | null;
     /** A presence room of the app's (`presence: true` in its server's rule). */
     room: string;
     /** The title before the count: "Online" by default. */
@@ -36,7 +37,8 @@ export function RoomOnline( { components, ...props }: RoomOnlineProps ) {
     return <PiecesProvider pieces={ components }><OnlineRows { ...props } /></PiecesProvider>;
 }
 
-function OnlineRows( { rt, room, title, actions, onClose, empty }: Omit<RoomOnlineProps, "components"> ) {
+function OnlineRows( { rt: given, room, title, actions, onClose, empty }: Omit<RoomOnlineProps, "components"> ) {
+    const rt = useRealtime<SdkRooms>( given );
     const view = useRoom( rt, room );
     const profiles = useProfiles( rt, view.members.map( ( m ) => m.id ) );
     const me = rt?.user ?? null;
@@ -67,7 +69,8 @@ function OnlineRows( { rt, room, title, actions, onClose, empty }: Omit<RoomOnli
 }
 
 export interface RoomTypingProps {
-    rt: SdkRooms | null | undefined;
+    /** The page's connection: <RealtimeProvider>'s when left out. */
+    rt?: SdkRooms | null;
     room: string;
     /** The event the room's typing goes by: `typing` by default, `{ on: true }` and `{ on: false }`. */
     event?: string;
@@ -75,7 +78,8 @@ export interface RoomTypingProps {
 }
 
 /** Who is typing in a room now, by name, as Better Messages says it; nothing while nobody is. */
-export function RoomTyping( { rt, room, event = "typing", compact }: RoomTypingProps ) {
+export function RoomTyping( { rt: given, room, event = "typing", compact }: RoomTypingProps ) {
+    const rt = useRealtime<SdkRooms>( given );
     const view = useRoom( rt, room );
     const writers = useTyping( rt, view.room, event );
     const profiles = useProfiles( rt, writers );
@@ -90,7 +94,8 @@ export function RoomTyping( { rt, room, event = "typing", compact }: RoomTypingP
 }
 
 export interface RoomCountProps {
-    rt: SdkRooms | null | undefined;
+    /** The page's connection: <RealtimeProvider>'s when left out. */
+    rt?: SdkRooms | null;
     room: string;
     className?: string;
 }

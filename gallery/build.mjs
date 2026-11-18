@@ -28,5 +28,6 @@ await build( {
 writeFileSync( join( out, 'ui.css' ), [ 'calls.css', 'presence.css', 'chat.css' ].map( ( f ) => readFileSync( join( root, 'dist', f ), 'utf8' ) ).join( '\n' ) );
 cpSync( join( here, 'index.html' ), join( out, 'index.html' ) );
 cpSync( join( here, 'avatars' ), join( out, 'avatars' ), { recursive: true } );
+cpSync( join( here, 'photos' ), join( out, 'photos' ), { recursive: true } );
 
-console.log( 'gallery/build: index.html, gallery.js, ui.css, avatars' );
+console.log( 'gallery/build: index.html, gallery.js, ui.css, avatars, photos' );

@@ -1,0 +1,449 @@
+// A group call's recording (components/calls/recording.tsx): the REC pill in the bar beside the connection status, the
+// notice in the join prompt's place, and the call's own dialog for the confirms and the question to everyone else.
+
+// ─── The preview ──────────────────────────────────────────────────────────
+// What someone in the call sees as it is recorded (recording-preview.tsx), for an admin choosing how people are told: a
+// small still stage with its people, the bar, and the notice or the question as the call draws them.
+
+.wplus-call-wrap.wplus-call-recording-preview {
+    height: auto;
+    aspect-ratio: 16 / 10;
+    min-height: 260px;
+    &:not(#\9) { border-radius: 14px; }
+    pointer-events: none;
+    user-select: none;
+
+    .wplus-call-recording-preview-people {
+        position: absolute;
+        inset: 0 0 64px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 12px;
+        padding: 12px;
+    }
+
+    .wplus-call-recording-preview-person {
+        display: flex;
+        flex: 1 1 0;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        max-width: 180px;
+        height: 100%;
+        min-width: 0;
+        &:not(#\9) { border-radius: 12px; }
+        background: rgba(255, 255, 255, 0.05);
+    }
+
+    .wplus-call-recording-preview-face {
+        display: grid;
+        place-items: center;
+        width: 52px;
+        height: 52px;
+        &:not(#\9) { border-radius: 50%; }
+        background: rgba(var(--wplus-color-accent, 59, 130, 246), 0.85);
+        color: #fff;
+        font-size: 18px;
+        font-weight: 600;
+    }
+
+    .wplus-call-recording-preview-name {
+        max-width: 90%;
+        overflow: hidden;
+        color: rgba(255, 255, 255, 0.85);
+        font-size: 12px;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    // The question is drawn whole in the stage, a little smaller than in a call.
+    .wplus-call-dialog {
+        animation: none;
+        font-size: 13px;
+    }
+
+    .wplus-call-rec-pill {
+        animation: none;
+    }
+
+    // REC beside the connection status, as in a call, where the dock after them keeps them at the start.
+    .wplus-group-call-controls-v2 {
+        justify-content: flex-start;
+    }
+}
+
+// ─── The pill ─────────────────────────────────────────────────────────────
+// After the connection status at the start of the bar, as high as its chip and clear of every tile. Red while it
+// records, dark while it starts or saves. A moderator's has Stop and is a button.
+
+.wplus-call-wrap .wplus-call-rec-region {
+    position: relative;
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    min-width: 0;
+}
+
+.wplus-call-wrap .wplus-call-rec-pill {
+    position: relative;
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    gap: 6px;
+    height: 28px;
+    max-width: 100%;
+    box-sizing: border-box;
+    padding: 0 10px;
+    &:not(#\9) { border-radius: var(--wplus-radius-pill); }
+    background: rgba(var(--wplus-color-recording), 1);
+    color: #fff;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+    user-select: none;
+    animation: wplus-call-popover-up 0.18s ease-out;
+
+    &[role="button"] {
+        cursor: pointer;
+        -webkit-tap-highlight-color: transparent;
+
+        &:hover { filter: brightness(1.08); }
+
+        &:focus-visible {
+            outline: 2px solid #fff;
+            outline-offset: 2px;
+        }
+
+        // A 44px target, around a pill drawn as high as the connection chip.
+        &::before {
+            content: "";
+            position: absolute;
+            inset: -8px -2px;
+        }
+    }
+
+    &[data-state="starting"],
+    &[data-state="stopping"] {
+        @include wplus-call-glass(0.42);
+        font-weight: 500;
+        letter-spacing: normal;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        animation: none;
+    }
+}
+
+.wplus-call-wrap .wplus-call-rec-dot {
+    flex: none;
+    width: 7px;
+    height: 7px;
+    &:not(#\9) { border-radius: 50%; }
+    background: #fff;
+    animation: wplus-call-recording-breathe 1.6s ease-in-out infinite;
+
+    @media (prefers-reduced-motion: reduce) {
+        animation: none;
+    }
+}
+
+.wplus-call-wrap .wplus-call-rec-time {
+    font-weight: 500;
+    letter-spacing: normal;
+}
+
+.wplus-call-wrap .wplus-call-rec-stop {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    height: 16px;
+    margin-inline-start: 2px;
+    padding-inline-start: 8px;
+    border-inline-start: 1px solid rgba(255, 255, 255, 0.45);
+    letter-spacing: normal;
+
+    > i {
+        display: block;
+        width: 7px;
+        height: 7px;
+        &:not(#\9) { border-radius: 1.5px; }
+        background: #fff;
+    }
+}
+
+// A phone held upright: the dot, the time and, for a moderator, Stop's square, where the dock leaves the bar little
+// room. REC and the word Stop go first.
+@container (max-width: 599px) {
+    .wplus-call-wrap .wplus-call-rec-label,
+    .wplus-call-wrap .wplus-call-rec-stop-word {
+        display: none;
+    }
+
+    .wplus-call-wrap .wplus-call-rec-pill {
+        gap: 5px;
+        padding: 0 9px;
+        font-size: 12px;
+    }
+
+    .wplus-call-wrap .wplus-call-rec-stop {
+        padding-inline-start: 7px;
+    }
+}
+
+// Read once by a screen reader as it starts, never shown.
+.wplus-call-recording-announce {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+}
+
+@keyframes wplus-call-recording-breathe {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.35; }
+}
+
+// ─── The notice ───────────────────────────────────────────────────────────
+// The ask prompt's card, its icon in the recording's red. While it shows, the join prompt waits under it.
+
+// Over the ask prompt's own accent badge, which it shares the classes of.
+.wplus-call-wrap .wplus-call-ask-prompt.wplus-call-recording-notice .wplus-call-join-prompt-icon {
+    background: rgba(var(--wplus-color-recording), 0.18);
+    color: rgba(var(--wplus-color-recording), 1);
+}
+
+.wplus-call-wrap:has(.wplus-call-recording-notice) .wplus-call-join-prompt-region:not(.wplus-call-recording-notice-region) {
+    display: none;
+}
+
+// ─── The dialog ───────────────────────────────────────────────────────────
+// Host Controls' card, centred over the dimmed stage, over the dock too: it is answered before anything else. On a
+// phone held upright, a sheet standing on the dock that spans the stage, as More's does.
+
+.wplus-call-wrap .wplus-call-dialog-scrim {
+    position: absolute;
+    z-index: 30;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+    padding: 16px;
+    background: rgba(0, 0, 0, 0.5);
+}
+
+.wplus-call-wrap .wplus-call-dialog {
+    display: flex;
+    flex-direction: column;
+    box-sizing: border-box;
+    width: 380px;
+    max-width: 100%;
+    max-height: 100%;
+    margin: 0;
+    padding: 6px 6px 12px;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    @include wplus-call-scrollbar;
+    border: 1px solid rgba(255, 255, 255, 0.09);
+    &:not(#\9) { border-radius: 14px; }
+    background: rgb(22, 24, 30);
+    box-shadow: 0 18px 48px rgba(0, 0, 0, 0.5), 0 2px 8px rgba(0, 0, 0, 0.35);
+    color: rgba(255, 255, 255, 0.94);
+    font-size: 14px;
+    font-weight: 400;
+    line-height: 1.45;
+    letter-spacing: normal;
+    text-align: start;
+    text-transform: none;
+    animation: wplus-call-popover-down 0.14s ease-out;
+
+    @media (prefers-reduced-motion: reduce) {
+        animation: none;
+    }
+}
+
+.wplus-call-wrap .wplus-call-dialog-head {
+    display: flex;
+    flex: none;
+    align-items: center;
+    gap: 10px;
+    margin: 0 0 4px;
+    padding: 8px 8px 10px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.wplus-call-wrap .wplus-call-dialog-badge {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    &:not(#\9) { border-radius: 8px; }
+    background: rgba(var(--wplus-color-recording), 0.18);
+    color: rgba(var(--wplus-color-recording), 1);
+
+    > svg { width: 16px; height: 16px; }
+}
+
+.wplus-call-wrap .wplus-call-dialog-title {
+    font-size: 14px;
+    font-weight: 600;
+    line-height: 1.3;
+    color: #fff;
+}
+
+.wplus-call-wrap .wplus-call-dialog-body {
+    padding: 6px 10px 2px;
+
+    p {
+        margin: 0;
+        padding: 0;
+        font-size: inherit;
+        line-height: inherit;
+        color: inherit;
+    }
+
+    .wplus-call-dialog-note {
+        margin-top: 12px;
+        font-size: 13px;
+        color: rgba(255, 255, 255, 0.62);
+    }
+}
+
+.wplus-call-wrap .wplus-call-dialog-facts {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 6px 14px;
+    margin: 14px 0 0;
+    padding: 0;
+    font-size: 13px;
+    line-height: 1.4;
+
+    dt {
+        margin: 0;
+        font-weight: 400;
+        color: rgba(255, 255, 255, 0.55);
+    }
+
+    dd {
+        margin: 0;
+        font-weight: 500;
+        overflow-wrap: anywhere;
+    }
+}
+
+// Remove and Ban from Calls' length (ban-dialog.tsx): a number and its unit on one row.
+.wplus-call-wrap .wplus-call-ban-label {
+    display: block;
+    margin-top: 14px;
+    font-size: 13px;
+    color: rgba(255, 255, 255, 0.62);
+}
+
+.wplus-call-wrap .wplus-call-ban-row {
+    display: flex;
+    gap: 8px;
+    margin-top: 6px;
+
+    input, select {
+        height: 36px;
+        min-width: 0;
+        padding: 0 10px;
+        border: 1px solid rgba(255, 255, 255, 0.16);
+        &:not(#\9) { border-radius: 8px; }
+        background: rgba(255, 255, 255, 0.08);
+        color: rgba(255, 255, 255, 0.94);
+        font: inherit;
+        font-size: 14px;
+    }
+
+    input { flex: 0 1 96px; }
+    select { flex: 1 1 auto; }
+}
+
+.wplus-call-wrap .wplus-call-dialog-yes[aria-disabled] {
+    opacity: 0.5;
+    cursor: default;
+}
+
+.wplus-call-wrap .wplus-call-dialog-actions {
+    display: flex;
+    flex: none;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-top: 12px;
+    padding: 12px 10px 0;
+    border-top: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.wplus-call-wrap .wplus-call-dialog-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    height: 36px;
+    padding: 0 16px;
+    &:not(#\9) { border-radius: var(--wplus-radius-pill); }
+    font-size: 13px;
+    font-weight: 600;
+    white-space: nowrap;
+    cursor: pointer;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+    transition: background 0.12s ease;
+
+    &:focus-visible {
+        outline: 2px solid rgba(var(--wplus-color-accent), 1);
+        outline-offset: 2px;
+    }
+}
+
+.wplus-call-wrap .wplus-call-dialog-no {
+    background: rgba(255, 255, 255, 0.1);
+    color: rgba(255, 255, 255, 0.94);
+
+    &:hover { background: rgba(255, 255, 255, 0.16); }
+}
+
+.wplus-call-wrap .wplus-call-dialog-yes {
+    background: rgba(var(--wplus-color-accent), 1);
+    color: rgba(var(--wplus-color-text-on-accent), 1);
+
+    &:hover { background: rgba(var(--wplus-color-accent-hover), 1); }
+
+    &[data-danger] {
+        background: rgba(var(--wplus-color-recording), 1);
+        color: #fff;
+
+        &:hover { filter: brightness(1.08); }
+    }
+}
+
+@media (pointer: coarse) {
+    @container (max-width: 599px) {
+        .wplus-call-wrap .wplus-call-dialog-scrim {
+            align-items: flex-end;
+            padding: 0 6px 74px;
+        }
+
+        .wplus-call-wrap .wplus-call-dialog {
+            width: 100%;
+            padding: 8px 8px 12px;
+            &:not(#\9) { border-radius: 16px; }
+        }
+
+        .wplus-call-wrap .wplus-call-dialog-button {
+            flex: 1;
+            height: 44px;
+            font-size: 15px;
+        }
+    }
+}

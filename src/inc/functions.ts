@@ -1,6 +1,5 @@
 // What the call screens take from Better Messages' inc/functions.ts, line for line, and formatSize, so a view copied
 // into an app imports none of the package's dependencies itself.
-import { filesize } from "filesize";
 
 export function BMHexToRGBA( hex: string, opacity: number ) {
     let c;
@@ -38,9 +37,28 @@ export function getSpeakerHighlightStyles(
     };
 }
 
-/** A number of bytes as people read it ("1.5 MB"): a call's traffic in its settings. */
+const SIZE_UNITS = [ "B", "kB", "MB", "GB", "TB", "PB", "EB", "ZB", "YB" ];
+
+/**
+ * A number of bytes as people read it ("1.5 MB"): a call's traffic in its settings, a file's size. As filesize wrote it
+ * with its defaults until 2026-10-31: powers of 1000, two decimals past the bytes, rounded half up, 1000 of a unit as
+ * one of the next (test/format-size.test.ts holds the two side by side).
+ */
 export function formatSize( bytes: number ): string {
-    return filesize( bytes );
+    if ( isNaN( bytes ) ) throw new TypeError( "Invalid number" );
+    const negative = bytes < 0;
+    const size = negative ? -bytes : bytes;
+    let unit = Math.min( Math.max( Math.floor( Math.log( size ) / Math.log( 1000 ) ), 0 ), 8 );
+    let value = 0;
+    if ( size !== 0 ) {
+        const decimals = Math.pow( 10, unit > 0 ? 2 : 0 );
+        value = Math.round( ( size / Math.pow( 1000, unit ) ) * decimals ) / decimals;
+        if ( value === 1000 && unit < 8 ) {
+            value = 1;
+            unit++;
+        }
+    }
+    return ( negative ? -value : value ) + " " + SIZE_UNITS[ unit ];
 }
 
 export function msToTime( duration: number ) {

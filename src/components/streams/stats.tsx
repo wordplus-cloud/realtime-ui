@@ -83,11 +83,11 @@ function Section( props : { title : string, rows : Row[] } ){
     if( rows.length === 0 ) return null;
 
     return (
-        <section className="estream-stats__section">
-            <h3 className="estream-stats__heading">{ props.title }</h3>
-            <dl className="estream-stats__rows">
+        <section className="wplus-live-stream-stats__section">
+            <h3 className="wplus-live-stream-stats__heading">{ props.title }</h3>
+            <dl className="wplus-live-stream-stats__rows">
                 { rows.map( ( [ label, value ] ) => (
-                    <div key={ label } className="estream-stats__row">
+                    <div key={ label } className="wplus-live-stream-stats__row">
                         <dt>{ label }</dt>
                         <dd>{ value }</dd>
                     </div>
@@ -221,7 +221,7 @@ export function StatsPanel(){
 
     const close = () => {
         player.toggleStats();
-        ( player.root.current?.querySelector( '.estream-stage' ) as HTMLElement | null )?.focus();
+        ( player.root.current?.querySelector( '.wplus-live-stream-stage' ) as HTMLElement | null )?.focus();
     };
 
     const transportText = transport?.protocol
@@ -237,23 +237,23 @@ export function StatsPanel(){
     return (
         <div
             ref={ panel }
-            className="estream-stats"
+            className="wplus-live-stream-stats"
             role="region"
             aria-label={ __( 'Statistics', 'wordplus-live-stream' ) }
             tabIndex={ -1 }
             onKeyDown={ ( e ) => { if( e.key === 'Escape' ){ e.stopPropagation(); close(); } } }
         >
-            <div className="estream-stats__head">
-                <h2 className="estream-stats__title">{ __( 'Statistics', 'wordplus-live-stream' ) }</h2>
-                <button type="button" className="estream-stats__button" onClick={ copy }>
+            <div className="wplus-live-stream-stats__head">
+                <h2 className="wplus-live-stream-stats__title">{ __( 'Statistics', 'wordplus-live-stream' ) }</h2>
+                <button type="button" className="wplus-live-stream-stats__button" onClick={ copy }>
                     <Icon name={ copied ? 'check' : 'copy' } />
                     { copied ? __( 'Copied', 'wordplus-live-stream' ) : __( 'Copy', 'wordplus-live-stream' ) }
                 </button>
-                <button type="button" className="estream-stats__button estream-stats__close" aria-label={ _x( 'Close', 'the statistics', 'wordplus-live-stream' ) } onClick={ close }>
+                <button type="button" className="wplus-live-stream-stats__button wplus-live-stream-stats__close" aria-label={ _x( 'Close', 'the statistics', 'wordplus-live-stream' ) } onClick={ close }>
                     <Icon name="close" />
                 </button>
             </div>
-            <div className="estream-stats__body" aria-live="off">
+            <div className="wplus-live-stream-stats__body" aria-live="off">
                 { /* For a host, what goes out first: what a host debugs. */ }
                 { detail?.video.map( ( v ) => <PictureOut key={ v.source } video={ v } /> ) }
                 { detail?.audio && <SoundOut audio={ detail.audio } /> }
@@ -299,9 +299,9 @@ export function StatsPanel(){
                     [ _x( 'Errors', 'in the statistics', 'wordplus-live-stream' ), count( session.errors ) ]
                 ] : [] } />
                 { stats && stats.events.length > 0 && (
-                    <section className="estream-stats__section">
-                        <h3 className="estream-stats__heading">{ _x( 'What happened', 'the last events, in the statistics', 'wordplus-live-stream' ) }</h3>
-                        <ol className="estream-stats__events">
+                    <section className="wplus-live-stream-stats__section">
+                        <h3 className="wplus-live-stream-stats__heading">{ _x( 'What happened', 'the last events, in the statistics', 'wordplus-live-stream' ) }</h3>
+                        <ol className="wplus-live-stream-stats__events">
                             { [ ...stats.events ].reverse().slice( 0, 12 ).map( ( event, i ) => (
                                 <li key={ event.at + ':' + i }>
                                     <time>{ new Date( event.at ).toLocaleTimeString() }</time>
@@ -312,7 +312,7 @@ export function StatsPanel(){
                         </ol>
                     </section>
                 ) }
-                { ! stats && ! detail && <p className="estream-stats__empty">{ _x( 'Nothing arrives yet', 'in the statistics', 'wordplus-live-stream' ) }</p> }
+                { ! stats && ! detail && <p className="wplus-live-stream-stats__empty">{ _x( 'Nothing arrives yet', 'in the statistics', 'wordplus-live-stream' ) }</p> }
             </div>
         </div>
     );

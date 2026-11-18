@@ -1,0 +1,3875 @@
+{
+  "//": "Cases every implementation of polls passes: realtime-ui (core.ts), the WordPlus SDK (PHP) and the server helpers of @wordplus/realtime. Times are unix seconds. Built by computing each output with core.ts, then read case by case.",
+  "definitions": [
+    {
+      "name": "a plain poll, anonymous by default",
+      "input": {
+        "question": "  Coming on Saturday?  ",
+        "options": [
+          "Yes",
+          "No",
+          "Maybe"
+        ]
+      },
+      "now": 1800000000,
+      "expect": {
+        "ok": true,
+        "value": {
+          "question": "Coming on Saturday?",
+          "options": [
+            {
+              "id": 1,
+              "text": "Yes"
+            },
+            {
+              "id": 2,
+              "text": "No"
+            },
+            {
+              "id": 3,
+              "text": "Maybe"
+            }
+          ],
+          "multiple": false,
+          "anonymous": true,
+          "quiz": null,
+          "closesAt": null,
+          "addOptions": false,
+          "hideResults": false
+        }
+      }
+    },
+    {
+      "name": "options as objects, their ids replaced by positions",
+      "input": {
+        "question": "Lunch?",
+        "options": [
+          {
+            "id": 9,
+            "text": "Pizza"
+          },
+          {
+            "id": 4,
+            "text": "Sushi"
+          }
+        ],
+        "anonymous": false,
+        "multiple": true
+      },
+      "now": 1800000000,
+      "expect": {
+        "ok": true,
+        "value": {
+          "question": "Lunch?",
+          "options": [
+            {
+              "id": 1,
+              "text": "Pizza"
+            },
+            {
+              "id": 2,
+              "text": "Sushi"
+            }
+          ],
+          "multiple": true,
+          "anonymous": false,
+          "quiz": null,
+          "closesAt": null,
+          "addOptions": false,
+          "hideResults": false
+        }
+      }
+    },
+    {
+      "name": "flags as WordPress and forms send them",
+      "input": {
+        "question": "Q",
+        "options": [
+          "A",
+          "B"
+        ],
+        "anonymous": "0",
+        "multiple": "1"
+      },
+      "now": 1800000000,
+      "expect": {
+        "ok": true,
+        "value": {
+          "question": "Q",
+          "options": [
+            {
+              "id": 1,
+              "text": "A"
+            },
+            {
+              "id": 2,
+              "text": "B"
+            }
+          ],
+          "multiple": true,
+          "anonymous": false,
+          "quiz": null,
+          "closesAt": null,
+          "addOptions": false,
+          "hideResults": false
+        }
+      }
+    },
+    {
+      "name": "line breaks and runs of spaces become one space",
+      "input": {
+        "question": "Line one\nline   two\t end",
+        "options": [
+          "A\r\nB",
+          "C"
+        ]
+      },
+      "now": 1800000000,
+      "expect": {
+        "ok": true,
+        "value": {
+          "question": "Line one line two end",
+          "options": [
+            {
+              "id": 1,
+              "text": "A B"
+            },
+            {
+              "id": 2,
+              "text": "C"
+            }
+          ],
+          "multiple": false,
+          "anonymous": true,
+          "quiz": null,
+          "closesAt": null,
+          "addOptions": false,
+          "hideResults": false
+        }
+      }
+    },
+    {
+      "name": "control characters and invisible spaces go, joiners stay",
+      "input": {
+        "question": "A\u0007B​C",
+        "options": [
+          "👨‍👩‍👧",
+          "می‌خواهم"
+        ]
+      },
+      "now": 1800000000,
+      "expect": {
+        "ok": true,
+        "value": {
+          "question": "ABC",
+          "options": [
+            {
+              "id": 1,
+              "text": "👨‍👩‍👧"
+            },
+            {
+              "id": 2,
+              "text": "می‌خواهم"
+            }
+          ],
+          "multiple": false,
+          "anonymous": true,
+          "quiz": null,
+          "closesAt": null,
+          "addOptions": false,
+          "hideResults": false
+        }
+      }
+    },
+    {
+      "name": "a quiz: one answer, multiple turned off",
+      "input": {
+        "question": "2 + 2?",
+        "options": [
+          "3",
+          "4",
+          "5"
+        ],
+        "multiple": true,
+        "quiz": {
+          "answer": 2,
+          "explanation": " Two pairs. "
+        }
+      },
+      "now": 1800000000,
+      "expect": {
+        "ok": true,
+        "value": {
+          "question": "2 + 2?",
+          "options": [
+            {
+              "id": 1,
+              "text": "3"
+            },
+            {
+              "id": 2,
+              "text": "4"
+            },
+            {
+              "id": 3,
+              "text": "5"
+            }
+          ],
+          "multiple": false,
+          "anonymous": true,
+          "quiz": {
+            "answer": 2,
+            "explanation": "Two pairs."
+          },
+          "closesAt": null,
+          "addOptions": false,
+          "hideResults": false
+        }
+      }
+    },
+    {
+      "name": "a quiz answer given as text",
+      "input": {
+        "question": "Q",
+        "options": [
+          "A",
+          "B"
+        ],
+        "quiz": {
+          "answer": "1"
+        }
+      },
+      "now": 1800000000,
+      "expect": {
+        "ok": true,
+        "value": {
+          "question": "Q",
+          "options": [
+            {
+              "id": 1,
+              "text": "A"
+            },
+            {
+              "id": 2,
+              "text": "B"
+            }
+          ],
+          "multiple": false,
+          "anonymous": true,
+          "quiz": {
+            "answer": 1,
+            "explanation": ""
+          },
+          "closesAt": null,
+          "addOptions": false,
+          "hideResults": false
+        }
+      }
+    },
+    {
+      "name": "a deadline in the future",
+      "input": {
+        "question": "Q",
+        "options": [
+          "A",
+          "B"
+        ],
+        "closesAt": 1800003600
+      },
+      "now": 1800000000,
+      "expect": {
+        "ok": true,
+        "value": {
+          "question": "Q",
+          "options": [
+            {
+              "id": 1,
+              "text": "A"
+            },
+            {
+              "id": 2,
+              "text": "B"
+            }
+          ],
+          "multiple": false,
+          "anonymous": true,
+          "quiz": null,
+          "closesAt": 1800003600,
+          "addOptions": false,
+          "hideResults": false
+        }
+      }
+    },
+    {
+      "name": "no deadline as 0 or null",
+      "input": {
+        "question": "Q",
+        "options": [
+          "A",
+          "B"
+        ],
+        "closesAt": 0
+      },
+      "now": 1800000000,
+      "expect": {
+        "ok": true,
+        "value": {
+          "question": "Q",
+          "options": [
+            {
+              "id": 1,
+              "text": "A"
+            },
+            {
+              "id": 2,
+              "text": "B"
+            }
+          ],
+          "multiple": false,
+          "anonymous": true,
+          "quiz": null,
+          "closesAt": null,
+          "addOptions": false,
+          "hideResults": false
+        }
+      }
+    },
+    {
+      "name": "an empty question",
+      "input": {
+        "question": "   ",
+        "options": [
+          "A",
+          "B"
+        ]
+      },
+      "now": 1800000000,
+      "expect": {
+        "ok": false,
+        "errors": [
+          {
+            "field": "question",
+            "code": "empty"
+          }
+        ]
+      }
+    },
+    {
+      "name": "a question of 255 characters, emoji counted once",
+      "input": {
+        "question": "😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀",
+        "options": [
+          "A",
+          "B"
+        ]
+      },
+      "now": 1800000000,
+      "expect": {
+        "ok": true,
+        "value": {
+          "question": "😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀",
+          "options": [
+            {
+              "id": 1,
+              "text": "A"
+            },
+            {
+              "id": 2,
+              "text": "B"
+            }
+          ],
+          "multiple": false,
+          "anonymous": true,
+          "quiz": null,
+          "closesAt": null,
+          "addOptions": false,
+          "hideResults": false
+        }
+      }
+    },
+    {
+      "name": "a question of 256 characters",
+      "input": {
+        "question": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+        "options": [
+          "A",
+          "B"
+        ]
+      },
+      "now": 1800000000,
+      "expect": {
+        "ok": false,
+        "errors": [
+          {
+            "field": "question",
+            "code": "too_long"
+          }
+        ]
+      }
+    },
+    {
+      "name": "one option",
+      "input": {
+        "question": "Q",
+        "options": [
+          "A"
+        ]
+      },
+      "now": 1800000000,
+      "expect": {
+        "ok": false,
+        "errors": [
+          {
+            "field": "options",
+            "code": "too_few"
+          }
+        ]
+      }
+    },
+    {
+      "name": "thirteen options",
+      "input": {
+        "question": "Q",
+        "options": [
+          "O0",
+          "O1",
+          "O2",
+          "O3",
+          "O4",
+          "O5",
+          "O6",
+          "O7",
+          "O8",
+          "O9",
+          "O10",
+          "O11",
+          "O12"
+        ]
+      },
+      "now": 1800000000,
+      "expect": {
+        "ok": false,
+        "errors": [
+          {
+            "field": "options",
+            "code": "too_many"
+          }
+        ]
+      }
+    },
+    {
+      "name": "twelve options",
+      "input": {
+        "question": "Q",
+        "options": [
+          "O1",
+          "O2",
+          "O3",
+          "O4",
+          "O5",
+          "O6",
+          "O7",
+          "O8",
+          "O9",
+          "O10",
+          "O11",
+          "O12"
+        ]
+      },
+      "now": 1800000000,
+      "expect": {
+        "ok": true,
+        "value": {
+          "question": "Q",
+          "options": [
+            {
+              "id": 1,
+              "text": "O1"
+            },
+            {
+              "id": 2,
+              "text": "O2"
+            },
+            {
+              "id": 3,
+              "text": "O3"
+            },
+            {
+              "id": 4,
+              "text": "O4"
+            },
+            {
+              "id": 5,
+              "text": "O5"
+            },
+            {
+              "id": 6,
+              "text": "O6"
+            },
+            {
+              "id": 7,
+              "text": "O7"
+            },
+            {
+              "id": 8,
+              "text": "O8"
+            },
+            {
+              "id": 9,
+              "text": "O9"
+            },
+            {
+              "id": 10,
+              "text": "O10"
+            },
+            {
+              "id": 11,
+              "text": "O11"
+            },
+            {
+              "id": 12,
+              "text": "O12"
+            }
+          ],
+          "multiple": false,
+          "anonymous": true,
+          "quiz": null,
+          "closesAt": null,
+          "addOptions": false,
+          "hideResults": false
+        }
+      }
+    },
+    {
+      "name": "no options at all",
+      "input": {
+        "question": "Q"
+      },
+      "now": 1800000000,
+      "expect": {
+        "ok": false,
+        "errors": [
+          {
+            "field": "options",
+            "code": "too_few"
+          }
+        ]
+      }
+    },
+    {
+      "name": "an empty option, a long one and a duplicate, each by position",
+      "input": {
+        "question": "Q",
+        "options": [
+          "Yes",
+          " ",
+          "yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy",
+          "YES"
+        ]
+      },
+      "now": 1800000000,
+      "expect": {
+        "ok": false,
+        "errors": [
+          {
+            "field": "option",
+            "code": "empty",
+            "index": 2
+          },
+          {
+            "field": "option",
+            "code": "too_long",
+            "index": 3
+          },
+          {
+            "field": "option",
+            "code": "duplicate",
+            "index": 4
+          }
+        ]
+      }
+    },
+    {
+      "name": "a quiz answer that is no option",
+      "input": {
+        "question": "Q",
+        "options": [
+          "A",
+          "B"
+        ],
+        "quiz": {
+          "answer": 3
+        }
+      },
+      "now": 1800000000,
+      "expect": {
+        "ok": false,
+        "errors": [
+          {
+            "field": "quiz",
+            "code": "unknown_answer"
+          }
+        ]
+      }
+    },
+    {
+      "name": "a quiz without an answer",
+      "input": {
+        "question": "Q",
+        "options": [
+          "A",
+          "B"
+        ],
+        "quiz": {}
+      },
+      "now": 1800000000,
+      "expect": {
+        "ok": false,
+        "errors": [
+          {
+            "field": "quiz",
+            "code": "unknown_answer"
+          }
+        ]
+      }
+    },
+    {
+      "name": "a quiz on too few options reports the options alone",
+      "input": {
+        "question": "Q",
+        "options": [
+          "A"
+        ],
+        "quiz": {
+          "answer": 1
+        }
+      },
+      "now": 1800000000,
+      "expect": {
+        "ok": false,
+        "errors": [
+          {
+            "field": "options",
+            "code": "too_few"
+          }
+        ]
+      }
+    },
+    {
+      "name": "an explanation of 201 characters",
+      "input": {
+        "question": "Q",
+        "options": [
+          "A",
+          "B"
+        ],
+        "quiz": {
+          "answer": 1,
+          "explanation": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+        }
+      },
+      "now": 1800000000,
+      "expect": {
+        "ok": false,
+        "errors": [
+          {
+            "field": "explanation",
+            "code": "too_long"
+          }
+        ]
+      }
+    },
+    {
+      "name": "a deadline under a minute away",
+      "input": {
+        "question": "Q",
+        "options": [
+          "A",
+          "B"
+        ],
+        "closesAt": 1800000059
+      },
+      "now": 1800000000,
+      "expect": {
+        "ok": false,
+        "errors": [
+          {
+            "field": "closesAt",
+            "code": "past"
+          }
+        ]
+      }
+    },
+    {
+      "name": "a deadline over 366 days away",
+      "input": {
+        "question": "Q",
+        "options": [
+          "A",
+          "B"
+        ],
+        "closesAt": 1831622401
+      },
+      "now": 1800000000,
+      "expect": {
+        "ok": false,
+        "errors": [
+          {
+            "field": "closesAt",
+            "code": "too_far"
+          }
+        ]
+      }
+    },
+    {
+      "name": "a deadline that is no number",
+      "input": {
+        "question": "Q",
+        "options": [
+          "A",
+          "B"
+        ],
+        "closesAt": "tomorrow"
+      },
+      "now": 1800000000,
+      "expect": {
+        "ok": false,
+        "errors": [
+          {
+            "field": "closesAt",
+            "code": "invalid"
+          }
+        ]
+      }
+    },
+    {
+      "name": "nothing at all",
+      "input": null,
+      "now": 1800000000,
+      "expect": {
+        "ok": false,
+        "errors": [
+          {
+            "field": "question",
+            "code": "empty"
+          },
+          {
+            "field": "options",
+            "code": "too_few"
+          }
+        ]
+      }
+    },
+    {
+      "name": "members may add options when the creator allows it",
+      "input": {
+        "question": "Where do we meet?",
+        "options": [
+          "Office",
+          "Cafe"
+        ],
+        "addOptions": true
+      },
+      "now": 1800000000,
+      "expect": {
+        "ok": true,
+        "value": {
+          "question": "Where do we meet?",
+          "options": [
+            {
+              "id": 1,
+              "text": "Office"
+            },
+            {
+              "id": 2,
+              "text": "Cafe"
+            }
+          ],
+          "multiple": false,
+          "anonymous": true,
+          "quiz": null,
+          "closesAt": null,
+          "addOptions": true,
+          "hideResults": false
+        }
+      }
+    },
+    {
+      "name": "results hidden until it ends",
+      "input": {
+        "question": "Who wins?",
+        "options": [
+          "Red",
+          "Blue"
+        ],
+        "hideResults": true
+      },
+      "now": 1800000000,
+      "expect": {
+        "ok": true,
+        "value": {
+          "question": "Who wins?",
+          "options": [
+            {
+              "id": 1,
+              "text": "Red"
+            },
+            {
+              "id": 2,
+              "text": "Blue"
+            }
+          ],
+          "multiple": false,
+          "anonymous": true,
+          "quiz": null,
+          "closesAt": null,
+          "addOptions": false,
+          "hideResults": true
+        }
+      }
+    },
+    {
+      "name": "the switches read from text, as a form sends them",
+      "input": {
+        "question": "Q",
+        "options": [
+          "A",
+          "B"
+        ],
+        "addOptions": "1",
+        "hideResults": "true"
+      },
+      "now": 1800000000,
+      "expect": {
+        "ok": true,
+        "value": {
+          "question": "Q",
+          "options": [
+            {
+              "id": 1,
+              "text": "A"
+            },
+            {
+              "id": 2,
+              "text": "B"
+            }
+          ],
+          "multiple": false,
+          "anonymous": true,
+          "quiz": null,
+          "closesAt": null,
+          "addOptions": true,
+          "hideResults": true
+        }
+      }
+    },
+    {
+      "name": "a quiz never takes added options, its options are the answer key",
+      "input": {
+        "question": "2 + 2?",
+        "options": [
+          "3",
+          "4"
+        ],
+        "quiz": {
+          "answer": 2
+        },
+        "addOptions": true
+      },
+      "now": 1800000000,
+      "expect": {
+        "ok": true,
+        "value": {
+          "question": "2 + 2?",
+          "options": [
+            {
+              "id": 1,
+              "text": "3"
+            },
+            {
+              "id": 2,
+              "text": "4"
+            }
+          ],
+          "multiple": false,
+          "anonymous": true,
+          "quiz": {
+            "answer": 2,
+            "explanation": ""
+          },
+          "closesAt": null,
+          "addOptions": false,
+          "hideResults": false
+        }
+      }
+    }
+  ],
+  "votes": [
+    {
+      "name": "a first vote",
+      "poll": {
+        "question": "Coming on Saturday?",
+        "options": [
+          {
+            "id": 1,
+            "text": "Yes"
+          },
+          {
+            "id": 2,
+            "text": "No"
+          },
+          {
+            "id": 3,
+            "text": "Maybe"
+          }
+        ],
+        "multiple": false,
+        "anonymous": false,
+        "quiz": null,
+        "closesAt": null,
+        "closedAt": null
+      },
+      "votes": [],
+      "user": 7,
+      "picks": [
+        2
+      ],
+      "now": 1800000000,
+      "expect": {
+        "ok": true,
+        "votes": [
+          {
+            "user": 7,
+            "option": 2,
+            "at": 1800000000
+          }
+        ]
+      }
+    },
+    {
+      "name": "a changed vote replaces the old one",
+      "poll": {
+        "question": "Coming on Saturday?",
+        "options": [
+          {
+            "id": 1,
+            "text": "Yes"
+          },
+          {
+            "id": 2,
+            "text": "No"
+          },
+          {
+            "id": 3,
+            "text": "Maybe"
+          }
+        ],
+        "multiple": false,
+        "anonymous": false,
+        "quiz": null,
+        "closesAt": null,
+        "closedAt": null
+      },
+      "votes": [
+        {
+          "user": 7,
+          "option": 1,
+          "at": 1799999940
+        },
+        {
+          "user": 8,
+          "option": 1,
+          "at": 1799999970
+        }
+      ],
+      "user": 7,
+      "picks": [
+        3
+      ],
+      "now": 1800000000,
+      "expect": {
+        "ok": true,
+        "votes": [
+          {
+            "user": 8,
+            "option": 1,
+            "at": 1799999970
+          },
+          {
+            "user": 7,
+            "option": 3,
+            "at": 1800000000
+          }
+        ]
+      }
+    },
+    {
+      "name": "the same vote again keeps its time",
+      "poll": {
+        "question": "Coming on Saturday?",
+        "options": [
+          {
+            "id": 1,
+            "text": "Yes"
+          },
+          {
+            "id": 2,
+            "text": "No"
+          },
+          {
+            "id": 3,
+            "text": "Maybe"
+          }
+        ],
+        "multiple": false,
+        "anonymous": false,
+        "quiz": null,
+        "closesAt": null,
+        "closedAt": null
+      },
+      "votes": [
+        {
+          "user": 7,
+          "option": 1,
+          "at": 1799999940
+        }
+      ],
+      "user": 7,
+      "picks": [
+        1
+      ],
+      "now": 1800000000,
+      "expect": {
+        "ok": true,
+        "votes": [
+          {
+            "user": 7,
+            "option": 1,
+            "at": 1799999940
+          }
+        ]
+      }
+    },
+    {
+      "name": "an empty list takes the vote back",
+      "poll": {
+        "question": "Coming on Saturday?",
+        "options": [
+          {
+            "id": 1,
+            "text": "Yes"
+          },
+          {
+            "id": 2,
+            "text": "No"
+          },
+          {
+            "id": 3,
+            "text": "Maybe"
+          }
+        ],
+        "multiple": false,
+        "anonymous": false,
+        "quiz": null,
+        "closesAt": null,
+        "closedAt": null
+      },
+      "votes": [
+        {
+          "user": 7,
+          "option": 1,
+          "at": 1799999940
+        },
+        {
+          "user": 8,
+          "option": 2,
+          "at": 1799999970
+        }
+      ],
+      "user": 7,
+      "picks": [],
+      "now": 1800000000,
+      "expect": {
+        "ok": true,
+        "votes": [
+          {
+            "user": 8,
+            "option": 2,
+            "at": 1799999970
+          }
+        ]
+      }
+    },
+    {
+      "name": "two picks where one is allowed",
+      "poll": {
+        "question": "Coming on Saturday?",
+        "options": [
+          {
+            "id": 1,
+            "text": "Yes"
+          },
+          {
+            "id": 2,
+            "text": "No"
+          },
+          {
+            "id": 3,
+            "text": "Maybe"
+          }
+        ],
+        "multiple": false,
+        "anonymous": false,
+        "quiz": null,
+        "closesAt": null,
+        "closedAt": null
+      },
+      "votes": [],
+      "user": 7,
+      "picks": [
+        1,
+        2
+      ],
+      "now": 1800000000,
+      "expect": {
+        "ok": false,
+        "error": "one_only"
+      }
+    },
+    {
+      "name": "two picks on a multiple-answer poll, duplicates dropped, in id order",
+      "poll": {
+        "question": "Coming on Saturday?",
+        "options": [
+          {
+            "id": 1,
+            "text": "Yes"
+          },
+          {
+            "id": 2,
+            "text": "No"
+          },
+          {
+            "id": 3,
+            "text": "Maybe"
+          }
+        ],
+        "multiple": true,
+        "anonymous": false,
+        "quiz": null,
+        "closesAt": null,
+        "closedAt": null
+      },
+      "votes": [],
+      "user": 7,
+      "picks": [
+        3,
+        1,
+        3
+      ],
+      "now": 1800000000,
+      "expect": {
+        "ok": true,
+        "votes": [
+          {
+            "user": 7,
+            "option": 1,
+            "at": 1800000000
+          },
+          {
+            "user": 7,
+            "option": 3,
+            "at": 1800000000
+          }
+        ]
+      }
+    },
+    {
+      "name": "an id given as text",
+      "poll": {
+        "question": "Coming on Saturday?",
+        "options": [
+          {
+            "id": 1,
+            "text": "Yes"
+          },
+          {
+            "id": 2,
+            "text": "No"
+          },
+          {
+            "id": 3,
+            "text": "Maybe"
+          }
+        ],
+        "multiple": false,
+        "anonymous": false,
+        "quiz": null,
+        "closesAt": null,
+        "closedAt": null
+      },
+      "votes": [],
+      "user": 7,
+      "picks": [
+        "2"
+      ],
+      "now": 1800000000,
+      "expect": {
+        "ok": true,
+        "votes": [
+          {
+            "user": 7,
+            "option": 2,
+            "at": 1800000000
+          }
+        ]
+      }
+    },
+    {
+      "name": "an option the poll does not have",
+      "poll": {
+        "question": "Coming on Saturday?",
+        "options": [
+          {
+            "id": 1,
+            "text": "Yes"
+          },
+          {
+            "id": 2,
+            "text": "No"
+          },
+          {
+            "id": 3,
+            "text": "Maybe"
+          }
+        ],
+        "multiple": false,
+        "anonymous": false,
+        "quiz": null,
+        "closesAt": null,
+        "closedAt": null
+      },
+      "votes": [],
+      "user": 7,
+      "picks": [
+        4
+      ],
+      "now": 1800000000,
+      "expect": {
+        "ok": false,
+        "error": "unknown_option"
+      }
+    },
+    {
+      "name": "picks that are not a list",
+      "poll": {
+        "question": "Coming on Saturday?",
+        "options": [
+          {
+            "id": 1,
+            "text": "Yes"
+          },
+          {
+            "id": 2,
+            "text": "No"
+          },
+          {
+            "id": 3,
+            "text": "Maybe"
+          }
+        ],
+        "multiple": false,
+        "anonymous": false,
+        "quiz": null,
+        "closesAt": null,
+        "closedAt": null
+      },
+      "votes": [],
+      "user": 7,
+      "picks": 2,
+      "now": 1800000000,
+      "expect": {
+        "ok": false,
+        "error": "invalid"
+      }
+    },
+    {
+      "name": "a pick that is no number",
+      "poll": {
+        "question": "Coming on Saturday?",
+        "options": [
+          {
+            "id": 1,
+            "text": "Yes"
+          },
+          {
+            "id": 2,
+            "text": "No"
+          },
+          {
+            "id": 3,
+            "text": "Maybe"
+          }
+        ],
+        "multiple": false,
+        "anonymous": false,
+        "quiz": null,
+        "closesAt": null,
+        "closedAt": null
+      },
+      "votes": [],
+      "user": 7,
+      "picks": [
+        "yes"
+      ],
+      "now": 1800000000,
+      "expect": {
+        "ok": false,
+        "error": "invalid"
+      }
+    },
+    {
+      "name": "a poll ended by hand",
+      "poll": {
+        "question": "Coming on Saturday?",
+        "options": [
+          {
+            "id": 1,
+            "text": "Yes"
+          },
+          {
+            "id": 2,
+            "text": "No"
+          },
+          {
+            "id": 3,
+            "text": "Maybe"
+          }
+        ],
+        "multiple": false,
+        "anonymous": false,
+        "quiz": null,
+        "closesAt": null,
+        "closedAt": 1799999990
+      },
+      "votes": [],
+      "user": 7,
+      "picks": [
+        1
+      ],
+      "now": 1800000000,
+      "expect": {
+        "ok": false,
+        "error": "closed"
+      }
+    },
+    {
+      "name": "a poll past its deadline",
+      "poll": {
+        "question": "Coming on Saturday?",
+        "options": [
+          {
+            "id": 1,
+            "text": "Yes"
+          },
+          {
+            "id": 2,
+            "text": "No"
+          },
+          {
+            "id": 3,
+            "text": "Maybe"
+          }
+        ],
+        "multiple": false,
+        "anonymous": false,
+        "quiz": null,
+        "closesAt": 1800000000,
+        "closedAt": null
+      },
+      "votes": [],
+      "user": 7,
+      "picks": [
+        1
+      ],
+      "now": 1800000000,
+      "expect": {
+        "ok": false,
+        "error": "closed"
+      }
+    },
+    {
+      "name": "a poll a second before its deadline",
+      "poll": {
+        "question": "Coming on Saturday?",
+        "options": [
+          {
+            "id": 1,
+            "text": "Yes"
+          },
+          {
+            "id": 2,
+            "text": "No"
+          },
+          {
+            "id": 3,
+            "text": "Maybe"
+          }
+        ],
+        "multiple": false,
+        "anonymous": false,
+        "quiz": null,
+        "closesAt": 1800000001,
+        "closedAt": null
+      },
+      "votes": [],
+      "user": 7,
+      "picks": [
+        1
+      ],
+      "now": 1800000000,
+      "expect": {
+        "ok": true,
+        "votes": [
+          {
+            "user": 7,
+            "option": 1,
+            "at": 1800000000
+          }
+        ]
+      }
+    },
+    {
+      "name": "a quiz answered for the first time",
+      "poll": {
+        "question": "Coming on Saturday?",
+        "options": [
+          {
+            "id": 1,
+            "text": "Yes"
+          },
+          {
+            "id": 2,
+            "text": "No"
+          },
+          {
+            "id": 3,
+            "text": "Maybe"
+          }
+        ],
+        "multiple": false,
+        "anonymous": false,
+        "quiz": {
+          "answer": 2,
+          "explanation": ""
+        },
+        "closesAt": null,
+        "closedAt": null
+      },
+      "votes": [],
+      "user": 7,
+      "picks": [
+        1
+      ],
+      "now": 1800000000,
+      "expect": {
+        "ok": true,
+        "votes": [
+          {
+            "user": 7,
+            "option": 1,
+            "at": 1800000000
+          }
+        ]
+      }
+    },
+    {
+      "name": "a quiz answer changed",
+      "poll": {
+        "question": "Coming on Saturday?",
+        "options": [
+          {
+            "id": 1,
+            "text": "Yes"
+          },
+          {
+            "id": 2,
+            "text": "No"
+          },
+          {
+            "id": 3,
+            "text": "Maybe"
+          }
+        ],
+        "multiple": false,
+        "anonymous": false,
+        "quiz": {
+          "answer": 2,
+          "explanation": ""
+        },
+        "closesAt": null,
+        "closedAt": null
+      },
+      "votes": [
+        {
+          "user": 7,
+          "option": 1,
+          "at": 1799999995
+        }
+      ],
+      "user": 7,
+      "picks": [
+        2
+      ],
+      "now": 1800000000,
+      "expect": {
+        "ok": false,
+        "error": "answered"
+      }
+    },
+    {
+      "name": "a quiz answer taken back",
+      "poll": {
+        "question": "Coming on Saturday?",
+        "options": [
+          {
+            "id": 1,
+            "text": "Yes"
+          },
+          {
+            "id": 2,
+            "text": "No"
+          },
+          {
+            "id": 3,
+            "text": "Maybe"
+          }
+        ],
+        "multiple": false,
+        "anonymous": false,
+        "quiz": {
+          "answer": 2,
+          "explanation": ""
+        },
+        "closesAt": null,
+        "closedAt": null
+      },
+      "votes": [
+        {
+          "user": 7,
+          "option": 1,
+          "at": 1799999995
+        }
+      ],
+      "user": 7,
+      "picks": [],
+      "now": 1800000000,
+      "expect": {
+        "ok": false,
+        "error": "answered"
+      }
+    },
+    {
+      "name": "a quiz answer sent again",
+      "poll": {
+        "question": "Coming on Saturday?",
+        "options": [
+          {
+            "id": 1,
+            "text": "Yes"
+          },
+          {
+            "id": 2,
+            "text": "No"
+          },
+          {
+            "id": 3,
+            "text": "Maybe"
+          }
+        ],
+        "multiple": false,
+        "anonymous": false,
+        "quiz": {
+          "answer": 2,
+          "explanation": ""
+        },
+        "closesAt": null,
+        "closedAt": null
+      },
+      "votes": [
+        {
+          "user": 7,
+          "option": 1,
+          "at": 1799999995
+        }
+      ],
+      "user": 7,
+      "picks": [
+        1
+      ],
+      "now": 1800000000,
+      "expect": {
+        "ok": true,
+        "votes": [
+          {
+            "user": 7,
+            "option": 1,
+            "at": 1799999995
+          }
+        ]
+      }
+    },
+    {
+      "name": "a guest, a negative id, beside a user with the same number",
+      "poll": {
+        "question": "Coming on Saturday?",
+        "options": [
+          {
+            "id": 1,
+            "text": "Yes"
+          },
+          {
+            "id": 2,
+            "text": "No"
+          },
+          {
+            "id": 3,
+            "text": "Maybe"
+          }
+        ],
+        "multiple": false,
+        "anonymous": false,
+        "quiz": null,
+        "closesAt": null,
+        "closedAt": null
+      },
+      "votes": [
+        {
+          "user": 5,
+          "option": 1,
+          "at": 1799999991
+        }
+      ],
+      "user": -5,
+      "picks": [
+        2
+      ],
+      "now": 1800000000,
+      "expect": {
+        "ok": true,
+        "votes": [
+          {
+            "user": 5,
+            "option": 1,
+            "at": 1799999991
+          },
+          {
+            "user": -5,
+            "option": 2,
+            "at": 1800000000
+          }
+        ]
+      }
+    },
+    {
+      "name": "one user as a number and as text",
+      "poll": {
+        "question": "Coming on Saturday?",
+        "options": [
+          {
+            "id": 1,
+            "text": "Yes"
+          },
+          {
+            "id": 2,
+            "text": "No"
+          },
+          {
+            "id": 3,
+            "text": "Maybe"
+          }
+        ],
+        "multiple": false,
+        "anonymous": false,
+        "quiz": null,
+        "closesAt": null,
+        "closedAt": null
+      },
+      "votes": [
+        {
+          "user": 5,
+          "option": 1,
+          "at": 1799999991
+        }
+      ],
+      "user": "5",
+      "picks": [
+        2
+      ],
+      "now": 1800000000,
+      "expect": {
+        "ok": true,
+        "votes": [
+          {
+            "user": "5",
+            "option": 2,
+            "at": 1800000000
+          }
+        ]
+      }
+    }
+  ],
+  "options": [
+    {
+      "name": "the next id, with who added it",
+      "poll": {
+        "question": "Coming on Saturday?",
+        "options": [
+          {
+            "id": 1,
+            "text": "Yes"
+          },
+          {
+            "id": 2,
+            "text": "No"
+          },
+          {
+            "id": 3,
+            "text": "Maybe"
+          }
+        ],
+        "multiple": false,
+        "anonymous": false,
+        "quiz": null,
+        "closesAt": null,
+        "closedAt": null,
+        "addOptions": true,
+        "hideResults": false
+      },
+      "user": 7,
+      "text": "Sunday",
+      "now": 1800000000,
+      "expect": {
+        "ok": true,
+        "value": {
+          "id": 4,
+          "text": "Sunday",
+          "by": 7
+        }
+      }
+    },
+    {
+      "name": "cleaned as the creator's options are",
+      "poll": {
+        "question": "Coming on Saturday?",
+        "options": [
+          {
+            "id": 1,
+            "text": "Yes"
+          },
+          {
+            "id": 2,
+            "text": "No"
+          },
+          {
+            "id": 3,
+            "text": "Maybe"
+          }
+        ],
+        "multiple": false,
+        "anonymous": false,
+        "quiz": null,
+        "closesAt": null,
+        "closedAt": null,
+        "addOptions": true,
+        "hideResults": false
+      },
+      "user": 7,
+      "text": "  Next\n  week  ",
+      "now": 1800000000,
+      "expect": {
+        "ok": true,
+        "value": {
+          "id": 4,
+          "text": "Next week",
+          "by": 7
+        }
+      }
+    },
+    {
+      "name": "after an option a member added, the one after it",
+      "poll": {
+        "question": "Coming on Saturday?",
+        "options": [
+          {
+            "id": 1,
+            "text": "Yes"
+          },
+          {
+            "id": 2,
+            "text": "No"
+          },
+          {
+            "id": 3,
+            "text": "Maybe"
+          },
+          {
+            "id": 4,
+            "text": "Sunday",
+            "by": 7
+          }
+        ],
+        "multiple": false,
+        "anonymous": false,
+        "quiz": null,
+        "closesAt": null,
+        "closedAt": null,
+        "addOptions": true,
+        "hideResults": false
+      },
+      "user": "app-user-9",
+      "text": "Monday",
+      "now": 1800000000,
+      "expect": {
+        "ok": true,
+        "value": {
+          "id": 5,
+          "text": "Monday",
+          "by": "app-user-9"
+        }
+      }
+    },
+    {
+      "name": "refused: one already there, whatever its case",
+      "poll": {
+        "question": "Coming on Saturday?",
+        "options": [
+          {
+            "id": 1,
+            "text": "Yes"
+          },
+          {
+            "id": 2,
+            "text": "No"
+          },
+          {
+            "id": 3,
+            "text": "Maybe"
+          }
+        ],
+        "multiple": false,
+        "anonymous": false,
+        "quiz": null,
+        "closesAt": null,
+        "closedAt": null,
+        "addOptions": true,
+        "hideResults": false
+      },
+      "user": 7,
+      "text": "YES",
+      "now": 1800000000,
+      "expect": {
+        "ok": false,
+        "error": "duplicate"
+      }
+    },
+    {
+      "name": "refused: empty",
+      "poll": {
+        "question": "Coming on Saturday?",
+        "options": [
+          {
+            "id": 1,
+            "text": "Yes"
+          },
+          {
+            "id": 2,
+            "text": "No"
+          },
+          {
+            "id": 3,
+            "text": "Maybe"
+          }
+        ],
+        "multiple": false,
+        "anonymous": false,
+        "quiz": null,
+        "closesAt": null,
+        "closedAt": null,
+        "addOptions": true,
+        "hideResults": false
+      },
+      "user": 7,
+      "text": "   ",
+      "now": 1800000000,
+      "expect": {
+        "ok": false,
+        "error": "empty"
+      }
+    },
+    {
+      "name": "refused: not text",
+      "poll": {
+        "question": "Coming on Saturday?",
+        "options": [
+          {
+            "id": 1,
+            "text": "Yes"
+          },
+          {
+            "id": 2,
+            "text": "No"
+          },
+          {
+            "id": 3,
+            "text": "Maybe"
+          }
+        ],
+        "multiple": false,
+        "anonymous": false,
+        "quiz": null,
+        "closesAt": null,
+        "closedAt": null,
+        "addOptions": true,
+        "hideResults": false
+      },
+      "user": 7,
+      "text": 42,
+      "now": 1800000000,
+      "expect": {
+        "ok": false,
+        "error": "empty"
+      }
+    },
+    {
+      "name": "refused: too long",
+      "poll": {
+        "question": "Coming on Saturday?",
+        "options": [
+          {
+            "id": 1,
+            "text": "Yes"
+          },
+          {
+            "id": 2,
+            "text": "No"
+          },
+          {
+            "id": 3,
+            "text": "Maybe"
+          }
+        ],
+        "multiple": false,
+        "anonymous": false,
+        "quiz": null,
+        "closesAt": null,
+        "closedAt": null,
+        "addOptions": true,
+        "hideResults": false
+      },
+      "user": 7,
+      "text": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+      "now": 1800000000,
+      "expect": {
+        "ok": false,
+        "error": "too_long"
+      }
+    },
+    {
+      "name": "refused: no room past twelve",
+      "poll": {
+        "question": "Coming on Saturday?",
+        "options": [
+          {
+            "id": 1,
+            "text": "Option 1"
+          },
+          {
+            "id": 2,
+            "text": "Option 2"
+          },
+          {
+            "id": 3,
+            "text": "Option 3"
+          },
+          {
+            "id": 4,
+            "text": "Option 4"
+          },
+          {
+            "id": 5,
+            "text": "Option 5"
+          },
+          {
+            "id": 6,
+            "text": "Option 6"
+          },
+          {
+            "id": 7,
+            "text": "Option 7"
+          },
+          {
+            "id": 8,
+            "text": "Option 8"
+          },
+          {
+            "id": 9,
+            "text": "Option 9"
+          },
+          {
+            "id": 10,
+            "text": "Option 10"
+          },
+          {
+            "id": 11,
+            "text": "Option 11"
+          },
+          {
+            "id": 12,
+            "text": "Option 12"
+          }
+        ],
+        "multiple": false,
+        "anonymous": false,
+        "quiz": null,
+        "closesAt": null,
+        "closedAt": null,
+        "addOptions": true,
+        "hideResults": false
+      },
+      "user": 7,
+      "text": "Thirteen",
+      "now": 1800000000,
+      "expect": {
+        "ok": false,
+        "error": "too_many"
+      }
+    },
+    {
+      "name": "refused: the creator did not allow it",
+      "poll": {
+        "question": "Coming on Saturday?",
+        "options": [
+          {
+            "id": 1,
+            "text": "Yes"
+          },
+          {
+            "id": 2,
+            "text": "No"
+          },
+          {
+            "id": 3,
+            "text": "Maybe"
+          }
+        ],
+        "multiple": false,
+        "anonymous": false,
+        "quiz": null,
+        "closesAt": null,
+        "closedAt": null,
+        "addOptions": false,
+        "hideResults": false
+      },
+      "user": 7,
+      "text": "Sunday",
+      "now": 1800000000,
+      "expect": {
+        "ok": false,
+        "error": "not_allowed"
+      }
+    },
+    {
+      "name": "refused: a quiz",
+      "poll": {
+        "question": "Coming on Saturday?",
+        "options": [
+          {
+            "id": 1,
+            "text": "Yes"
+          },
+          {
+            "id": 2,
+            "text": "No"
+          },
+          {
+            "id": 3,
+            "text": "Maybe"
+          }
+        ],
+        "multiple": false,
+        "anonymous": false,
+        "quiz": {
+          "answer": 1,
+          "explanation": ""
+        },
+        "closesAt": null,
+        "closedAt": null,
+        "addOptions": true,
+        "hideResults": false
+      },
+      "user": 7,
+      "text": "Sunday",
+      "now": 1800000000,
+      "expect": {
+        "ok": false,
+        "error": "not_allowed"
+      }
+    },
+    {
+      "name": "refused: ended by hand",
+      "poll": {
+        "question": "Coming on Saturday?",
+        "options": [
+          {
+            "id": 1,
+            "text": "Yes"
+          },
+          {
+            "id": 2,
+            "text": "No"
+          },
+          {
+            "id": 3,
+            "text": "Maybe"
+          }
+        ],
+        "multiple": false,
+        "anonymous": false,
+        "quiz": null,
+        "closesAt": null,
+        "closedAt": 1799999990,
+        "addOptions": true,
+        "hideResults": false
+      },
+      "user": 7,
+      "text": "Sunday",
+      "now": 1800000000,
+      "expect": {
+        "ok": false,
+        "error": "closed"
+      }
+    },
+    {
+      "name": "refused: past its deadline",
+      "poll": {
+        "question": "Coming on Saturday?",
+        "options": [
+          {
+            "id": 1,
+            "text": "Yes"
+          },
+          {
+            "id": 2,
+            "text": "No"
+          },
+          {
+            "id": 3,
+            "text": "Maybe"
+          }
+        ],
+        "multiple": false,
+        "anonymous": false,
+        "quiz": null,
+        "closesAt": 1800000000,
+        "closedAt": null,
+        "addOptions": true,
+        "hideResults": false
+      },
+      "user": 7,
+      "text": "Sunday",
+      "now": 1800000000,
+      "expect": {
+        "ok": false,
+        "error": "closed"
+      }
+    }
+  ],
+  "states": [
+    {
+      "name": "a public poll with its latest three voters on each option, newest first",
+      "poll": {
+        "question": "Coming on Saturday?",
+        "options": [
+          {
+            "id": 1,
+            "text": "Yes"
+          },
+          {
+            "id": 2,
+            "text": "No"
+          },
+          {
+            "id": 3,
+            "text": "Maybe"
+          }
+        ],
+        "multiple": false,
+        "anonymous": false,
+        "quiz": null,
+        "closesAt": null,
+        "closedAt": null
+      },
+      "votes": [
+        {
+          "user": 1,
+          "option": 1,
+          "at": 1799999950
+        },
+        {
+          "user": 2,
+          "option": 1,
+          "at": 1799999960
+        },
+        {
+          "user": 3,
+          "option": 2,
+          "at": 1799999970
+        },
+        {
+          "user": 4,
+          "option": 1,
+          "at": 1799999980
+        },
+        {
+          "user": 5,
+          "option": 1,
+          "at": 1799999990
+        },
+        {
+          "user": 6,
+          "option": 3,
+          "at": 1799999995
+        }
+      ],
+      "now": 1800000000,
+      "expect": {
+        "question": "Coming on Saturday?",
+        "options": [
+          {
+            "id": 1,
+            "text": "Yes"
+          },
+          {
+            "id": 2,
+            "text": "No"
+          },
+          {
+            "id": 3,
+            "text": "Maybe"
+          }
+        ],
+        "multiple": false,
+        "anonymous": false,
+        "quiz": false,
+        "closesAt": null,
+        "closedAt": null,
+        "closed": false,
+        "addOptions": false,
+        "hidden": false,
+        "counts": {
+          "1": 4,
+          "2": 1,
+          "3": 1
+        },
+        "voters": 6,
+        "recent": {
+          "1": [
+            5,
+            4,
+            2
+          ],
+          "2": [
+            3
+          ],
+          "3": [
+            6
+          ]
+        }
+      }
+    },
+    {
+      "name": "an anonymous poll: counts, no voters",
+      "poll": {
+        "question": "Coming on Saturday?",
+        "options": [
+          {
+            "id": 1,
+            "text": "Yes"
+          },
+          {
+            "id": 2,
+            "text": "No"
+          },
+          {
+            "id": 3,
+            "text": "Maybe"
+          }
+        ],
+        "multiple": false,
+        "anonymous": true,
+        "quiz": null,
+        "closesAt": null,
+        "closedAt": null
+      },
+      "votes": [
+        {
+          "user": 1,
+          "option": 1,
+          "at": 1799999950
+        },
+        {
+          "user": 2,
+          "option": 1,
+          "at": 1799999960
+        },
+        {
+          "user": 3,
+          "option": 2,
+          "at": 1799999970
+        },
+        {
+          "user": 4,
+          "option": 1,
+          "at": 1799999980
+        },
+        {
+          "user": 5,
+          "option": 1,
+          "at": 1799999990
+        },
+        {
+          "user": 6,
+          "option": 3,
+          "at": 1799999995
+        }
+      ],
+      "now": 1800000000,
+      "expect": {
+        "question": "Coming on Saturday?",
+        "options": [
+          {
+            "id": 1,
+            "text": "Yes"
+          },
+          {
+            "id": 2,
+            "text": "No"
+          },
+          {
+            "id": 3,
+            "text": "Maybe"
+          }
+        ],
+        "multiple": false,
+        "anonymous": true,
+        "quiz": false,
+        "closesAt": null,
+        "closedAt": null,
+        "closed": false,
+        "addOptions": false,
+        "hidden": false,
+        "counts": {
+          "1": 4,
+          "2": 1,
+          "3": 1
+        },
+        "voters": 6
+      }
+    },
+    {
+      "name": "no votes yet",
+      "poll": {
+        "question": "Coming on Saturday?",
+        "options": [
+          {
+            "id": 1,
+            "text": "Yes"
+          },
+          {
+            "id": 2,
+            "text": "No"
+          },
+          {
+            "id": 3,
+            "text": "Maybe"
+          }
+        ],
+        "multiple": false,
+        "anonymous": false,
+        "quiz": null,
+        "closesAt": null,
+        "closedAt": null
+      },
+      "votes": [],
+      "now": 1800000000,
+      "expect": {
+        "question": "Coming on Saturday?",
+        "options": [
+          {
+            "id": 1,
+            "text": "Yes"
+          },
+          {
+            "id": 2,
+            "text": "No"
+          },
+          {
+            "id": 3,
+            "text": "Maybe"
+          }
+        ],
+        "multiple": false,
+        "anonymous": false,
+        "quiz": false,
+        "closesAt": null,
+        "closedAt": null,
+        "closed": false,
+        "addOptions": false,
+        "hidden": false,
+        "counts": {
+          "1": 0,
+          "2": 0,
+          "3": 0
+        },
+        "voters": 0,
+        "recent": {
+          "1": [],
+          "2": [],
+          "3": []
+        }
+      }
+    },
+    {
+      "name": "a multiple-answer poll counts people once and picks each",
+      "poll": {
+        "question": "Coming on Saturday?",
+        "options": [
+          {
+            "id": 1,
+            "text": "Yes"
+          },
+          {
+            "id": 2,
+            "text": "No"
+          },
+          {
+            "id": 3,
+            "text": "Maybe"
+          }
+        ],
+        "multiple": true,
+        "anonymous": false,
+        "quiz": null,
+        "closesAt": null,
+        "closedAt": null
+      },
+      "votes": [
+        {
+          "user": 1,
+          "option": 1,
+          "at": 1799999991
+        },
+        {
+          "user": 1,
+          "option": 2,
+          "at": 1799999991
+        },
+        {
+          "user": 2,
+          "option": 2,
+          "at": 1799999995
+        }
+      ],
+      "now": 1800000000,
+      "expect": {
+        "question": "Coming on Saturday?",
+        "options": [
+          {
+            "id": 1,
+            "text": "Yes"
+          },
+          {
+            "id": 2,
+            "text": "No"
+          },
+          {
+            "id": 3,
+            "text": "Maybe"
+          }
+        ],
+        "multiple": true,
+        "anonymous": false,
+        "quiz": false,
+        "closesAt": null,
+        "closedAt": null,
+        "closed": false,
+        "addOptions": false,
+        "hidden": false,
+        "counts": {
+          "1": 1,
+          "2": 2,
+          "3": 0
+        },
+        "voters": 2,
+        "recent": {
+          "1": [
+            1
+          ],
+          "2": [
+            2,
+            1
+          ],
+          "3": []
+        }
+      }
+    },
+    {
+      "name": "two votes in one second: the later in the list first",
+      "poll": {
+        "question": "Coming on Saturday?",
+        "options": [
+          {
+            "id": 1,
+            "text": "Yes"
+          },
+          {
+            "id": 2,
+            "text": "No"
+          },
+          {
+            "id": 3,
+            "text": "Maybe"
+          }
+        ],
+        "multiple": false,
+        "anonymous": false,
+        "quiz": null,
+        "closesAt": null,
+        "closedAt": null
+      },
+      "votes": [
+        {
+          "user": 1,
+          "option": 1,
+          "at": 1799999995
+        },
+        {
+          "user": 2,
+          "option": 1,
+          "at": 1799999995
+        }
+      ],
+      "now": 1800000000,
+      "expect": {
+        "question": "Coming on Saturday?",
+        "options": [
+          {
+            "id": 1,
+            "text": "Yes"
+          },
+          {
+            "id": 2,
+            "text": "No"
+          },
+          {
+            "id": 3,
+            "text": "Maybe"
+          }
+        ],
+        "multiple": false,
+        "anonymous": false,
+        "quiz": false,
+        "closesAt": null,
+        "closedAt": null,
+        "closed": false,
+        "addOptions": false,
+        "hidden": false,
+        "counts": {
+          "1": 2,
+          "2": 0,
+          "3": 0
+        },
+        "voters": 2,
+        "recent": {
+          "1": [
+            2,
+            1
+          ],
+          "2": [],
+          "3": []
+        }
+      }
+    },
+    {
+      "name": "votes for an option the poll lost are not counted",
+      "poll": {
+        "question": "Coming on Saturday?",
+        "options": [
+          {
+            "id": 1,
+            "text": "Yes"
+          },
+          {
+            "id": 2,
+            "text": "No"
+          },
+          {
+            "id": 3,
+            "text": "Maybe"
+          }
+        ],
+        "multiple": false,
+        "anonymous": false,
+        "quiz": null,
+        "closesAt": null,
+        "closedAt": null
+      },
+      "votes": [
+        {
+          "user": 1,
+          "option": 9,
+          "at": 1799999995
+        },
+        {
+          "user": 2,
+          "option": 1,
+          "at": 1799999996
+        }
+      ],
+      "now": 1800000000,
+      "expect": {
+        "question": "Coming on Saturday?",
+        "options": [
+          {
+            "id": 1,
+            "text": "Yes"
+          },
+          {
+            "id": 2,
+            "text": "No"
+          },
+          {
+            "id": 3,
+            "text": "Maybe"
+          }
+        ],
+        "multiple": false,
+        "anonymous": false,
+        "quiz": false,
+        "closesAt": null,
+        "closedAt": null,
+        "closed": false,
+        "addOptions": false,
+        "hidden": false,
+        "counts": {
+          "1": 1,
+          "2": 0,
+          "3": 0
+        },
+        "voters": 1,
+        "recent": {
+          "1": [
+            2
+          ],
+          "2": [],
+          "3": []
+        }
+      }
+    },
+    {
+      "name": "an open quiz keeps its answer",
+      "poll": {
+        "question": "Coming on Saturday?",
+        "options": [
+          {
+            "id": 1,
+            "text": "Yes"
+          },
+          {
+            "id": 2,
+            "text": "No"
+          },
+          {
+            "id": 3,
+            "text": "Maybe"
+          }
+        ],
+        "multiple": false,
+        "anonymous": false,
+        "quiz": {
+          "answer": 2,
+          "explanation": "Because."
+        },
+        "closesAt": null,
+        "closedAt": null
+      },
+      "votes": [
+        {
+          "user": 1,
+          "option": 2,
+          "at": 1799999995
+        }
+      ],
+      "now": 1800000000,
+      "expect": {
+        "question": "Coming on Saturday?",
+        "options": [
+          {
+            "id": 1,
+            "text": "Yes"
+          },
+          {
+            "id": 2,
+            "text": "No"
+          },
+          {
+            "id": 3,
+            "text": "Maybe"
+          }
+        ],
+        "multiple": false,
+        "anonymous": false,
+        "quiz": true,
+        "closesAt": null,
+        "closedAt": null,
+        "closed": false,
+        "addOptions": false,
+        "hidden": false,
+        "counts": {
+          "1": 0,
+          "2": 1,
+          "3": 0
+        },
+        "voters": 1,
+        "recent": {
+          "1": [],
+          "2": [
+            1
+          ],
+          "3": []
+        }
+      }
+    },
+    {
+      "name": "a quiz ended by hand shows its answer",
+      "poll": {
+        "question": "Coming on Saturday?",
+        "options": [
+          {
+            "id": 1,
+            "text": "Yes"
+          },
+          {
+            "id": 2,
+            "text": "No"
+          },
+          {
+            "id": 3,
+            "text": "Maybe"
+          }
+        ],
+        "multiple": false,
+        "anonymous": false,
+        "quiz": {
+          "answer": 2,
+          "explanation": "Because."
+        },
+        "closesAt": null,
+        "closedAt": 1799999999
+      },
+      "votes": [
+        {
+          "user": 1,
+          "option": 2,
+          "at": 1799999995
+        }
+      ],
+      "now": 1800000000,
+      "expect": {
+        "question": "Coming on Saturday?",
+        "options": [
+          {
+            "id": 1,
+            "text": "Yes"
+          },
+          {
+            "id": 2,
+            "text": "No"
+          },
+          {
+            "id": 3,
+            "text": "Maybe"
+          }
+        ],
+        "multiple": false,
+        "anonymous": false,
+        "quiz": true,
+        "closesAt": null,
+        "closedAt": 1799999999,
+        "closed": true,
+        "addOptions": false,
+        "hidden": false,
+        "counts": {
+          "1": 0,
+          "2": 1,
+          "3": 0
+        },
+        "voters": 1,
+        "recent": {
+          "1": [],
+          "2": [
+            1
+          ],
+          "3": []
+        },
+        "answer": 2,
+        "explanation": "Because."
+      }
+    },
+    {
+      "name": "a quiz past its deadline shows its answer",
+      "poll": {
+        "question": "Coming on Saturday?",
+        "options": [
+          {
+            "id": 1,
+            "text": "Yes"
+          },
+          {
+            "id": 2,
+            "text": "No"
+          },
+          {
+            "id": 3,
+            "text": "Maybe"
+          }
+        ],
+        "multiple": false,
+        "anonymous": false,
+        "quiz": {
+          "answer": 2,
+          "explanation": ""
+        },
+        "closesAt": 1799999999,
+        "closedAt": null
+      },
+      "votes": [],
+      "now": 1800000000,
+      "expect": {
+        "question": "Coming on Saturday?",
+        "options": [
+          {
+            "id": 1,
+            "text": "Yes"
+          },
+          {
+            "id": 2,
+            "text": "No"
+          },
+          {
+            "id": 3,
+            "text": "Maybe"
+          }
+        ],
+        "multiple": false,
+        "anonymous": false,
+        "quiz": true,
+        "closesAt": 1799999999,
+        "closedAt": null,
+        "closed": true,
+        "addOptions": false,
+        "hidden": false,
+        "counts": {
+          "1": 0,
+          "2": 0,
+          "3": 0
+        },
+        "voters": 0,
+        "recent": {
+          "1": [],
+          "2": [],
+          "3": []
+        },
+        "answer": 2,
+        "explanation": ""
+      }
+    },
+    {
+      "name": "a deadline not reached",
+      "poll": {
+        "question": "Coming on Saturday?",
+        "options": [
+          {
+            "id": 1,
+            "text": "Yes"
+          },
+          {
+            "id": 2,
+            "text": "No"
+          },
+          {
+            "id": 3,
+            "text": "Maybe"
+          }
+        ],
+        "multiple": false,
+        "anonymous": false,
+        "quiz": null,
+        "closesAt": 1800000060,
+        "closedAt": null
+      },
+      "votes": [],
+      "now": 1800000000,
+      "expect": {
+        "question": "Coming on Saturday?",
+        "options": [
+          {
+            "id": 1,
+            "text": "Yes"
+          },
+          {
+            "id": 2,
+            "text": "No"
+          },
+          {
+            "id": 3,
+            "text": "Maybe"
+          }
+        ],
+        "multiple": false,
+        "anonymous": false,
+        "quiz": false,
+        "closesAt": 1800000060,
+        "closedAt": null,
+        "closed": false,
+        "addOptions": false,
+        "hidden": false,
+        "counts": {
+          "1": 0,
+          "2": 0,
+          "3": 0
+        },
+        "voters": 0,
+        "recent": {
+          "1": [],
+          "2": [],
+          "3": []
+        }
+      }
+    },
+    {
+      "name": "hidden results while open: no counts, no faces, the people who voted still count",
+      "poll": {
+        "question": "Coming on Saturday?",
+        "options": [
+          {
+            "id": 1,
+            "text": "Yes"
+          },
+          {
+            "id": 2,
+            "text": "No"
+          },
+          {
+            "id": 3,
+            "text": "Maybe"
+          }
+        ],
+        "multiple": false,
+        "anonymous": false,
+        "quiz": null,
+        "closesAt": null,
+        "closedAt": null,
+        "addOptions": true,
+        "hideResults": true
+      },
+      "votes": [
+        {
+          "user": 1,
+          "option": 1,
+          "at": 1799999970
+        },
+        {
+          "user": 2,
+          "option": 2,
+          "at": 1799999980
+        },
+        {
+          "user": 3,
+          "option": 1,
+          "at": 1799999990
+        }
+      ],
+      "now": 1800000000,
+      "expect": {
+        "question": "Coming on Saturday?",
+        "options": [
+          {
+            "id": 1,
+            "text": "Yes"
+          },
+          {
+            "id": 2,
+            "text": "No"
+          },
+          {
+            "id": 3,
+            "text": "Maybe"
+          }
+        ],
+        "multiple": false,
+        "anonymous": false,
+        "quiz": false,
+        "closesAt": null,
+        "closedAt": null,
+        "closed": false,
+        "addOptions": true,
+        "hidden": true,
+        "counts": {
+          "1": 0,
+          "2": 0,
+          "3": 0
+        },
+        "voters": 3
+      }
+    },
+    {
+      "name": "hidden results once it ended: every count and face",
+      "poll": {
+        "question": "Coming on Saturday?",
+        "options": [
+          {
+            "id": 1,
+            "text": "Yes"
+          },
+          {
+            "id": 2,
+            "text": "No"
+          },
+          {
+            "id": 3,
+            "text": "Maybe"
+          }
+        ],
+        "multiple": false,
+        "anonymous": false,
+        "quiz": null,
+        "closesAt": null,
+        "closedAt": 1799999995,
+        "addOptions": true,
+        "hideResults": true
+      },
+      "votes": [
+        {
+          "user": 1,
+          "option": 1,
+          "at": 1799999970
+        },
+        {
+          "user": 2,
+          "option": 2,
+          "at": 1799999980
+        },
+        {
+          "user": 3,
+          "option": 1,
+          "at": 1799999990
+        }
+      ],
+      "now": 1800000000,
+      "expect": {
+        "question": "Coming on Saturday?",
+        "options": [
+          {
+            "id": 1,
+            "text": "Yes"
+          },
+          {
+            "id": 2,
+            "text": "No"
+          },
+          {
+            "id": 3,
+            "text": "Maybe"
+          }
+        ],
+        "multiple": false,
+        "anonymous": false,
+        "quiz": false,
+        "closesAt": null,
+        "closedAt": 1799999995,
+        "closed": true,
+        "addOptions": true,
+        "hidden": false,
+        "counts": {
+          "1": 2,
+          "2": 1,
+          "3": 0
+        },
+        "voters": 3,
+        "recent": {
+          "1": [
+            3,
+            1
+          ],
+          "2": [
+            2
+          ],
+          "3": []
+        }
+      }
+    },
+    {
+      "name": "hidden results past the deadline count as ended",
+      "poll": {
+        "question": "Coming on Saturday?",
+        "options": [
+          {
+            "id": 1,
+            "text": "Yes"
+          },
+          {
+            "id": 2,
+            "text": "No"
+          },
+          {
+            "id": 3,
+            "text": "Maybe"
+          }
+        ],
+        "multiple": false,
+        "anonymous": true,
+        "quiz": null,
+        "closesAt": 1799999999,
+        "closedAt": null,
+        "addOptions": true,
+        "hideResults": true
+      },
+      "votes": [
+        {
+          "user": 1,
+          "option": 1,
+          "at": 1799999970
+        },
+        {
+          "user": 2,
+          "option": 2,
+          "at": 1799999980
+        },
+        {
+          "user": 3,
+          "option": 1,
+          "at": 1799999990
+        }
+      ],
+      "now": 1800000000,
+      "expect": {
+        "question": "Coming on Saturday?",
+        "options": [
+          {
+            "id": 1,
+            "text": "Yes"
+          },
+          {
+            "id": 2,
+            "text": "No"
+          },
+          {
+            "id": 3,
+            "text": "Maybe"
+          }
+        ],
+        "multiple": false,
+        "anonymous": true,
+        "quiz": false,
+        "closesAt": 1799999999,
+        "closedAt": null,
+        "closed": true,
+        "addOptions": true,
+        "hidden": false,
+        "counts": {
+          "1": 2,
+          "2": 1,
+          "3": 0
+        },
+        "voters": 3
+      }
+    },
+    {
+      "name": "an option a member added carries who added it",
+      "poll": {
+        "question": "Coming on Saturday?",
+        "options": [
+          {
+            "id": 1,
+            "text": "Yes"
+          },
+          {
+            "id": 2,
+            "text": "No"
+          },
+          {
+            "id": 3,
+            "text": "Maybe"
+          },
+          {
+            "id": 4,
+            "text": "Sunday",
+            "by": 9
+          }
+        ],
+        "multiple": false,
+        "anonymous": false,
+        "quiz": null,
+        "closesAt": null,
+        "closedAt": null,
+        "addOptions": true,
+        "hideResults": false
+      },
+      "votes": [
+        {
+          "user": 1,
+          "option": 1,
+          "at": 1799999970
+        },
+        {
+          "user": 2,
+          "option": 2,
+          "at": 1799999980
+        },
+        {
+          "user": 3,
+          "option": 1,
+          "at": 1799999990
+        },
+        {
+          "user": 9,
+          "option": 4,
+          "at": 1799999995
+        }
+      ],
+      "now": 1800000000,
+      "expect": {
+        "question": "Coming on Saturday?",
+        "options": [
+          {
+            "id": 1,
+            "text": "Yes"
+          },
+          {
+            "id": 2,
+            "text": "No"
+          },
+          {
+            "id": 3,
+            "text": "Maybe"
+          },
+          {
+            "id": 4,
+            "text": "Sunday",
+            "by": 9
+          }
+        ],
+        "multiple": false,
+        "anonymous": false,
+        "quiz": false,
+        "closesAt": null,
+        "closedAt": null,
+        "closed": false,
+        "addOptions": true,
+        "hidden": false,
+        "counts": {
+          "1": 2,
+          "2": 1,
+          "3": 0,
+          "4": 1
+        },
+        "voters": 4,
+        "recent": {
+          "1": [
+            3,
+            1
+          ],
+          "2": [
+            2
+          ],
+          "3": [],
+          "4": [
+            9
+          ]
+        }
+      }
+    },
+    {
+      "name": "a quiz never offers adding options, whatever its record says",
+      "poll": {
+        "question": "Coming on Saturday?",
+        "options": [
+          {
+            "id": 1,
+            "text": "Yes"
+          },
+          {
+            "id": 2,
+            "text": "No"
+          },
+          {
+            "id": 3,
+            "text": "Maybe"
+          }
+        ],
+        "multiple": false,
+        "anonymous": false,
+        "quiz": {
+          "answer": 1,
+          "explanation": ""
+        },
+        "closesAt": null,
+        "closedAt": null,
+        "addOptions": true,
+        "hideResults": false
+      },
+      "votes": [],
+      "now": 1800000000,
+      "expect": {
+        "question": "Coming on Saturday?",
+        "options": [
+          {
+            "id": 1,
+            "text": "Yes"
+          },
+          {
+            "id": 2,
+            "text": "No"
+          },
+          {
+            "id": 3,
+            "text": "Maybe"
+          }
+        ],
+        "multiple": false,
+        "anonymous": false,
+        "quiz": true,
+        "closesAt": null,
+        "closedAt": null,
+        "closed": false,
+        "addOptions": false,
+        "hidden": false,
+        "counts": {
+          "1": 0,
+          "2": 0,
+          "3": 0
+        },
+        "voters": 0,
+        "recent": {
+          "1": [],
+          "2": [],
+          "3": []
+        }
+      }
+    }
+  ],
+  "members": [
+    {
+      "name": "picks in id order",
+      "poll": {
+        "question": "Coming on Saturday?",
+        "options": [
+          {
+            "id": 1,
+            "text": "Yes"
+          },
+          {
+            "id": 2,
+            "text": "No"
+          },
+          {
+            "id": 3,
+            "text": "Maybe"
+          }
+        ],
+        "multiple": true,
+        "anonymous": false,
+        "quiz": null,
+        "closesAt": null,
+        "closedAt": null
+      },
+      "votes": [
+        {
+          "user": 7,
+          "option": 3,
+          "at": 1799999991
+        },
+        {
+          "user": 8,
+          "option": 1,
+          "at": 1799999992
+        },
+        {
+          "user": 7,
+          "option": 1,
+          "at": 1799999995
+        }
+      ],
+      "user": 7,
+      "expect": {
+        "votes": [
+          1,
+          3
+        ]
+      }
+    },
+    {
+      "name": "no vote",
+      "poll": {
+        "question": "Coming on Saturday?",
+        "options": [
+          {
+            "id": 1,
+            "text": "Yes"
+          },
+          {
+            "id": 2,
+            "text": "No"
+          },
+          {
+            "id": 3,
+            "text": "Maybe"
+          }
+        ],
+        "multiple": false,
+        "anonymous": false,
+        "quiz": null,
+        "closesAt": null,
+        "closedAt": null
+      },
+      "votes": [
+        {
+          "user": 8,
+          "option": 1,
+          "at": 1799999992
+        }
+      ],
+      "user": 7,
+      "expect": {
+        "votes": []
+      }
+    },
+    {
+      "name": "a quiz answered: the answer and why",
+      "poll": {
+        "question": "Coming on Saturday?",
+        "options": [
+          {
+            "id": 1,
+            "text": "Yes"
+          },
+          {
+            "id": 2,
+            "text": "No"
+          },
+          {
+            "id": 3,
+            "text": "Maybe"
+          }
+        ],
+        "multiple": false,
+        "anonymous": false,
+        "quiz": {
+          "answer": 2,
+          "explanation": "Because."
+        },
+        "closesAt": null,
+        "closedAt": null
+      },
+      "votes": [
+        {
+          "user": 7,
+          "option": 1,
+          "at": 1799999995
+        }
+      ],
+      "user": 7,
+      "expect": {
+        "votes": [
+          1
+        ],
+        "answer": 2,
+        "explanation": "Because."
+      }
+    },
+    {
+      "name": "a quiz not answered: nothing of the answer",
+      "poll": {
+        "question": "Coming on Saturday?",
+        "options": [
+          {
+            "id": 1,
+            "text": "Yes"
+          },
+          {
+            "id": 2,
+            "text": "No"
+          },
+          {
+            "id": 3,
+            "text": "Maybe"
+          }
+        ],
+        "multiple": false,
+        "anonymous": false,
+        "quiz": {
+          "answer": 2,
+          "explanation": "Because."
+        },
+        "closesAt": null,
+        "closedAt": null
+      },
+      "votes": [
+        {
+          "user": 8,
+          "option": 2,
+          "at": 1799999995
+        }
+      ],
+      "user": 7,
+      "expect": {
+        "votes": []
+      }
+    }
+  ],
+  "winners": [
+    {
+      "name": "none before anyone voted",
+      "state": {
+        "options": [
+          {
+            "id": 1,
+            "text": "Yes"
+          },
+          {
+            "id": 2,
+            "text": "No"
+          },
+          {
+            "id": 3,
+            "text": "Maybe"
+          }
+        ],
+        "counts": {
+          "1": 0,
+          "2": 0,
+          "3": 0
+        },
+        "voters": 0,
+        "hidden": false
+      },
+      "expect": []
+    },
+    {
+      "name": "the one with the most picks",
+      "state": {
+        "options": [
+          {
+            "id": 1,
+            "text": "Yes"
+          },
+          {
+            "id": 2,
+            "text": "No"
+          },
+          {
+            "id": 3,
+            "text": "Maybe"
+          }
+        ],
+        "counts": {
+          "1": 2,
+          "2": 1,
+          "3": 0
+        },
+        "voters": 3,
+        "hidden": false
+      },
+      "expect": [
+        1
+      ]
+    },
+    {
+      "name": "a tie, in id order",
+      "state": {
+        "options": [
+          {
+            "id": 1,
+            "text": "Yes"
+          },
+          {
+            "id": 2,
+            "text": "No"
+          },
+          {
+            "id": 3,
+            "text": "Maybe"
+          }
+        ],
+        "counts": {
+          "1": 0,
+          "2": 2,
+          "3": 2
+        },
+        "voters": 4,
+        "hidden": false
+      },
+      "expect": [
+        2,
+        3
+      ]
+    },
+    {
+      "name": "none while the counts are hidden",
+      "state": {
+        "options": [
+          {
+            "id": 1,
+            "text": "Yes"
+          },
+          {
+            "id": 2,
+            "text": "No"
+          },
+          {
+            "id": 3,
+            "text": "Maybe"
+          }
+        ],
+        "counts": {
+          "1": 0,
+          "2": 0,
+          "3": 0
+        },
+        "voters": 3,
+        "hidden": true
+      },
+      "expect": []
+    }
+  ],
+  "percentages": [
+    {
+      "name": "one vote each of three: 34, 33, 33",
+      "state": {
+        "options": [
+          {
+            "id": 1,
+            "text": "A"
+          },
+          {
+            "id": 2,
+            "text": "B"
+          },
+          {
+            "id": 3,
+            "text": "C"
+          }
+        ],
+        "counts": {
+          "1": 1,
+          "2": 1,
+          "3": 1
+        },
+        "voters": 3,
+        "multiple": false
+      },
+      "expect": {
+        "1": 34,
+        "2": 33,
+        "3": 33
+      }
+    },
+    {
+      "name": "two of three and one",
+      "state": {
+        "options": [
+          {
+            "id": 1,
+            "text": "A"
+          },
+          {
+            "id": 2,
+            "text": "B"
+          },
+          {
+            "id": 3,
+            "text": "C"
+          }
+        ],
+        "counts": {
+          "1": 2,
+          "2": 1,
+          "3": 0
+        },
+        "voters": 3,
+        "multiple": false
+      },
+      "expect": {
+        "1": 67,
+        "2": 33,
+        "3": 0
+      }
+    },
+    {
+      "name": "no votes",
+      "state": {
+        "options": [
+          {
+            "id": 1,
+            "text": "A"
+          },
+          {
+            "id": 2,
+            "text": "B"
+          },
+          {
+            "id": 3,
+            "text": "C"
+          }
+        ],
+        "counts": {
+          "1": 0,
+          "2": 0,
+          "3": 0
+        },
+        "voters": 0,
+        "multiple": false
+      },
+      "expect": {
+        "1": 0,
+        "2": 0,
+        "3": 0
+      }
+    },
+    {
+      "name": "all for one",
+      "state": {
+        "options": [
+          {
+            "id": 1,
+            "text": "A"
+          },
+          {
+            "id": 2,
+            "text": "B"
+          },
+          {
+            "id": 3,
+            "text": "C"
+          }
+        ],
+        "counts": {
+          "1": 0,
+          "2": 5,
+          "3": 0
+        },
+        "voters": 5,
+        "multiple": false
+      },
+      "expect": {
+        "1": 0,
+        "2": 100,
+        "3": 0
+      }
+    },
+    {
+      "name": "seven ways, one each: the first two get the spare points",
+      "state": {
+        "options": [
+          {
+            "id": 1,
+            "text": "A"
+          },
+          {
+            "id": 2,
+            "text": "B"
+          },
+          {
+            "id": 3,
+            "text": "C"
+          },
+          {
+            "id": 4,
+            "text": "D"
+          },
+          {
+            "id": 5,
+            "text": "E"
+          },
+          {
+            "id": 6,
+            "text": "F"
+          },
+          {
+            "id": 7,
+            "text": "G"
+          }
+        ],
+        "counts": {
+          "1": 1,
+          "2": 1,
+          "3": 1,
+          "4": 1,
+          "5": 1,
+          "6": 1,
+          "7": 1
+        },
+        "voters": 7,
+        "multiple": false
+      },
+      "expect": {
+        "1": 15,
+        "2": 15,
+        "3": 14,
+        "4": 14,
+        "5": 14,
+        "6": 14,
+        "7": 14
+      }
+    },
+    {
+      "name": "multiple answers: of the people, past 100 in all",
+      "state": {
+        "options": [
+          {
+            "id": 1,
+            "text": "A"
+          },
+          {
+            "id": 2,
+            "text": "B"
+          },
+          {
+            "id": 3,
+            "text": "C"
+          }
+        ],
+        "counts": {
+          "1": 2,
+          "2": 2,
+          "3": 1
+        },
+        "voters": 3,
+        "multiple": true
+      },
+      "expect": {
+        "1": 67,
+        "2": 67,
+        "3": 33
+      }
+    }
+  ],
+  "labels": [
+    {
+      "question": "Coming on Saturday?",
+      "expect": "📊 Coming on Saturday?"
+    }
+  ]
+}

@@ -4,10 +4,14 @@ import { SfuReporter } from '../calls/sfu-report.js';
 import { randomId } from '../calls/types.js';
 import { callUserOf } from '../calls/users.js';
 import { CallDispatcher, SdkCallTransport } from './transport.js';
-import { openRoom } from './group-call.js';
+import { callName } from './call-name.js';
+import { listDevices, LocalDevices } from './devices.js';
+import { RealtimeError } from '../errors.js';
+import { actsOf, openRoom, } from './group-call.js';
 import { Invite, inviteState } from './invite.js';
-import { loadLiveKit } from './media.js';
+import { loadRoomClient } from './media.js';
 import { Stream } from './stream.js';
+import { siteRequest } from '../site.js';
 import { streamsEngine } from './streams-engine.js';
 const ANSWER_MS = 8000;
 /** A token is renewed this long before it runs out. */
@@ -20,7 +24,7 @@ const OUT_MARGIN_MS = 150;
 /** The most people one `may` request asks about: the route refuses more. */
 const MAY_AT_ONCE = 100;
 const nowS = () => Math.floor(Date.now() / 1000);
-const refused = (code) => Object.assign(new Error(code), { code });
+const refused = (code) => new RealtimeError(code);
 const instances = new WeakMap();
 /** The page's calls, on a site's or app's rooms: one for each. */
 export function calls(rt, options = {}) {
@@ -60,12 +64,6 @@ export class Calls {
         if (this.ringOn && this.ride.socket.connected)
             void this.holdLine();
     }
-    /**
-     * `incoming` (Incoming: a call ringing for this page's user), `call` (Call: one this page started or answered),
-     * `group` (GroupCall: one it joined, by `group()`, a ring into one answered, or a call of its that became one),
-     * `error` ({ code }). `call` and `group` hear the calls a call screen makes too, so a page can keep to its own rules,
-     * such as how long a call may last.
-     */
     on(event, fn) {
         this.listeners.on(event, fn);
         return this;
@@ -78,8 +76,17 @@ export class Calls {
     incoming() {
         return [...this.ringing.values()];
     }
-    /** Calls `to` (a user id) about `name`, a call the plugin owns: rings their every open tab. Rejects with its `code`. */
-    async start(name, options) {
+    /** The cameras, microphones and speakers this browser has, for a choice before a call. */
+    devices() {
+        return listDevices();
+    }
+    /**
+     * Calls `to` (a user id) about `name`, a call the plugin owns: rings their every open tab. The name may be a template
+     * as the call buttons take it, `support:{pair}`: `{pair}` the two ids in order, `{me}`, `{id}` the one called. Rejects
+     * with its `code`.
+     */
+    async start(template, options) {
+        const name = callName(template, this.rt.user, options.to);
         const type = options.type ?? 'video';
         const id = randomId(20);
         const request = { call: name, id, role: 'caller', to: options.to, type };
@@ -91,15 +98,97 @@ export class Calls {
         return call;
     }
     /**
+     * Starts the call in a token from the app's own server (`callToken()` there), which decided that this user may make
+     * it, and rings the person it names. The calls route isn't asked. A token rings once, so each call takes a new one.
+     * Rejects with its `code`: `bad_token`, or `forbidden` for a token made for another user.
+     */
+    async startCall(token) {
+        const made = openCallToken(token);
+        if (!made)
+            throw refused('bad_token');
+        if (this.rt.user !== null && this.rt.user !== undefined && made.pair[0] !== callUserOf(this.rt.user))
+            throw refused('forbidden');
+        // Its proof of being in the call gets it a new token through the calls route, should the call outlast this one.
+        const request = { call: made.call, id: made.id, role: 'caller', to: made.to, type: made.type, member: made.member };
+        const call = new Call(this, { id: made.id, name: made.call, type: made.type, role: 'caller', peer: { user: made.to, info: null } }, request, made);
+        this.active.set(made.id, call);
+        await call.begin();
+        this.listeners.fire('call', [call], false);
+        return call;
+    }
+    /**
+     * A token from a route of the app's own, as `<call-button token-url>` asks for one: a GET with what is asked in its
+     * query (`?to=34&type=video`) and the headers the app's other routes take, answered with `{ token }`. Rejects with
+     * `forbidden` for a route that says no.
+     */
+    async tokenFrom(url, ask) {
+        const headers = (this.options.calls ?? routeBeside(this.ride.options))?.headers;
+        const query = Object.entries(ask).map(([name, value]) => name + '=' + encodeURIComponent(String(value))).join('&');
+        let res;
+        try {
+            res = await fetch(url + (url.includes('?') ? '&' : '?') + query, { headers, credentials: 'same-origin' });
+        }
+        catch {
+            throw refused('auth_failed');
+        }
+        if (res.status === 401 || res.status === 403)
+            throw refused('forbidden');
+        const token = res.ok ? (await res.json().catch(() => null))?.token : null;
+        if (typeof token !== 'string' || !token)
+            throw refused('auth_failed');
+        return token;
+    }
+    /**
      * A group call `name` on the mesh, encrypted end to end when its rule says so. Rejects with its `code`.
      */
     async group(name, options = {}) {
         await this.afterOut(name);
         const grant = await this.authorize({ room: name, type: options.type ?? 'video' });
-        const place = await this.ask('room', { tab: this.ride.tab, token: grant.token });
+        return this.connectGroup(name, await this.placeInRoom(name, grant.token, grant.media_key, { mayRecord: !!grant.record, acts: grant.acts }));
+    }
+    /**
+     * Joins the group call in a token from the app's own server (`groupCallToken()` there), which decided that this user
+     * may join and what they may do in it. The calls route isn't asked. Rejects with its `code`: `bad_token`, or `forbidden`
+     * for a token made for another user, and for one signed before its user was taken out of the call: they need a new one to
+     * come back, signed at least a second after. `banned` for someone a host banned, while the ban holds, and `locked`
+     * for a locked call they weren't in, or were removed from.
+     */
+    async joinGroupCall(token) {
+        const made = openToken(token);
+        if (!made || typeof made.token !== 'string' || typeof made.room !== 'string')
+            throw refused('bad_token');
+        if (this.rt.user !== null && this.rt.user !== undefined && callUserOf(made.user) !== callUserOf(this.rt.user))
+            throw refused('forbidden');
+        return this.connectGroup(made.room, await this.placeInRoom(made.room, made.token, typeof made.media_key === 'string' ? made.media_key : undefined, {
+            host: made.host,
+            recorder: made.recorder,
+            member: made.member,
+            mayRecord: !!made.recorder,
+            acts: made.acts,
+        }));
+    }
+    /**
+     * A place in the group call's room, with its token, and the room to connect to it: what it offers is what the realtime
+     * server's place and the app's package both name (actsOf()), and a refusal is the server's code (`banned`, `locked` …),
+     * with when a ban ends where the server says it (`until`, ms).
+     */
+    async placeInRoom(name, token, mediaKey, may) {
+        const place = await this.ask('room', { tab: this.ride.tab, token });
         if (!place?.ok)
-            throw refused(place?.error ?? 'server');
-        const room = await this.openRoom({}, grant.media_key, undefined, (act, user) => this.moderateVia(name, act, user));
+            throw refusedJoin(place);
+        const room = await this.openRoom({}, mediaKey, undefined, (act, user, options) => this.moderateVia(name, act, user, may.host, options), {
+            record: (action, recording) => this.recordVia(name, action, recording, may.recorder),
+            mayRecord: may.mayRecord,
+            hand: (up, user) => this.handVia(name, up, user, may.host, may.member),
+            acts: actsOf(place.acts, may.acts),
+        });
+        return { room, place };
+    }
+    /**
+     * Starts connecting, in the same tick that hands the room to the caller, so whoever awaited it is listening before anything
+     * connects: a spotlight already on as it joins is said once, as the room connects.
+     */
+    connectGroup(name, { room, place }) {
         room.on('ended', (reason) => {
             if (reason === 'removed' || reason === 'closed')
                 this.outAt.set(name, Date.now());
@@ -113,24 +202,49 @@ export class Calls {
      * `streams()` rule says who is what in it, and the page joins as that host, guest or viewer. Its chat rides the page's
      * connection; its picture comes through the rooms script. Rejects with its `code`. `video: false` for a page that shows
      * only the chat or the stream's details: the picture is fetched once something wants it (`watch()`).
+     *
+     * @deprecated On an app's page, `rt.stream( name )`: a stream is no call.
      */
     async stream(name, options = {}) {
-        let first = (await this.authorize({ stream: name })).token;
+        const first = (await this.authorize({ stream: name })).token;
+        return this.intoStream(name, first, async () => (await this.authorize({ stream: name })).token, options);
+    }
+    /**
+     * Joins the live stream in a token from the app's own server (`streamToken()` there), which decided who this user is in
+     * it. A token lasts minutes, so this takes a function that gets one, which is asked again as each runs out, and your
+     * route may then say no. Rejects with its `code`: `bad_token`, or `expired` for a token given alone that ran out.
+     */
+    async joinStream(source, options = {}) {
+        const read = (token) => {
+            const made = openToken(token);
+            if (!made || typeof made.token !== 'string' || typeof made.name !== 'string')
+                throw refused('bad_token');
+            return made;
+        };
+        const made = read(typeof source === 'function' ? await source() : source);
+        return this.intoStream(made.name, made.token, async () => {
+            if (typeof source !== 'function')
+                throw refused('expired');
+            return read(await source()).token;
+        }, options);
+    }
+    async intoStream(name, token, renew, options) {
+        let first = token;
         const ride = this.ride.options;
         // The engine is fetched on a page's first stream, so a page with calls alone never carries it.
         const { EasyStreamClient } = await streamsEngine(this.options.streams ?? this.options.rooms?.replace(/realtime-rooms\.min\.js(?=$|\?)/, 'realtime-streams.min.js'));
         const engine = new EasyStreamClient({
             cloud: ride.server,
-            // The grant the route just signed, then a new one each time one runs out.
+            // The grant just signed, then a new one each time one runs out.
             grant: async () => {
                 if (first) {
-                    const token = first;
+                    const given = first;
                     first = null;
-                    return token;
+                    return given;
                 }
-                return (await this.authorize({ stream: name })).token;
+                return renew();
             },
-            media: () => loadLiveKit(this.options.rooms),
+            media: () => loadRoomClient(this.options.rooms),
             worker: ride.worker ?? null,
             video: options.video,
         });
@@ -191,7 +305,9 @@ export class Calls {
     async answer(incoming) {
         if (incoming.group)
             return this.answerGroup(incoming, incoming.group);
-        const request = { call: incoming.call, id: incoming.id, role: 'callee', from: incoming.from, type: incoming.type };
+        // A call from a token of the app's server brought the proof that this user was rung, which is all the calls route needs.
+        const { ring } = incoming.proofs;
+        const request = { call: incoming.call, id: incoming.id, role: 'callee', from: incoming.from, type: incoming.type, ...(ring ? { ring } : {}) };
         const grant = await this.authorize(request);
         const call = new Call(this, { id: incoming.id, name: incoming.call, type: incoming.type, role: 'callee', peer: { user: incoming.from, info: incoming.info } }, request, grant);
         this.ringing.delete(incoming.id);
@@ -214,10 +330,11 @@ export class Calls {
     async joinGroup(group, token, mediaKey, tracks) {
         const place = await this.ask('group', { tab: this.ride.tab, token });
         if (!place?.ok)
-            throw refused(place?.error ?? 'server');
+            throw refusedJoin(place);
         const link = {
             id: group.id,
-            add: (user) => this.invite(group, user),
+            ref: refOf(group),
+            add: (who) => this.addTo(group, who),
             invites: () => [...this.invites.values()].filter((invite) => invite.group === group.id),
         };
         const room = await this.openRoom({}, mediaKey, link);
@@ -243,6 +360,21 @@ export class Calls {
     async invite(group, user) {
         const id = randomId(20);
         const grant = await this.authorize({ call: group.name, id, role: 'caller', to: user, type: group.type, group: group.id, pair: group.pair, member: group.member });
+        return this.ringInto(group, id, user, grant);
+    }
+    /**
+     * @internal Rings someone into a group call, or the call that becomes one: with a token from the app's own server
+     * (`callToken( user, to, { into: call.ref } )`), or by their user id, which a rule of the app's decides.
+     */
+    addTo(group, who) {
+        const made = typeof who === 'string' ? openCallToken(who) : null;
+        if (!made)
+            return this.invite(group, who);
+        if (made.group !== group.id)
+            return Promise.reject(refused('forbidden'));
+        return this.ringInto(group, made.id, made.to, made);
+    }
+    async ringInto(group, id, user, grant) {
         const reply = await this.ask('invite', { tab: this.ride.tab, token: grant.token, ring: grant.ring });
         if (!reply?.ok)
             throw refused(reply?.error ?? 'server');
@@ -289,9 +421,9 @@ export class Calls {
      * @internal A room, its encryption worker started when the site gave its key: a call's rooms always, a group call's
      * when its plugin encrypts it.
      */
-    async openRoom(options, mediaKey, group, moderate) {
-        const lib = await loadLiveKit(this.options.rooms);
-        return openRoom(lib, options, this.ride.keyring, { key: mediaKey, worker: this.options.roomsWorker, rooms: this.options.rooms, group, moderate });
+    async openRoom(options, mediaKey, group, moderate, recording) {
+        const lib = await loadRoomClient(this.options.rooms);
+        return openRoom(lib, options, this.ride.keyring, { key: mediaKey, worker: this.options.roomsWorker, rooms: this.options.rooms, group, moderate, ...recording });
     }
     /**
      * Before joining a group call this page was just taken out of, or that just ended: the realtime server refuses a
@@ -307,18 +439,57 @@ export class Calls {
         if (wait > 0)
             await new Promise((resolve) => setTimeout(resolve, wait));
     }
-    /** A host's act in the group call `name`, as the site's calls route answers it: whether it changed anything. */
-    async moderateVia(name, act, user) {
-        const answer = await (this.options.authorize ?? ((r) => this.viaRoute(r)))({ moderate: name, act, user });
+    /**
+     * A host's act in the group call `name`, as the site's calls route answers it: whether it changed anything, and for an
+     * ask its id, for the rules the rules now. A ban's `minutes`, an ask's `devices` and the `rules` go with it.
+     */
+    async moderateVia(name, act, user, host, options = {}) {
+        const request = {
+            moderate: name,
+            act,
+            user,
+            ...(host ? { host } : {}),
+            ...(options.minutes !== undefined ? { minutes: options.minutes } : {}),
+            ...(options.devices ? { devices: options.devices } : {}),
+            ...(options.rules ? { rules: options.rules } : {}),
+        };
+        const answer = await (this.options.authorize ?? ((r) => this.viaRoute(r)))(request);
+        if (answer?.denied)
+            throw refused(answer.denied);
+        if (typeof answer?.done !== 'boolean')
+            throw refused('server');
+        return {
+            done: answer.done,
+            ...(typeof answer.id === 'string' ? { id: answer.id } : {}),
+            ...(answer.rules && typeof answer.rules === 'object' ? { rules: answer.rules } : {}),
+        };
+    }
+    /**
+     * A hand in the group call `name`, through the site's calls route: this user's own up or down, or with `user` a host
+     * lowering another's (null: everyone's), with the token's proofs that this user is in the call and hosts it.
+     */
+    async handVia(name, up, user, host, member) {
+        const request = { hand: name, up, ...(user !== undefined ? { user } : {}), ...(host ? { host } : {}), ...(member ? { member } : {}) };
+        const answer = await (this.options.authorize ?? ((r) => this.viaRoute(r)))(request);
         if (answer?.denied)
             throw refused(answer.denied);
         if (typeof answer?.done !== 'boolean')
             throw refused('server');
         return answer.done;
     }
+    /** Starts or stops the recording of the group call `name`, as the site's calls route answers it. */
+    async recordVia(name, record, recording, recorder) {
+        const request = { call: name, record, ...(recording === undefined ? {} : { recording }), ...(recorder ? { recorder } : {}) };
+        const answer = await (this.options.authorize ?? ((r) => this.viaRoute(r)))(request);
+        if (answer?.denied)
+            throw refused(answer.denied);
+        if (typeof answer?.recording?.id !== 'string')
+            throw refused('server');
+        return answer.recording;
+    }
     /** Connects a room in the background: one that fails is left, and said so. */
     connectRoom(room, place, name) {
-        void room.connect({ server: place.server, token: place.token, iceServers: place.ice_servers }).catch((error) => {
+        void room.connect({ server: place.server, token: place.token, iceServers: place.ice_servers, micHeld: place.mic_held === true }).catch((error) => {
             room.leave();
             this.listeners.fire('error', [{ code: 'room_failed', room: name, error }], false);
         });
@@ -351,12 +522,8 @@ export class Calls {
         const route = this.options.calls ?? routeBeside(this.ride.options);
         if (!route)
             return { denied: 'no_auth' };
-        const res = await fetch(route.endpoint, {
-            method: 'POST',
-            credentials: 'same-origin',
-            headers: { 'Content-Type': 'application/json', ...route.headers },
-            body: JSON.stringify(request),
-        });
+        // On another website (rooms()' `embedded`), at the site's absolute address alone and without cookies (site.ts).
+        const res = await siteRequest(this.ride.options, route, request);
         if (res.status === 403 || res.status === 401)
             return { denied: (await res.json().catch(() => null))?.denied ?? 'forbidden' };
         if (!res.ok)
@@ -456,10 +623,49 @@ export class Calls {
         void keys.ensure(missing).then(() => {
             if (this.ringing.get(m.id) !== incoming || incoming.state !== 'ringing')
                 return;
-            incoming.info = opened();
+            incoming.opened(opened());
             this.listeners.fire('incoming', [incoming], false);
         });
     }
+}
+/**
+ * The realtime server's refusal of a place in a group call, by its code: `banned` (with `until`, when the ban ends, in ms,
+ * where the server says it), `locked`, `forbidden`, `expired` …
+ */
+function refusedJoin(place) {
+    const error = refused(typeof place?.error === 'string' && place.error !== '' ? place.error : 'server');
+    if (typeof place?.until === 'number')
+        Object.assign(error, { until: place.until });
+    return error;
+}
+/** A token from the app's server, read, or null for anything else. */
+function openToken(token) {
+    if (typeof token !== 'string' || !/^[A-Za-z0-9_-]+$/.test(token))
+        return null;
+    try {
+        const bytes = Uint8Array.from(atob(token.replace(/-/g, '+').replace(/_/g, '/')), (c) => c.charCodeAt(0));
+        const made = JSON.parse(new TextDecoder().decode(bytes));
+        return made && typeof made === 'object' ? made : null;
+    }
+    catch {
+        return null;
+    }
+}
+/** What a page sends the app's route to ring someone into this call: the call, and the proof that this user is in it. */
+function refOf(group) {
+    const text = String.fromCharCode(...new TextEncoder().encode(JSON.stringify({ id: group.id, name: group.name, type: group.type, pair: group.pair, member: group.member })));
+    return btoa(text).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+/** A token from the app's `callToken()`, read, or null for anything else. */
+function openCallToken(token) {
+    const made = openToken(token);
+    if (typeof made?.token !== 'string' || typeof made.call !== 'string' || typeof made.id !== 'string' || typeof made.member !== 'string')
+        return null;
+    const to = callUserOf(made.to);
+    const pair = Array.isArray(made.pair) && made.pair.length === 2 ? made.pair.map(callUserOf) : [];
+    if (to === null || pair.length !== 2 || pair.includes(null))
+        return null;
+    return { ...made, token: made.token, call: made.call, id: made.id, member: made.member, to, type: made.type === 'audio' ? 'audio' : 'video', pair: pair };
 }
 /** The calls route beside the rooms' auth route: `…/realtime/auth` → `…/realtime/calls`. */
 function routeBeside(options) {
@@ -481,12 +687,26 @@ export class Incoming {
         this.id = m.id;
         this.call = String(m.call ?? '');
         this.from = callUserOf(m.from) ?? 0;
-        this.info = m.info ?? null;
+        this.info = null;
         this.type = m.type === 'audio' ? 'audio' : 'video';
         this.group = typeof m.group === 'string' && m.group !== '' ? m.group : null;
         const two = Array.isArray(m.pair) && m.pair.length === 2 ? m.pair.map(callUserOf) : [];
         const pair = two.length === 2 && two.every((u) => u !== null) ? two : undefined;
         this.proofs = { pair, ring: typeof m.ring === 'string' ? m.ring : undefined };
+        this.opened(m.info ?? null);
+    }
+    /**
+     * @internal The caller's info, once it opens. A call from a token of the app's server carries the proof that this
+     * user was rung inside it, which is for the calls route alone and not part of what the app said about the caller.
+     */
+    opened(info) {
+        if (info && typeof info === 'object' && typeof info._ring === 'string') {
+            const { _ring, ...rest } = info;
+            this.proofs.ring = _ring;
+            this.info = Object.keys(rest).length > 0 ? rest : null;
+            return;
+        }
+        this.info = info;
     }
     on(event, fn) {
         this.listeners.on(event, fn);
@@ -529,8 +749,9 @@ const NOTHING = { camera: false, microphone: false, screen_share: false, screen_
 /**
  * A call between two people. Events: `state` (CallState), `path` (CallPath), `remote` (RemoteMedia), `waiting`
  * ({ until, reason }: the mesh is finding the room a place), `reacquire` (the source the other side stopped hearing:
- * open the device again), `autoplay_blocked` (a click must start the sound), `group` (GroupCall: someone was added, and
- * the call goes on as a group call there, with what this page sends), and `ended` (the reason; `group` after `group`).
+ * open the device again), `autoplay_blocked` (a click must start the sound: `startAudio()`), `group` (GroupCall: someone
+ * was added, and the call goes on as a group call there, with what this page sends), and `ended` (the reason; `group`
+ * after `group`).
  */
 export class Call {
     constructor(owner, who, request, grant) {
@@ -541,6 +762,8 @@ export class Call {
         this.remote = { camera: null, microphone: null, screen: null, screenAudio: null, media: { ...NOTHING }, quality: 'unknown' };
         this.listeners = new Listeners();
         this.local = new Map();
+        // What setCamera(), setMicrophone() and setScreenShare() opened, handed to the group call this call may become.
+        this.opened = new LocalDevices((source, track) => this.setTrack(source, track), () => null);
         this.room = null;
         this.toGroupOnce = null;
         this.reporter = null;
@@ -548,6 +771,7 @@ export class Call {
         this.roomWait = null;
         this.renewal = null;
         this.connectedOnce = false;
+        this.handedOver = false;
         this.id = who.id;
         this.name = who.name;
         this.type = who.type;
@@ -591,21 +815,62 @@ export class Call {
         return this;
     }
     /**
-     * Rings `user` into the call, which becomes a group call: both sides get `room` and go on there, and `user` arrives
-     * in it once they answer. The site decides as for any call, with this page's user calling `user` about the call's
-     * name. Rejects with its `code`: `not_connected` before the call is up, or the site's or the server's refusal.
+     * Rings someone into the call, which becomes a group call: both sides get `room` and go on there, and they arrive in it
+     * once they answer. Takes a token from the app's own server, `callToken( user, to, { into: call.ref } )`, which decided
+     * they may be added, or a user id, which a rule of the app's decides. Rejects with its `code`: `not_connected` before the
+     * call is up, or the site's or the server's refusal.
      */
-    add(user) {
+    add(who) {
         if (this.state !== 'connected' && this.state !== 'reconnecting')
             return Promise.reject(refused('not_connected'));
-        return this.owner.invite(this.group(), user);
+        return this.owner.addTo(this.group(), who);
+    }
+    /** What the page sends your route to ring someone into this call: `realtime.callToken( user, to, { into: ref } )`. */
+    get ref() {
+        return refOf(this.group());
     }
     /** The group call this call is, or becomes. */
     group() {
         return { id: this.id, name: this.name, type: this.type, ...this.proofs };
     }
-    /** What this page sends from a source: a live track, or null to stop sending it. */
+    /**
+     * The browser's camera, opened and sent, or stopped with false: the device named, the one last named, or the browser's
+     * own choice, and named while on, it moves there. Closed as the call ends. Rejects with its `code`: `device_denied`,
+     * `device_missing`, `device_busy` or `no_devices`.
+     */
+    setCamera(on, options) {
+        return this.opened.setCamera(on, options);
+    }
+    /** The browser's microphone, as `setCamera()` has its camera. */
+    setMicrophone(on, options) {
+        return this.opened.setMicrophone(on, options);
+    }
+    /** Shares a screen, its sound with it where the browser gives it, or stops: whether one is shared now. */
+    setScreenShare(on) {
+        return this.opened.setScreenShare(on);
+    }
+    /** The cameras, microphones and speakers this browser has. Their names are empty until the browser gave the site one. */
+    devices() {
+        return listDevices();
+    }
+    /** What this page sends now, for a picture of its own: `video.srcObject = new MediaStream( [ call.camera ] )`. */
+    get camera() {
+        return this.local.get('camera') ?? null;
+    }
+    get microphone() {
+        return this.local.get('microphone') ?? null;
+    }
+    get screen() {
+        return this.local.get('screen_share') ?? null;
+    }
+    /** The other side's sound, where the browser held it back: call it from a click, such as a Turn On Sound button. */
+    async startAudio() {
+        await this.session.resumePlayback();
+        await this.room?.startAudio();
+    }
+    /** What this page sends from a source: a live track of your own, or null to stop sending it. */
     setTrack(source, track) {
+        this.opened.replaced(source, track);
         if (track)
             this.local.set(source, track);
         else
@@ -689,6 +954,11 @@ export class Call {
                 this.clearRoomWait();
                 this.fromPerson(person);
             });
+            // Gone, or away and maybe coming back: the minute's wait starts as soon as they leave.
+            room.on('person_away', (person) => {
+                if (person.user === this.peer.user)
+                    this.waitInRoom();
+            });
             room.on('person_left', (person) => {
                 if (person.user === this.peer.user)
                     this.waitInRoom();
@@ -730,6 +1000,9 @@ export class Call {
                     return;
                 }
                 this.setPath('room');
+                // The devices it opened go on in the group call, which closes them as it ends.
+                room.takeDevices(this.opened);
+                this.handedOver = true;
                 this.listeners.fire('group', [room], false);
                 this.finish('group');
             }
@@ -801,6 +1074,8 @@ export class Call {
             clearInterval(this.reportTimer);
         this.reporter?.close();
         this.room?.leave();
+        if (!this.handedOver)
+            this.opened.stop();
         this.owner.forget(this);
         this.listeners.fire('state', ['ended'], false);
         this.listeners.fire('ended', [reason], false);

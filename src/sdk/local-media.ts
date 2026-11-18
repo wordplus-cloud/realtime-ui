@@ -6,11 +6,15 @@ import { _x } from "../inc/globals.ts";
 import { host } from "../host.ts";
 import { localTrack } from "./tracks.ts";
 import type { SdkMediaSource } from "./types.ts";
+import { chosenEffect, NOISE_WAIT_MS, TrackEffect, useEffectsChoice, warmNoise, type EffectKind } from "../inc/calls/effects.ts";
+import { useOwnBackgroundsVersion } from "../inc/calls/own-backgrounds.ts";
+import { CAMERA_CAPTURE, cameraConstraints } from "../inc/calls/camera-size.ts";
 
 export type LocalTrack = ReturnType<typeof localTrack>;
 
-// the size and frames a camera is opened at (useLocalMedia's constraints)
-export const CAMERA_SIZE = { width: { ideal: 1920 }, height: { ideal: 1080 }, frameRate: { ideal: 30 } } as const;
+// The size and frames a camera is opened at where the app says nothing (useLocalMedia asks cameraConstraints(), the
+// device settings' preview too).
+export const CAMERA_SIZE = { width: { ideal: CAMERA_CAPTURE.width }, height: { ideal: CAMERA_CAPTURE.height }, frameRate: { ideal: CAMERA_CAPTURE.frameRate } } as const;
 
 /**
  * What this page sends in a call made with the SDK: its camera, microphone and screen, opened on the devices the call
@@ -38,15 +42,32 @@ export function useLocalMedia( send: ( source: SdkMediaSource, track: MediaStrea
             : _x( 'Microphone', 'Media Inputs', 'bp-better-messages' ) ) );
     };
 
+    // What the devices give, under what is sent: with an effect on (the device settings' background or noise removal,
+    // inc/calls/effects.ts) the call sends the effect's track, and turning a device off stops the device itself. A
+    // camera with an effect goes out only once the effect is on, so the room it hides is never sent.
+    const rawCamera = useRef<MediaStreamTrack | null>( null );
+    const rawMicrophone = useRef<MediaStreamTrack | null>( null );
+    const effects = useRef<Record<EffectKind, TrackEffect> | null>( null );
+    const effectFailed = () => host().showError( _x( 'This effect could not start on this device.', 'Call Effects', 'bp-better-messages' ) );
+    const effectOf = ( kind: EffectKind ) => {
+        effects.current ??= { camera: new TrackEffect( 'camera', undefined, effectFailed ), noise: new TrackEffect( 'noise', undefined, effectFailed ) };
+        return effects.current[ kind ];
+    };
+    const withEffect = async ( kind: EffectKind, raw: MediaStreamTrack ) => {
+        const effect = effectOf( kind );
+        await effect.set( raw, chosenEffect( kind ) );
+        return effect.output ?? raw;
+    };
+
     // What the browser is asked for: the device picked in the switches, else the camera facing the user and the default
     // microphone; a camera at up to 1080p and 30 frames, as Better Messages' call opens one (tracks.ts, LiveKit's
-    // h1080), which the call's encoder lowers where it can't keep up (realtime-client's fitCameraTrack). Asked for no
-    // size, Chrome opens 640x480, and the SDK's calls went out at 480p (the review after the move to the mesh,
-    // 2026-10-21).
+    // h1080), which the call's encoder lowers where it can't keep up (realtime-client's fitCameraTrack), or the app's
+    // own size (UiHost.cameraSize), as the device settings' preview asks it. Asked for no size, Chrome opens 640x480,
+    // and the SDK's calls went out at 480p (the review after the move to the mesh, 2026-10-21).
     const constraints = ( kind: 'camera' | 'microphone' ): MediaTrackConstraints | true => {
         const device = kind === 'camera' ? selectedCameraDevice : selectedMicrophoneDevice;
         if ( kind === 'microphone' ) return device ? { deviceId: { exact: device } } : true;
-        return { ...( device ? { deviceId: { exact: device } } : { facingMode: facing.current } ), ...CAMERA_SIZE };
+        return { ...( device ? { deviceId: { exact: device } } : { facingMode: facing.current } ), ...cameraConstraints() };
     };
 
     const open = async ( kind: 'camera' | 'microphone' ): Promise<MediaStreamTrack> => {
@@ -59,15 +80,27 @@ export function useLocalMedia( send: ( source: SdkMediaSource, track: MediaStrea
     // A track opened, handed to the call, unless the call ended meanwhile.
     const takeCamera = async ( track: MediaStreamTrack ) => {
         if ( ended.current ) return void track.stop();
+        rawCamera.current = track;
         setActiveCameraDevice( track.getSettings().deviceId ?? '' );
-        setCamera( localTrack( track ) );
-        await send( 'camera', track );
+        const sent = await withEffect( 'camera', track );
+        // Turned off, or the call over, while the effect started.
+        if ( rawCamera.current !== track || ended.current ) return;
+        setCamera( localTrack( sent ) );
+        await send( 'camera', sent );
     };
 
+    // AI Noise Removal is waited for NOISE_WAIT_MS at most: with its files still on their way (the first time on a
+    // browser) the call takes the microphone as it hears, and the noise removal's track takes its place once it is on,
+    // as one turned on during the call does (swapEffect).
     const takeMicrophone = async ( track: MediaStreamTrack ) => {
         if ( ended.current ) return void track.stop();
-        setMicrophone( localTrack( track ) );
-        await send( 'microphone', track );
+        rawMicrophone.current = track;
+        const effect = withEffect( 'noise', track );
+        const sent = await Promise.race( [ effect, new Promise<null>( ( late ) => setTimeout( late, NOISE_WAIT_MS, null ) ) ] );
+        if ( rawMicrophone.current !== track || ended.current ) return;
+        setMicrophone( localTrack( sent ?? track ) );
+        await send( 'microphone', sent ?? track );
+        if ( ! sent ) void effect.then( () => swapEffect( 'noise' ) );
     };
 
     const enableCamera = async () => {
@@ -85,6 +118,10 @@ export function useLocalMedia( send: ( source: SdkMediaSource, track: MediaStrea
 
     const disableCamera = async () => {
         const current = cameraRef.current;
+        const raw = rawCamera.current;
+        rawCamera.current = null;
+        raw?.stop();
+        void effectOf( 'camera' ).set( null, null );
         if ( ! current ) return;
         current.track.stop();
         setCamera( null );
@@ -143,11 +180,34 @@ export function useLocalMedia( send: ( source: SdkMediaSource, track: MediaStrea
 
     const disableMic = async () => {
         const current = microphoneRef.current;
+        const raw = rawMicrophone.current;
+        rawMicrophone.current = null;
+        raw?.stop();
+        void effectOf( 'noise' ).set( null, null );
         if ( ! current ) return;
         current.track.stop();
         setMicrophone( null );
         await send( 'microphone', null );
     };
+
+    // An effect turned on, off or changed in the device settings during the call: what goes out is swapped for the
+    // device's track with the new effect, the device kept as it is. A picture of the person's own the same, once the
+    // browser has read it.
+    const chosen = useEffectsChoice();
+    const own = useOwnBackgroundsVersion();
+    const swapEffect = async ( kind: EffectKind ) => {
+        const raw = ( kind === 'camera' ? rawCamera : rawMicrophone ).current;
+        if ( ! raw ) return;
+        const sent = await withEffect( kind, raw );
+        const held = kind === 'camera' ? cameraRef : microphoneRef;
+        if ( ( kind === 'camera' ? rawCamera : rawMicrophone ).current !== raw || held.current?.track === sent || ended.current ) return;
+        ( kind === 'camera' ? setCamera : setMicrophone )( localTrack( sent ) );
+        await send( kind === 'camera' ? 'camera' : 'microphone', sent );
+    };
+    useEffect( () => void swapEffect( 'camera' ), [ chosen.camera, chosen.camera.startsWith( 'own:' ) ? own : 0 ] );
+    useEffect( () => void swapEffect( 'noise' ), [ chosen.noise ] );
+    // AI Noise Removal's files, read ahead of the microphone as the call's screen opens for someone who has it on.
+    useEffect( () => warmNoise(), [ chosen.noise ] );
 
     const disableShareScreen = async () => {
         const current = screenRef.current;
@@ -227,7 +287,12 @@ export function useLocalMedia( send: ( source: SdkMediaSource, track: MediaStrea
     const stopAll = () => {
         ended.current = true;
         for ( const held of [ cameraRef.current, microphoneRef.current, screenRef.current ] ) held?.track.stop();
+        rawCamera.current?.stop();
+        rawMicrophone.current?.stop();
         screenAudio.current?.stop();
+        void effects.current?.camera.dispose();
+        void effects.current?.noise.dispose();
+        effects.current = null;
     };
 
     // Mounted again after React's Strict Mode rehearses an unmount (a Next.js or Vite app in development): the call is

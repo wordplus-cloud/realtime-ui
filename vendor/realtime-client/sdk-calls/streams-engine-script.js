@@ -1,5 +1,12 @@
 let loading = null;
-const ready = () => globalThis.wordplusRealtimeStreams;
+// The engine under its own name, or an older copy's on the page under the name the screens have now
+// (window.wordplusRealtimeStreams, script-streams.ts), told apart from them by its EasyStreamClient.
+const ready = () => {
+    const scope = globalThis;
+    if (scope.wordplusRealtimeStreamEngine?.EasyStreamClient)
+        return scope.wordplusRealtimeStreamEngine;
+    return scope.wordplusRealtimeStreams?.EasyStreamClient ? scope.wordplusRealtimeStreams : undefined;
+};
 export function streamsEngine(script) {
     const engine = ready();
     if (engine?.EasyStreamClient)

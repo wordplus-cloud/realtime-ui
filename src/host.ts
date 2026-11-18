@@ -13,6 +13,9 @@ import { escapeHtml, plainName } from "./inc/names.ts";
  * Set once, before the first screen draws: `configureUi( { translate, Avatar, … } )`. Anything left out keeps its
  * default.
  */
+/** AI Noise Removal before a person chooses: off, or on where the device can run it (UiHost.noiseDefault). */
+export type NoiseDefault = 'off' | 'auto';
+
 export interface UiHost {
     /**
      * A string the screens show, translated: `text` as written, `context` telling apart two meanings of one text, and
@@ -59,6 +62,57 @@ export interface UiHost {
      * Messages loads its own copy when a page has none.
      */
     whenShared( part: SharedPart, run: () => void ): void;
+    /**
+     * The folder the call effects are served from, dist/effects of this package as the app serves it, ending in a
+     * slash: its engine and models load from there once someone turns an effect on. '' by default, and then the
+     * device settings offer no blurred or replaced background.
+     */
+    effectsUrl(): string;
+    /**
+     * The folder AI Noise Removal is served from, dist/noise of this package as the app serves it, ending in a slash:
+     * a pack of its own, apart from the effects, as its model is some 11 MB more. Its engine and models load from
+     * there once someone turns it on. '' by default, and then the device settings do not offer it.
+     */
+    noiseUrl(): string;
+    /**
+     * Whether AI Noise Removal is on for someone who never turned it on or off in the device settings: 'off', as it
+     * ships, or 'auto', on where the device is a computer that can run it and the browser is not asked to save data. A
+     * person's own choice always comes first. 'off' by default.
+     */
+    noiseDefault?(): NoiseDefault;
+    /**
+     * Pictures the app adds to the call effects' backgrounds, shown after the built-in ones: the picture at about 1280
+     * by 720, a small one for its tile and a name. One on another origin (a CDN) needs CORS headers, as WebGL draws no
+     * other: without them its tile says it cannot be used here. [] by default.
+     */
+    backgrounds(): HostBackground[];
+    /**
+     * The built-in backgrounds offered: pictures of WordPlus's catalog (dist/backgrounds) the app picked and serves,
+     * each by its id in the catalog (chosen as `image:<id>`) and with its name in the user's language, shown before the
+     * app's own. The same CORS rule. [] by default.
+     */
+    builtInBackgrounds(): HostBackground[];
+    /**
+     * Whether people may use a picture of their own device as the background (chosen as `own:<id>`): the device
+     * settings then offer Add Your Own after the app's pictures. The picture is read, scaled and kept by the browser
+     * alone (inc/calls/own-backgrounds.ts), never sent anywhere: the others see it only in the camera, as with any
+     * background. False by default. Turned off, those a browser keeps are not offered, and stay for when it is on again.
+     */
+    ownBackgrounds(): boolean;
+    /**
+     * The size and frame rate the app's call opens the camera at, which the device settings' preview asks too, so it
+     * shows the shape the others get (inc/calls/camera-size.ts). Null by default: 1920x1080 at 30 frames, as
+     * realtime-client's cameraCapture() without a call's settings.
+     */
+    cameraSize(): { width: number, height: number, frameRate: number } | null;
+}
+
+/** A background of the call effects: one of the catalog's, chosen as `image:<id>`, or the app's own, as `site:<id>`. */
+export interface HostBackground {
+    id: string | number;
+    url: string;
+    thumb?: string;
+    name: string;
 }
 
 export type SharedPart = "toasts" | "tooltips" | "menus";
@@ -80,6 +134,11 @@ export interface UserAvatarProps {
     link?: boolean;
     /** The conversation the avatar is drawn for, which some hosts read a guest's picture from. */
     fromThread?: unknown;
+    /**
+     * `false` draws the avatar without the host's presence dot or status: the people a call is with once it has
+     * connected, who are plainly there. The call screens keep the dot on a call that rings alone.
+     */
+    presence?: boolean;
 }
 
 export interface UserNameProps {
@@ -126,6 +185,13 @@ const defaults: UiHost = {
         // Tooltips also from the package's own floater, on a page without the SDK's (the elements script sets it).
         if ( part === "tooltips" ? sharedTooltips() : ( window as unknown as Record<string, unknown> )[ SHARED_GLOBALS[ part ] ] ) run();
     },
+    effectsUrl: () => "",
+    noiseUrl: () => "",
+    noiseDefault: () => "off",
+    backgrounds: () => [],
+    builtInBackgrounds: () => [],
+    ownBackgrounds: () => false,
+    cameraSize: () => null,
 };
 
 const SHARED_GLOBALS = {
